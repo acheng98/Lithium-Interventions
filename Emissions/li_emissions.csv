@@ -1,0 +1,104 @@
+Source,Pathway,Detailed Pathway,Emissions Factor,Unit,Citation,Source [detailed],Notes
+Brine,Generic,Brine - High,6.2,t CO2e/t LC,Manjong et al. 2021,Page 15,
+Brine,Generic,Brine - Low,2.0,t CO2e/t LC,Manjong et al. 2021,Page 15,
+Brine,High-grade Brine,High-grade Brine,3.06,t CO2e/t LC,Ambrose and Kendall 2020b,Figure 2 / Supplementary 2,
+Brine,Low-grade Brine,Low-grade Brine,3.97,t CO2e/t LC,Ambrose and Kendall 2020b,Figure 2 / Supplementary 2,
+Brine,Low-grade Brine/Unfavorable Conditions,Low-grade Brine/Unfavorable Conditions,5.28,t CO2e/t LC,Ambrose and Kendall 2020b,Figure 2 / Supplementary 2,
+Brine-DLE,Brine-DLE Adsorption,Brine-DLE Adsorption,47.9,t CO2e/t LC,Nikfar et al. 2025,Abstract,
+Brine-DLE,Brine-DLE Membrane Electrolysis,Brine-DLE Membrane Electrolysis,80.57,t CO2e/t LC,Nikfar et al. 2025,Abstract,
+Brine-DLE,Brine-DLE Nanofiltration,Brine-DLE Nanofiltration,17.7,t CO2e/t LC,Nikfar et al. 2025,Abstract,
+Brine-DLE,Brine-DLE Solvent Extraction,Brine-DLE Solvent Extraction,52.7,t CO2e/t LC,Nikfar et al. 2025,Abstract,
+Brine-DLE,China,Brine-DLE - China [Qarhan],31.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Brine-DLE,China,Brine-DLE Adsorption - China [Qarhan Salt Lake?],19.28,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified. Adsorption specified in Song et al. 2017"
+Brine-DLE,China,Brine-DLE Adsorption - China [West Taijinar lake?],12.10,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified. Adsorption specified in Zhu et al. 2021"
+Brine-DLE,China,Brine-DLE Adsorption - China [Yiliping Salt Lake?],14.79,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified. Adsorption specified by China Minmetals http://en.sasac.gov.cn/2025/03/17/c_19016.htm"
+Brine-DLE,China,Brine-DLE - China [Average],13.3,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,"Best guess, exact number not provided"
+Brine-DLE,China,Brine-DLE Nanofiltration - China [West Taijiner Lake],6.0,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,"Best guess, exact number not provided"
+Brine-DLE,China,Brine-DLE Adsorption - China [Lop Nur],10.0,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,"Best guess, exact number not provided"
+Brine-DLE,China,Brine-DLE Adsorption - China [Qarhan Salt Lake],10.5,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,"Best guess, exact number not provided"
+Brine-DLE,China,Brine-DLE Adsorption - China [Da Lang Tan],18.0,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,"Best guess, exact number not provided"
+Brine-DLE,China,Brine-DLE Calcination - China [West Taijiner Lake],20.8,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,"Best guess, exact number not provided"
+Brine-DLE,Generic,Brines-DLE (MCr) - Generic,15.094,t CO2e/t LC,Bonk 2022,Page 66,
+Brine-DLE,US,"Brines-DLE - US [""Nevada""-90% solar, 10% grid] Low",7.6,t CO2e/t LC,Mousavinezhad et al. 2024,Page 5,
+Brine-DLE,US,"Brines-DLE - US [""Nevada""-Diesel] High",22.0,t CO2e/t LC,Mousavinezhad et al. 2024,Page 5,
+Brine-DLE,US,Brines-DLE - US High,12.6,t CO2e/t LC,Iyer and Kelly 2024,Table 2,
+Brine-DLE,US,Brines-DLE - US Low,12.0,t CO2e/t LC,Iyer and Kelly 2024,Table 2,
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Cauchari-Olaroz],7.7,t CO2e/t LC,Schenker et al. 2022,Page 6,
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Cauchari-Olaroz],13.54,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Cauchari],15.60,t CO2e/t LC,Chordia et al. 2022,S5.2 Table,
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Hombre Muerto?],4.61,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Hombre Muerto],7.9,t CO2e/t LC,Sun et al. 2025,Table S1,
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Hombre Muerto],8.0,t CO2e/t LC,Schenker et al. 2022,Page 6,
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Olaroz],7.5,t CO2e/t LC,Sun et al. 2025,Table S1,
+Brine-Evaporation,Argentina,Brine-Evaporation - Argentina [Salar de Olaroz],7.4,t CO2e/t LC,Schenker et al. 2022,Page 6,
+Brine-Evaporation,Argentina,Brines-Evaporation - Argentina [Salar de Cauchari-Olaroz],9.3,t CO2e/t LC,Mousavinezhad et al. 2024,Page 6,
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama - Albemarle?],4.45,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama - SQM?],3.07,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama],5.50,t CO2e/t LC,Chordia et al. 2022,S5.1 Table,
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama],5.82,t CO2e/t LC,He et al. 2025,Fig. 8,
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama],3.4,t CO2e/t LC,Schenker et al. 2022,Page 4,
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama],3.2,t CO2e/t LC,Sun et al. 2025,Table S1,
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama],4.0,t CO2e/t LC,Khakmardan et al. 2023,Fig. 3,Emissions factors are approximate as exact values are not given
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Atacama],2.02,t CO2e/t LC,Stamp 2012,Page 109,Likely disregard (spodumene was not very significant in 2012)
+Brine-Evaporation,Chile,Brine-Evaporation - Chile [Salar de Maricunga],17.30,t CO2e/t LC,Chordia et al. 2022,S5.2 Table,
+Brine-Evaporation,Chile,Brine-Evaporation - Chile High,3.1,t CO2e/t LC,Kelly et al. 2021,Fig. 4,
+Brine-Evaporation,Chile,Brine-Evaporation - Chile Low,2.7,t CO2e/t LC,Kelly et al. 2021,Fig. 4,
+Brine-Evaporation,Chile,Brines-Evaporation - Chile [Salar de Atacama],6.17,t CO2e/t LC,Mousavinezhad et al. 2024,Page 6,
+Brine-Evaporation,China,Brine-Evaporation - China [Chaerhan Salt Lake],31.6,t CO2e/t LC,Schenker et al. 2022,Page 6,
+Brine-Evaporation,China,Brine-Evaporation - China [Zabuye Salt Lake?],17.68,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Brine-Evaporation,Generic,Brines-Evaporation - Generic,3.292,t CO2e/t LC,Bonk 2022,Page 66,
+Brine-Evaporation,US,Brine-Evaporation - US [Silver Peak],8.1,t CO2e/t LC,Sun et al. 2025,Table S1,
+Brine-Evaporation,US,Brines-Evaporation - US [Silver Peak],21.19,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Clays,Low-grade Rock Minerals,Low-grade Rock Minerals,3.32,t CO2e/t LC,Ambrose and Kendall 2020b,Figure 2 / Supplementary 2,
+Clays,Mexico,Clay-Acid Leaching - Mexico [Sonora],20.38,t CO2e/t LC,Khakmardan et al. 2024,Table 3,"ReCiPe 2016 method, mid H"
+Clays,Mexico,Clay-Acid Leaching - Mexico [Sonora],22.0,t CO2e/t LC,Khakmardan et al. 2023,Fig. 3,Emissions factors are approximate as exact values are not given
+Clays,Peru,Clay-Acid Leaching - Peru [Falchani],17.10,t CO2e/t LC,Khakmardan et al. 2024,Table 3,"ReCiPe 2016 method, mid H"
+Clays,US,Clay - US High,16.6,t CO2e/t LC,Iyer and Kelly 2024,Table 2,
+Clays,US,Clay-Acid Leaching - US [Thacker Pass],22.51,t CO2e/t LC,Khakmardan et al. 2024,Table 3,"ReCiPe 2016 method, mid H"
+Clays,US,Clays - US Low,8.9,t CO2e/t LC,Iyer and Kelly 2024,Table 2,
+Clays,US,Clays-Acid Leaching - US [Thacker Pass],14.53,t CO2e/t LC,Roy et al. 2024,Table 2,
+Clays,US,Clays-Roasting - US [Thacker Pass],25.4,t CO2e/t LC,Roy et al. 2024,Table 2,
+Geothermal Brines-DLE,Generic,Geothermal Brines-DLE,1.2,t CO2e/t LC,Huang et al. 2021,Table 4,
+Geothermal Brines-DLE,Germany,Geothermal Brines-DLE - Germany [Upper Rhine Graben-Conv B] High,46.5,t CO2e/t LC,Schenker et al. 2024,Page 8,
+Geothermal Brines-DLE,Germany,Geothermal Brines-DLE - Germany [Upper Rhine Graben-Geo A] Low,5.3,t CO2e/t LC,Schenker et al. 2024,Page 8,
+Geothermal Brines-DLE,US,Geothermal Brines-DLE - US [Salton Sea-Conv C] High,59.2,t CO2e/t LC,Schenker et al. 2024,Table 2,
+Geothermal Brines-DLE,US,Geothermal Brines-DLE - US [Salton Sea-Geo A] Low,17.6,t CO2e/t LC,Schenker et al. 2024,Table 2,
+Lepidolite,China,Lepidolite - China [Average],24.5,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,
+Lepidolite,China,Lepidolite Spodumene & Lepidolite Pathway - China [Average],17.6,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,
+Lepidolite,China,Lepidolite Sulfate Pathway - China [Average],22.0,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,
+Lepidolite,China,Lepidolite Sulfuric Acid Pathway - China [Average],29.8,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,
+Spodumene,Australia-China,"Spodumene - Australia [""Western Australia""] --> China Refining",29.2,t CO2e/t LC,Mousavinezhad et al. 2024,Page 5,
+Spodumene,Australia-China,"Spodumene - Australia [""Western Australia""] --> China Refining [""Xinyu""]",15.69,t CO2e/t LC,Jiang et al. 2020,Table 2,
+Spodumene,Australia-China,Spodumene - Australia [Bald Hill] --> China Refining,17.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Australia-China,Spodumene - Australia [Finniss] --> China Refining,19.21,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Spodumene,Australia-China,Spodumene - Australia [Greenbushes] --> China Refining,2.27,t CO2e/t LC,Stamp 2012,Page 109,Likely disregard (spodumene was not very significant in 2012)
+Spodumene,Australia-China,Spodumene - Australia [Greenbushes] --> China Refining,20.4,t CO2e/t LC,Kelly et al. 2021,Fig. 4,
+Spodumene,Australia-China,Spodumene - Australia [Greenbushes] --> China Refining,19.20,t CO2e/t LC,Chordia et al. 2022,S5.1 Table,
+Spodumene,Australia-China,Spodumene - Australia [Greenbushes] --> China Refining,16.35,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Spodumene,Australia-China,Spodumene - Australia [Greenbushes] --> China Refining,17.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Australia-China,"Spodumene - Australia [Greenbushes] --> China Refining [""Qinzhou""]",12.4,t CO2e/t LC,Feng et al. 2024,SI Table S8,
+Spodumene,Australia-China,"Spodumene - Australia [Greenbushes] --> China Refining [""Suining""]",16.4,t CO2e/t LC,Feng et al. 2024,SI Table S8,
+Spodumene,Australia-China,Spodumene - Australia [Greenbushes] --> China Refining [Zhangjiagang],14.00,t CO2e/t LC,Khakmardan et al. 2023,Fig. 3,Emissions factors are approximate as exact values are not given
+Spodumene,Australia-China,Spodumene - Australia [Mt Cattlin] --> China Refining,19.64,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Spodumene,Australia-China,Spodumene - Australia [Mt Cattlin] --> China Refining,17.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Australia-China,"Spodumene - Australia [Mt Cattlin] --> China Refining [""Yaan""]",10.5,t CO2e/t LC,Feng et al. 2024,SI Table S8,
+Spodumene,Australia-China,Spodumene - Australia [Mt Cattlin] --> China Refining [Zhangjiagang],34.50,t CO2e/t LC,Khakmardan et al. 2023,Fig. 3,Emissions factors are approximate as exact values are not given
+Spodumene,Australia-China,Spodumene - Australia [Mt Marion] --> China Refining,17.53,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Spodumene,Australia-China,Spodumene - Australia [Mt Marion] --> China Refining,17.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Australia-China,"Spodumene - Australia [Mt Marion] --> China Refining [""Xinyu""]",11.7,t CO2e/t LC,Feng et al. 2024,SI Table S8,
+Spodumene,Australia-China,"Spodumene - Australia [Mt Wodgina] --> China Refining [""Xinyu""]",15.2,t CO2e/t LC,Feng et al. 2024,SI Table S8,
+Spodumene,Australia-China,Spodumene - Australia [Pilgangoora] --> China Refining,16.73,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Spodumene,Australia-China,Spodumene - Australia [Pilgangoora] --> China Refining,17.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Australia-China,"Spodumene - Australia [Pilgangoora] --> China Refining [""Yibin""]",14.5,t CO2e/t LC,Feng et al. 2024,SI Table S8,
+Spodumene,Australia-China,Spodumene - Australia [Wodgina] --> China Refining,17.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Australia-China,Spodumene - Australia [Generic] --> China Refining [Generic],13.9,t CO2e/t LC,Liu et al. 2025,Abstract / Figure 2 / Table S8,Ranges from ~10 to ~20 based on pathway
+Spodumene,Brazil-China,Spodumene - Brazil [Grota do Cirilo] --> China Refining,16.3,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Canada,Spodumene - Canada [Nemaska],9.66,t CO2e/t LC,Chordia et al. 2022,S5.2 Table,
+Spodumene,China,Spodumene - China [Cuola] --> China Refining,21.55,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
+Spodumene,Finland,Spodumene - Finland [Keliber],10.10,t CO2e/t LC,Chordia et al. 2022,S5.2 Table,
+Spodumene,Generic,Spodumene - High,9.0,t CO2e/t LC,Manjong et al. 2021,Page 15,
+Spodumene,Generic,Spodumene - Low,3.5,t CO2e/t LC,Manjong et al. 2021,Page 15,
+Spodumene,High-grade (Australia?),High-grade (Australia?),2.28,t CO2e/t LC,Ambrose and Kendall 2020b,Figure 2 / Supplementary 2,
+Spodumene,Low-grade (Canada?),Low-grade (Canada?),2.67,t CO2e/t LC,Ambrose and Kendall 2020b,Figure 2 / Supplementary 2,
+Spodumene,Zimbabwe-China,Spodumene - Zimbabwe [Arcadia] --> China Refining,16.7,t CO2e/t LC,Sun et al. 2025,Table S1,
+Spodumene,Zimbabwe-China,Spodumene - Zimbabwe [Bikita] --> China Refining,17.38,t CO2e/t LC,Peiseler et al. 2025,"Figure 1, Supplementary Data","Best guess of match, exact project not specified"
