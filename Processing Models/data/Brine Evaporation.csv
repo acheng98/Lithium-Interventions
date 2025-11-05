@@ -1,0 +1,101 @@
+variable_name,Description,Pumping,Evaporation
+step_id,Step ID (unique),1,2
+step_name,Human-readable process step,Brine pumping,Evaporation Ponds
+key_chemical,Key chemical equation evaluated in this step.,N/A,Concentration of lithium brine via evaporation
+notes,"Key information, notes","Includes cost of installation and other capex, estimated to be roughly $1M per input data. Electricity usage depends on depth of drilling, but not represented here either.",
+sources,,,
+process_type,continuous or batch,batch,batch
+base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",36000,1
+base_volume_unit,"Not used directly in calculation, but for human readability",L/h,n/a (cost is wholly a footprint cost)
+scaling_exponent_throughput,,,
+batch_cycle_time,,1,1
+batch_cycle_time_unit,,unit,unit
+batch_setup_time,,0,0
+batch_setup_time_unit,,n/a,n/a
+dedicated_line,,TRUE,TRUE
+electricity_base_total,"Reference electricity use, for base volume",20,0
+electricity_base_total_unit,,kWh/h,kWh/h
+electricity_source,For LCA,Chile_Atacama,Chile_Atacama
+natural_gas_base_total,Reference gas consumption,0,0
+natural_gas_base_total_unit,,therm/h,therm/h
+natural_gas_source,For LCA,,
+process_water_base_total,Makeup water,0,0
+process_water_base_total_unit,,m³/h,m³/h
+cooling_water_base_total,Reference cooling water,0,0
+cooling_water_base_total_unit,,m³/h,m³/h
+steam_base_total,Reference steam use,0,0
+steam_base_total_unit,,kg/h,kg/h
+compressed_air_base_total,Reference compressed air,0,0
+compressed_air_base_total_unit,,Nm³/h,Nm³/h
+prim_equip_price_base,Reference equipment capex,1000000,0
+prim_equip_price_base_unit,,2025USD,2025USD
+prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",0.7,1
+prim_equip_life,Expected equipment life,20,1
+prim_equip_life_unit,,years,n/a
+tooling_cost_base,Reference tooling cost,0,0
+tooling_cost_base_unit,,n/a,0
+tooling_scaling_exponent,Scale exponent,1,1
+footprint_base,Plot area incl. access,50,
+footprint_base_unit,,m²,m²
+footprint_scaling_exponent,Scale exponent,1,1
+dedicated_labor,,FALSE,FALSE
+labor_base,Reference labor requirement,0,0
+labor_base_unit,,FTE,FTE
+labor_scaling_exponent,Labor efficiency with scale,,1
+opex_fraction_of_capex,"Additional operating costs (e.g. maintennace), as function of capex",0.05,0.05
+unplanned_downtime,Fraction of entire facility uptime,0.1,0
+proc_avail_factor,Uptime excluding planned outages,0.9,1
+scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.05,0
+volume_defining_input,What is the key input or input constituent that needs to be converted,raw_brine_from_ground,Li
+volume_defining_input_unit,What unit is that key input in?,mg/L,mg/L
+volume_defining_output,What is the key output or output constituent that needs to be converted to,pumped_brine,Li
+volume_defining_output_unit,What unit is that key output in?,mg/L,mg/L
+primary_input_1_name,,raw_brine_from_ground,pumped_brine
+primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Ca; Na; B; SO4
+primary_input_1_constituent_fractions,Values of input constituents,1500; 18000; 10000; 40000; 500; 800; 4000,
+primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
+primary_input_1_conversion_factor,Additional conversion factor (less than 1 = more input material needed per output material),1,1
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE,FALSE
+reagent_1_name,Reagent name,,
+reagent_1_name_long,Long/descriptive reagent name,,
+reagent_1_target_constituents,,,
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_1_units,,,
+reagent_2_name,Reagent name,,
+reagent_2_name_long,Long/descriptive reagent name,,
+reagent_2_target_constituents,,,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_2_units,,,
+reagent_3_name,Reagent name,,
+reagent_3_name_long,Long/descriptive reagent name,,
+reagent_3_target_constituents,,,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_3_units,,,
+primary_output_1_name,Output stream/material,pumped_brine,concentrated_lithium_brine
+primary_output_1_step,The step or waste material tracker that this output goes to,2,Final
+primary_output_1_yield_rate,Yield Rate,1,1
+primary_output_1_units,Units after conversion is applied,L/h,L/h
+primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4
+primary_output_1_constituent_fractions,,,
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE
+coproduct_1_name,,,
+coproduct_1_sink,,,
+coproduct_1_conversion_factor,,,
+coproduct_1_units,,,
+coproduct_1_constituents,,,
+coproduct_1_constituent_fractions,,,
+coproduct_2_name,,,
+coproduct_2_sink,,,
+coproduct_2_conversion_factor,,,
+coproduct_2_units,,,
+coproduct_2_constituents,,,
+coproduct_2_constituent_fractions,,,
+coproduct_3_name,,,
+coproduct_3_sink,,,Air
+coproduct_3_conversion_factor,,,
+coproduct_3_units,,,
+coproduct_3_constituents,,,
+coproduct_3_constituent_fractions,,,

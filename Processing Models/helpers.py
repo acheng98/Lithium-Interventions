@@ -1,4 +1,7 @@
 from typing import Dict, Any, List, Optional
+import numpy as np
+import matplotlib.pyplot as plt
+import textwrap
 
 # robust helpers
 def safe_float(x, default=0.0):
@@ -15,9 +18,9 @@ def safe_bool(x, default=False):
 	if isinstance(x, bool):
 		return x
 	s = str(x).strip().lower()
-	if s in {"true", "t", "yes", "y", "1"}:
+	if s in {"true", "t", "yes", "y"}:
 		return True
-	if s in {"false", "f", "no", "n", "0"}:
+	if s in {"false", "f", "no", "n"}:
 		return False
 	return default
 
@@ -63,13 +66,12 @@ def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 	i = 1
 	while f"primary_input_{i}_name" in step_vars:
 		in_name = step_vars.get(f"primary_input_{i}_name")
-		if not in_name:
+		if not in_name: # Assumes that inputs are listed in order, e.g. no skipping from 1 to 3
 			break
 		constituents = parse_list_field(step_vars.get(f"primary_input_{i}_constituents", ""))
 		chemistry_dependence = str(step_vars.get(f"primary_input_{i}_chemistry_dependence", "False")).strip().lower() in ("true", "yes", "1") # All strings always return as TRUE
-		if not chemistry_dependence: # If not dependent on chemistry, we take the prescribed constituent fractions
-			fractions = parse_list_field(step_vars.get(f"primary_input_{i}_constituent_fractions", ""), cast=float)
-		else: # Else they must be calculated from an input chemistry
+		fractions = parse_list_field(step_vars.get(f"primary_input_{i}_constituent_fractions", ""), cast=float)
+		if chemistry_dependence or len(fractions) == 0: # If not dependent on chemistry, we take the prescribed constituent fractions
 			fractions = [""]*len(constituents)
 		material_flows["primary_inputs"][in_name] = {
 			"constituents": dict(zip(constituents, fractions)),
@@ -104,11 +106,15 @@ def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 			break
 		constituents = parse_list_field(step_vars.get(f"primary_output_{i}_constituents", ""))
 		fractions = parse_list_field(step_vars.get(f"primary_output_{i}_constituent_fractions", ""), cast=float)
+		chemistry_dependence = str(step_vars.get(f"primary_output_{i}_chemistry_dependence", "False")).strip().lower() in ("true", "yes", "1") # All strings always return as TRUE
+		if len(fractions) == 0: # If constituent fractions not defined, they must be calculated from a defined chemistry
+			fractions = [""]*len(constituents)
 		material_flows["primary_outputs"][out_name] = {
 			"next_step": step_vars.get(f"primary_output_{i}_step"),
 			"yield_rate": float(step_vars.get(f"primary_output_{i}_yield_rate", 1.0)),
 			"units": step_vars.get(f"primary_output_{i}_units"),
 			"constituents": dict(zip(constituents, fractions)),
+			"chemistry_dependence": chemistry_dependence,
 		}
 		i += 1
 
@@ -120,6 +126,8 @@ def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 			break
 		constituents = parse_list_field(step_vars.get(f"coproduct_{i}_constituents", ""))
 		fractions = parse_list_field(step_vars.get(f"coproduct_{i}_constituent_fractions", ""), cast=float)
+		if len(fractions) == 0: # If constituent fractions not defined, they must be calculated from a defined chemistry
+			fractions = [""]*len(constituents)
 		material_flows["secondary_outputs"][co_name] = {
 			"sink": step_vars.get(f"coproduct_{i}_sink"),
 			"conversion_factor": float(step_vars.get(f"coproduct_{i}_conversion_factor", 1.0)),
@@ -160,3 +168,110 @@ def build_locations_dict(locational_data: List[List[str]]) -> Dict[str, Any]:
 			locations_dict[loc][var_name] = val
 
 	return locations_dict
+
+# PLOTTING HELPERS
+def _wrap_labels(labels, width=14):
+	tw = textwrap.TextWrapper(width=width,
+							  break_long_words=False,   # don't cut words
+							  break_on_hyphens=True)    # allow existing hyphens
+	wrapped = []
+	for s in map(str, labels):
+		if '/' in s:
+			parts = [p.strip() for p in s.split('/')]
+			parts_wrapped = ['\n'.join(tw.wrap(p)) for p in parts]
+			# keep the slash at the end of the line where the break occurs
+			wrapped.append(' /\n'.join(parts_wrapped))
+		else:
+			wrapped.append('\n'.join(tw.wrap(s)))
+	return wrapped
+
+def plot_breakdown(labels, variable_costs, fixed_costs,
+					xscale=1, yscale=1, title='Cost of Steps', xlab='Step Names', ylab='Total Cost', 
+					xlims=None, ylims=None, fixed_width=None, base_width_per_bar=0.5, show=True):
+	labels = list(labels)
+	v = np.asarray(variable_costs, dtype=float) * yscale
+	f = np.asarray(fixed_costs, dtype=float) * yscale
+	n = len(labels)
+
+	# Compute figure width dynamically or use fixed width
+	if fixed_width is not None:
+		fig_width = fixed_width
+	else:
+		# Adaptive width so bars are never cramped or overly spaced
+		fig_width = 2 * min(max(6, n * base_width_per_bar), 14)
+
+	fig, ax = plt.subplots(figsize=(fig_width, 6))
+
+	# X positions for bars
+	x = np.arange(n)
+
+	# Plot stacked bars
+	ax.bar(x, fixed_costs, label="Fixed Cost", color="#f28e2b")
+	ax.bar(x, variable_costs, bottom=fixed_costs, label="Variable Cost", color="#4e79a7")
+	
+	# Label formatting
+	ax.set_xticks(x)
+	ax.set_xticklabels(_wrap_labels(labels, width=12), ha='center')
+
+	# Labels and title
+	ax.set_xlabel(xlab)
+	ax.set_ylabel(ylab)
+	ax.set_title(title, pad=12)
+
+	# Add light grid and legend
+	ax.grid(axis='y', linestyle=':', alpha=0.4)
+
+	# Optional limits
+	if xlims is not None:
+		ax.set_xlim(xlims)
+	if ylims is not None:
+		ax.set_ylim(ylims)
+
+	handles, labels_ = ax.get_legend_handles_labels()
+	order = [labels_.index("Variable Cost"), labels_.index("Fixed Cost")]
+	ax.legend([handles[i] for i in order], [labels_[i] for i in order], 
+			frameon=True, loc='upper right', handlelength=1.2, handletextpad=0.4, borderpad=0.3, 
+			facecolor='white', edgecolor='none')
+
+	plt.tight_layout()
+	if show:
+		plt.show()
+	return fig, ax
+
+def plot_production_curve(apvs,avg_costs,xscale=1,yscale=1,title='APV vs Average Cost',xlab='Annual Production Volume (APV)',ylab='Unit Cost'):
+	fig = plt.figure(figsize=(8, 6))
+	plt.scatter(apvs, avg_costs, color='blue', label='Production Volume vs Cost')
+
+	# Add labels and title
+	plt.title(title, fontsize=14)
+	plt.xlabel(xlab, fontsize=12)
+	plt.ylabel(ylab, fontsize=12)
+	plt.grid(True, linestyle='--', alpha=0.6)
+	plt.legend()
+	plt.tight_layout()
+
+	# Display the plot
+	plt.show()
+	return fig
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

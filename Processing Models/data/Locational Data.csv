@@ -1,0 +1,35 @@
+variable_name,Description,Unit,Chile_Atacama,Argentina,United States,China,Australia,Canada,Brazil
+dpy,Working days/year,Days per year,,,,,,,
+upd,Facility-wide average Unplanned Downtime,% of total possible uptime,,,,,,,
+scm,Scheduled maintenance,% of total possible uptime,,,,,,,
+spd,Number of shifts/day,Number,,,,,,,
+hps,Hours per shift,Hours,,,,,,,
+ub,Hours of unpaid breaks/shift,Hours,,,,,,,
+pb,Hours of paid breaks/shift,Hours,,,,,,,
+dr,Discount Rate,%,8,,,,,,
+wage,Direct Wage (w/benefits),2025USD per hour,$7.00,,,,,,
+enpt,"Energy Cost, as % of material and labor costs",% of material and labor costs,,,,,,,
+elec,Electricity cost,$/KWh,$0.17,,,,,,
+gas,Gas cost,$/MMBTU,$12.40,,,,,,
+diesel,Diesel cost,,,,,,,,
+proc_water,Cost of water used for processing,$/m^3,$1.00,,,,,,
+cool_water,Cost of cooled water. Assume for now an increase over the process water cost.,$/m^3,$1.20,,,,,,
+steam,Cost of steam. ,$/kg,$0.03,,,,,,
+comp_air,Cost of compressed air. ,$/Nm^3 (normal m^3),$0.04,,,,,,
+build,Building space cost,$/m^2,$600.00,,,,,,
+crp,Capital Recovery Period - may be site-specific,years,20,,,,,,
+brp,Building Recovery Period - may be site-specific,years,20,,,,,,
+aux_equip,Annualized auxiliary Equipment cost,% of main machine cost,10%,,,,,,
+maint,Annualized maintenance costs,% of main machine cost,5%,,,,,,
+fixed_over,Annualized fixed overhead costs,"% of the total of {main machine, building, auxiliary equipment, and maintenance} costs",10%,,,,,,
+electricity.co2,Grid emissions intensity ,kgCO2e/kWh,0.27343,0.32716,0.35507,0.66307,0.58023,0.11541,0.06398
+electricity.water,Water usage intensity of grid electricity,L/kWh,0.1,0.1,0.1,0.1,0.1,0.1,0.1
+natural_gas.co2,Combustion emissions intensity of natural gas,kgCO2e/MMBTU,53.06,53.06,53.06,53.06,53.06,53.06,53.06
+cool_water.co2,Emissions intensity of chilled water,kgCO2e/m3,0.08,0.08,0.08,0.08,0.08,0.08,0.08
+steam.co2,Emissions intensity of steam,kgCO2e/m3,0.08,0.08,0.08,0.08,0.08,0.08,0.08
+steam.water,Water usage of steam (pressure dependent),# Don't use for now,,,,,,,
+compressed_air.co2,Emissions intensity of compressed air (pressure dependent),# Don't use for now,,,,,,,
+landfill.co2,Emissions intensity of landfill,# Don't use for now,,,,,,,
+landfill.landuse,Land use of landfilled items,m^2/m^3,,,,,,,
+wastewater.water,# Don't use for now,,,,,,,,
+wastewater.eutrophification,# Don't use for now,,,,,,,,
