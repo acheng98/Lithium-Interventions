@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Optional
 import numpy as np
 import matplotlib.pyplot as plt
 import textwrap
+import re
 
 # robust helpers
 def safe_float(x, default=0.0):
@@ -23,6 +24,43 @@ def safe_bool(x, default=False):
 	if s in {"false", "f", "no", "n"}:
 		return False
 	return default
+
+def _parse_numeric(cell):
+	"""
+	Parse a CSV cell into float. Handles $, commas, parentheses-negative, %, sci-notation.
+	Returns (value, is_percent_flag) where value is float or None if blank.
+	Raises ValueError if non-numeric, non-blank content remains.
+	"""
+	if cell is None:
+		return None
+
+	s = str(cell).strip()
+	if s == "" or s.lower() in {"na", "n/a", "null"}:
+		return None
+
+	# Handle negative in parentheses (e.g., (1,234))
+	is_negative = s.startswith("(") and s.endswith(")")
+	if is_negative:
+		s = s[1:-1].strip()
+
+	# Remove currency symbols and commas
+	s = s.replace("$", "").replace(",", "")
+	has_percent = s.endswith("%")
+	if has_percent:
+		s = s[:-1].strip()
+
+	# Try parsing as float
+	try:
+		val = float(s)
+	except ValueError:
+		return None
+
+	if is_negative:
+		val = -val
+	if has_percent:
+		val /= 100.0
+
+	return val
 
 # Split delimiter-separated strings into a typed list.
 def parse_list_field(val: str, delim =";", cast=str) -> List[Any]:
@@ -141,33 +179,44 @@ def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 def build_locations_dict(locational_data: List[List[str]]) -> Dict[str, Any]:
 	"""
 	"""
-	# First row = header
 	header = locational_data[0]
-
-	# Extract location names (skip variable_name, Description, Unit)
-	location_names = header[3:]
-
+	location_names = [str(h).strip() for h in header[3:]]
 	locations_dict = {loc: {} for loc in location_names}
 
-	# Process each row
 	for row in locational_data[1:]:
-		if not row or len(row) < 3:
-			continue  # skip empty/malformed rows
+		if not row or len(row) < 4:
+			continue
 
-		var_name = row[0]
-		# values start from 4th column onward
+		var_name = str(row[0]).strip()
+		if not var_name:
+			continue
+
 		values = row[3:]
 
-		for loc, val in zip(location_names, values):
-			try:
-				# Try to cast to float if numeric
-				val = float(val)
-			except (ValueError, TypeError):
-				pass  # leave as string if not numeric
+		# Handle impact_factors rows
+		if var_name.startswith("impact_factor."):
+			parts = [p.strip() for p in var_name.split(".")]
+			if len(parts) != 3:
+				continue  # ignore malformed rows
 
-			locations_dict[loc][var_name] = val
+			_, utility, category = parts
+			for loc, raw in zip(location_names, values):
+				val = _parse_numeric(raw)
+				if val is None:
+					continue
+				loc_dict = locations_dict[loc]
+				loc_dict.setdefault("impact_factors", {}).setdefault(utility, {})[category] = val
+
+		# Handle flat variable rows
+		else:
+			for loc, raw in zip(location_names, values):
+				val = _parse_numeric(raw)
+				if val is None:
+					continue
+				locations_dict[loc][var_name] = val
 
 	return locations_dict
+
 
 # PLOTTING HELPERS
 def _wrap_labels(labels, width=14):

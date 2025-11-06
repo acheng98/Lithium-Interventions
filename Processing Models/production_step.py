@@ -480,9 +480,111 @@ class ProductionStep:
 						props["abs_usage"] = abs_usage
 						props["total_cost"] = abs_usage * self.facility.material_costs.get(reagent_name, 0.0)
 
-		#######################
-		# CALCULATE ALL COSTS #
-		#######################
+		from typing import Dict, Any
+
+		def calculate_environmental_impacts(self, impact_factors: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
+				"""
+				Compute environmental impacts for THIS step by multiplying this step's
+				utility use and sinked coproduct volumes by the provided impact_factors.
+
+				Parameters
+				----------
+				impact_factors : dict
+						Expected keys for utilities like:
+								{"electricity": {...}, "natural_gas": {...}, ...}
+						And (optionally) sink factors either as:
+								impact_factors["sinks"][sink_name][coproduct_name] -> {category: factor}
+						or flat:
+								impact_factors[sink_name] -> {category: factor}
+
+				Returns
+				-------
+				dict
+						{
+							"utility_impacts": { utility: {category: value, ...}, ... },
+							"sink_impacts":    { sink: { coproduct: {category: value, ...}, ... }, ... },
+							"total_step_impacts":   { category: total_value_across_utilities_and_sinks }
+						}
+				"""
+				def _lookup_sink_factors(sink_name: str, coproduct_name: str) -> Dict[str, float]:
+						sinks_block = (impact_factors or {}).get("sinks", {})
+						# Prefer coproduct-specific factors if present
+						if isinstance(sinks_block, dict) and sink_name in sinks_block:
+								maybe = sinks_block.get(sink_name, {})
+								if isinstance(maybe, dict) and coproduct_name in maybe:
+										return maybe.get(coproduct_name, {}) or {}
+								return maybe if isinstance(maybe, dict) else {}
+						# Fallback to top-level sink block (no coproduct specificity)
+						return (impact_factors or {}).get(sink_name, {}) or {}
+
+				# Map this class's attributes -> impact_factors keys
+				utility_map = [
+						("electricity_consumed",    "electricity"),
+						("natural_gas_consumed",    "natural_gas"),
+						("process_water_consumed",  "process_water"),
+						("cooling_water_consumed",  "cooling_water"),
+						("steam_consumed",          "steam"),
+						("compressed_air_consumed", "compressed_air"),
+						# Add more if necessary
+				]
+
+				# ---------- Utilities ----------
+				utility_impacts: Dict[str, Dict[str, float]] = {}
+				for attr, key in utility_map:
+						qty = getattr(self, attr, 0.0) or 0.0
+						if not qty:
+								continue
+						factors = (impact_factors or {}).get(key, {}) or {}
+						if factors:
+								utility_impacts[key] = {cat: qty * fac for cat, fac in factors.items()}
+
+				# ---------- Sinks (coproducts routed to landfill/wastewater/air/etc.) ----------
+				sink_impacts: Dict[str, Dict[str, Dict[str, float]]] = {}
+				secondary_outputs = getattr(self, "secondary_outputs", {}) or {}
+				for coproduct_name, props in secondary_outputs.items():
+						sink_name = (props or {}).get("sink")
+						volume = (props or {}).get("volume", 0.0) or 0.0
+						if not sink_name or not volume:
+								continue
+						factors = _lookup_sink_factors(sink_name, coproduct_name)
+						if not factors:
+								continue
+						sink_impacts.setdefault(sink_name, {})
+						sink_impacts[sink_name][coproduct_name] = {
+								cat: volume * fac for cat, fac in factors.items()
+						}
+
+				# ---------- Totals ----------
+				scope_one_impacts: Dict[str, float] = {}
+				scope_two_impacts: Dict[str, float] = {}
+				total_step_impacts: Dict[str, float] = {}
+				for cats in utility_impacts.values():
+						for cat, val in cats.items():
+								scope_two_impacts[cat] = scope_two_impacts.get(cat, 0.0) + val
+								total_step_impacts[cat] = total_step_impacts.get(cat, 0.0) + val
+				for by_coproduct in sink_impacts.values():
+						for cats in by_coproduct.values():
+								for cat, val in cats.items():
+										scope_one_impacts[cat] = scope_one_impacts.get(cat, 0.0) + val
+										total_step_impacts[cat] = total_step_impacts.get(cat, 0.0) + val
+
+				self.utility_impacts = utility_impacts
+				self.sink_impacts = sink_impacts
+				self.scope_one_impacts = scope_one_impacts
+				self.scope_two_impacts = scope_two_impacts
+				self.total_step_impacts = total_step_impacts
+
+				return {
+						"utility_impacts": utility_impacts,
+						"sink_impacts": sink_impacts,
+						"scope_one_impacts": scope_one_impacts,
+						"scope_two_impacts": scope_two_impacts,
+						"total_step_impacts": total_step_impacts,
+				}
+
+		#######################################
+		# CALCULATE ALL COSTS & EXTERNALITIES #
+		#######################################
 		def calculate(self):
 				# --- STEP 1: Process-type specific throughput & scaling ---
 				if self.process_type == "batch":
@@ -506,6 +608,9 @@ class ProductionStep:
 																self.building_cost + self.aux_equip_cost +
 																self.maint_cost + self.fixed_over_cost)
 				self.tot_cost = self.tot_var_cost + self.tot_fixed_cost
+
+				# --- STEP 5: Externalites --- # Should this be here? 
+				self.calculate_environmental_impacts(self.facility.impact_factors)
 
 		##############################
 		# INTERNAL COST CALC HELPERS #

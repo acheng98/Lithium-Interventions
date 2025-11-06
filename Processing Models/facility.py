@@ -8,16 +8,13 @@ from helpers import plot_breakdown, plot_production_curve
 class Facility:
 
 		# Instance attribute
-		def __init__(self, fac_id, apv, material_costs, sinks, location=None, locations_dict=None, impact_factors=None,
+		def __init__(self, fac_id, material_costs, sinks, apv=0, location=None, locations_dict=None, impact_factors=None,
 								dpy=330, upd=0.2, scm=0, spd=3, hps=8, ub=0.5, pb=0.5, dr=0.10,
 								wage=18, enpt=0.03, elec=0.08, gas=3.46, proc_water=3, cool_water=4, steam=0.0265, comp_air=0.04,
 								build=3000, crp=6, brp=20, aux_equip=0.10, maint=0.10, fixed_over = 0.35):
-			if isinstance(apv, (int, float)):
-					self.apv = apv # Annual Production Volume
-			else:
-					raise ValueError(f"Input 'next step' must be a number (int or float), got {type(apv).__name__} instead.")
-
+			
 			self.fac_id = fac_id
+			self.apv = apv
 			self.location = location # Location name
 			self.material_costs = material_costs # material: cost. Gotta be careful of units
 			self.steps = {}
@@ -25,7 +22,7 @@ class Facility:
 			self.primary_outputs = {}  # facility-level "exports"
 			# Note the sinks input is a list. Possibly put this back into 'steps' later.
 			self.sinks = sinks_dict = {sink: {} for sink in sinks} # Landfill, air/environment, wastewater treatment, etc.
-			self.impact_factors = impact_factors or {
+			self.impact_factors = impact_factors or { # Should I even set 0 defaults?? 
 					"electricity": {"CO2": 0.0, "water": 0.0},   # defaults: no impact
 					"natural_gas": {"CO2": 0.0},
 					"cooling_water": {"CO2": 0.0},
@@ -313,50 +310,33 @@ class Facility:
 								totals[sink_name][coproduct_name] = total_volume
 				return totals
 
-		def calculate_environmental_impacts(self):
+		def get_step_environmental_impacts(self, update = False) -> dict:
 				"""
-				Calculate total environmental impacts of utility consumption
-				based on location-specific impact factors.
-				Requires self.total_utilities (from report_utilities).
+				Returns a dict keyed by step_name with each step's impacts.
 				"""
-				if not hasattr(self, "total_utilities") or not self.total_utilities:
-						self.report_utilities()
+				results = {}
+				for step_id, step in self.steps.items():
+						if update:
+								summary = step.calculate_environmental_impacts(self.impact_factors)
+						else:
+								summary = {
+														"utility_impacts": step.utility_impacts,
+														"sink_impacts": step.sink_impacts,
+														"total_step_impacts": step.total_step_impacts,
+												}
+						results[step.step_name] = summary
+				return results
 
-				impacts = {}
-
-				# --- Utility impacts ---
-				utility_impacts = {}
-				print("Impact factors:", self.impact_factors)
-				for utility, factors in self.impact_factors.items():
-						usage = self.total_utilities.get(utility, {}).get('quantity', 0.0)
-						utility_impacts[utility] = {cat: usage * factor for cat, factor in factors.items()}
-
-				# --- Sink impacts ---
-				sink_totals = self._sum_coproducts_in_sinks()
-				sink_impacts = {}
-				for sink_name, coproducts in sink_totals.items():
-						sink_impacts[sink_name] = {}
-						for coproduct_name, total_volume in coproducts.items():
-								factors = self.impact_factors.get("sinks", {}).get(sink_name, {}).get(coproduct_name, {})
-								sink_impacts[sink_name][coproduct_name] = {cat: total_volume * factor for cat, factor in factors.items()}
-
-				# --- Aggregate total impacts per category ---
-				total_impacts = {}
-				# Sum utility impacts
-				for utility, impacts in utility_impacts.items():
-						for cat, value in impacts.items():
-								total_impacts[cat] = total_impacts.get(cat, 0.0) + value
-				# Sum sink impacts
-				for sink, coproducts in sink_impacts.items():
-						for coproduct, impacts in coproducts.items():
-								for cat, value in impacts.items():
-										total_impacts[cat] = total_impacts.get(cat, 0.0) + value
-
-				return {
-						"utility_impacts": utility_impacts,
-						"sink_impacts": sink_impacts,
-						"total_impacts": total_impacts
-				}
+		def get_total_environmental_impacts(self, update = False) -> dict:
+				"""
+				Sums all step totals into facility-wide totals (same categories).
+				"""
+				by_step = self.calculate_step_environmental_impacts(update)
+				totals = {}
+				for step_dict in by_step.values():
+						for cat, val in step_dict["total_impacts"].items():
+								totals[cat] = totals.get(cat, 0.0) + val
+				return totals
 
 		# ============================================================
 		# COST CALCULATIONS

@@ -21,13 +21,14 @@ def lithium_evaporation(material_costs, locations_dict, steps_dicts, target_pvs,
 
 	# Concentrated Brine facility 
 	# UPDATE TO TAKE IN LOCATIONAL DATA
-	conc_brine = Facility(fac_id="Concentrated Brine",apv=10000, material_costs = material_costs, #Does the APV need to be defined here
+	conc_brine = Facility(fac_id="Concentrated Brine", material_costs = material_costs,
 						sinks = ["landfill","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
 						dpy=300, spd=3, hps=8, ub=2/3, pb=1/3, dr=0.10, wage=18, elec=0.15, build=3000,
 						crp=6, brp=20, aux_equip=0.10, maint=0.10, fixed_over=0.35, enpt=0.03)
 
 	import_steps(conc_brine,steps_dicts[1])
 	conc_brine.add_target_comp(target = "concentrated_lithium_brine", composition = interm_chem, target_step_id = "1", propagate = True)
+	conc_brine.update_location("Chile_Atacama",locations_dict["Chile_Atacama"]) # Technically not Chile Atacama - need to find details for concentrated brine facility
 	sc.add_facility(conc_brine)
 
 	# Transportation
@@ -36,11 +37,12 @@ def lithium_evaporation(material_costs, locations_dict, steps_dicts, target_pvs,
 	# sc.add_facility()
 
 	# Evaporation ponds 'facility' 
-	evap_ponds = Facility(fac_id="Evaporation Ponds",apv=10000, material_costs = material_costs, #Does the APV need to be defined here
+	evap_ponds = Facility(fac_id="Evaporation Ponds", material_costs = material_costs,
 						sinks = ["landfill","atmosphere"], # Potassium? 
 						dpy=300, spd=3, hps=8, ub=2/3, pb=1/3, dr=0.10, wage=18, elec=0.15, build=3000,
 						crp=6, brp=20, aux_equip=0.10, maint=0.10, fixed_over=0.35, enpt=0.03)
 	import_steps(evap_ponds,steps_dicts[0])
+	evap_ponds.update_location("Chile_Atacama",locations_dict["Chile_Atacama"]) # Technically not Chile Atacama - need to find details for concentrated brine facility
 
 	products = {"concentrated_lithium_brine": 1}
 	sc.add_facility(evap_ponds, next_fac=conc_brine, products=products)
@@ -50,8 +52,8 @@ def lithium_evaporation(material_costs, locations_dict, steps_dicts, target_pvs,
 	for target_pv in target_pvs:
 		sc.update_apv(target_pv)
 		# sc.plot_tot_steps_in_facs_costs(ylims=[0,4*10**6])
+		sc.plot_tot_steps_in_facs_impacts()
 
-	print(evap_ponds.calculate_environmental_impacts())
 	# sc.plot_unit_cc()
 	# sc.plot_total_cc()
 
@@ -83,6 +85,8 @@ if __name__ == '__main__':
 
 	# Build dictionary using your existing function
 	locations_dict = build_locations_dict(locational_data)
+
+	print(locations_dict)
 
 	steps_dicts = []
 	for path in input_data_paths:

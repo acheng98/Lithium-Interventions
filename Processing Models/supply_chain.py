@@ -203,6 +203,24 @@ class SupplyChain:
 
 		plot_breakdown(labels,variable_costs,fixed_costs,xscale,yscale,title,xlab,ylab,xlims,ylims)
 
+	def plot_tot_steps_in_facs_impacts(self,apv=None,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None):
+		if apv is not None:
+			self.update_apv(apv)
+		elif len(self.prod_map.keys()) == 0:
+			raise ValueError(f"No APV values have been run; rerun with some target production volume.")
+
+		labels = []
+		scope_one = []
+		scope_two = []
+
+		for fac in self.fwd:
+			for step in fac.fwd:
+				labels.append(step.step_name)
+				scope_one.append(step.scope_one_impacts.get('co2',0))
+				scope_two.append(step.scope_two_impacts.get('co2',0))
+
+		plot_breakdown(labels,scope_one,scope_two,xscale,yscale,title,xlab,ylab,xlims,ylims)
+
 	def plot_unit_cc(self,xscale=1,yscale=1,title='APV vs Average Cost',xlab='Annual Production Volume (APV)',ylab='Unit Cost'):
 		# Extract APVs and costs from the prod_map
 		apvs = [apv * xscale for apv in self.prod_map.keys()]
