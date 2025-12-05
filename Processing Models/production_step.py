@@ -1,21 +1,19 @@
 from typing import Dict, Any, List, Optional
 import copy
 import math
+from collections import defaultdict
 
 from helpers import safe_float, safe_bool, build_material_flows
 
 
 # Define a class for each step of the PBCM
 class ProductionStep:
-		'''
-		Current issues:
-		step_pv = primary_input_pv, which would need to be disentangled later on.
-		'''
 		def __init__(self,
 							facility,
 							step_id: str,
 							step_name: Optional[str] = None,
 							# Step details
+							step_basis: Optional[str] = None,
 							key_chemical: Optional[str] = None,
 							notes: Optional[str] = None,
 							sources: Optional[Any] = None,
@@ -37,7 +35,9 @@ class ProductionStep:
 				self.notes = notes
 				self.sources = sources
 
-				self.step_pv = None
+				self.step_basis = step_basis # The unit of measure of the intermediate volume in the step
+				self.step_pv = None # Amount of production volume of step basis 
+				self.constituents = None # Chemical constituents of the step basis
 
 				# Default dictionaries if not provided
 				# Maybe should probably raise errors instead of using empty dicts? we use default values
@@ -56,7 +56,7 @@ class ProductionStep:
 				self.base_volume_unit: Optional[str] = process_params.get("base_volume_unit")
 				self.scaling_exponent: float = process_params.get("scaling_exponent", 1.0)
 				self.dedicated_line: bool = process_params.get("dedicated_line", False)
-				self.volume_defining_input: str = process_params.get("volume_defining_input") # Probably need to eventually clarify if this is a whole input or constituent
+				self.volume_defining_basis: str = process_params.get("volume_defining_basis")
 				self.volume_defining_output: str = process_params.get("volume_defining_output")
 
 				# Batch
@@ -158,7 +158,7 @@ class ProductionStep:
 
 				if self.volume_defining_output not in valid_outputs:
 						raise KeyError(
-								f"Volume defining output '{self.volume_defining_output}' is not defined as a primary output or as a constituent in this step."
+								f"Volume defining output '{self.volume_defining_output}' is not defined as a primary output or as a constituent in this step {self.step_name}."
 						)
 
 				# Initialize connections from secondary outputs/coproducts to sinks
@@ -177,13 +177,15 @@ class ProductionStep:
 				# --------- Inputs ---------
 
 				# Check to make sure volume_defining_input (defined in production_step input data) is in the primary inputs or is a constituent
-				valid_inputs = set(self.primary_inputs.keys()) # Gather all valid outputs
-				for input_data in self.primary_inputs.values():
-						valid_inputs.update(input_data["constituents"].keys())
-				if self.volume_defining_input not in valid_inputs and self.volume_defining_input != "":
-						raise KeyError(
-								f"Volume defining input '{self.volume_defining_input}' is not defined as a primary input or as a constituent in this step."
-						)
+				# --> NEED TO ADAPT THIS TO CHECK <<PROCESS VOLUME BASIS / CONSTITUENTS>> RATHER THAN INPUTS DIRECTLY. 
+				# --> NAME WAS CHANGED 
+				# valid_inputs = set(self.primary_inputs.keys()) # Gather all valid outputs
+				# for input_data in self.primary_inputs.values():
+				# 		valid_inputs.update(input_data["constituents"].keys())
+				# if self.volume_defining_input not in valid_inputs and self.volume_defining_input != "":
+				# 		raise KeyError(
+				# 				f"Volume defining input '{self.volume_defining_input}' is not defined as a primary input or as a constituent in this step {self.step_name}."
+				# 		)
 
 				for reagent_name, props in self.secondary_inputs.items():
 						# Check to make sure reagent has a cost associated with it
@@ -227,7 +229,7 @@ class ProductionStep:
 							"base_volume_unit": step_vars.get("base_volume_unit"),
 							"scaling_exponent": safe_float(step_vars.get("scaling_exponent", 1.0)),
 							"dedicated_line": safe_bool(step_vars.get("dedicated_line", False)),
-							"volume_defining_input": step_vars.get("volume_defining_input"),
+							"volume_defining_basis": step_vars.get("volume_defining_basis"),
 							"volume_defining_output": step_vars.get("volume_defining_output"),
 					}
 
@@ -288,6 +290,7 @@ class ProductionStep:
 							facility=facility,
 							step_id=step_vars["step_id"],
 							step_name=step_vars.get("step_name"),
+							step_basis=step_vars.get("step_basis"),
 							key_chemical=step_vars.get("key_chemical"),
 							notes=step_vars.get("notes"),
 							sources=step_vars.get("sources"),
@@ -323,12 +326,25 @@ class ProductionStep:
 				else:
 						raise KeyError(f"Target {target_name} not found in step {self.step_id}.")
 
-		def apply_reagents(self):
+		def set_conversion_factor(self,target_name,factor,change_yield=False):
 				"""
-				Apply reagent effects to the current step.
-				Updates constituent removal and records per-unit reagent usage.
+				Set the conversion factor (or yield) of an input, output, or coproduct.
 				"""
+				if target_name in self.primary_inputs:
+						self.primary_inputs[target_name]["conversion_factor"] = factor
+				elif target_name in self.primary_outputs:
+						if change_yield:
+								self.primary_outputs[target_name]["yield"] = factor
+						else:
+								self.primary_outputs[target_name]["conversion_factor"] = factor
+				elif target_name in self.secondary_outputs:
+						self.secondary_outputs[target_name]["conversion_factor"] = factor
+				else:
+						raise KeyError(f"Target {target_name} not found in step {self.step_id}.")
+
+		def aggregate_inputs(self):
 				# Gather initial amounts of constituents across all primary inputs
+				# Massive issue here with conversion factors and units - sufficient for now (hopefully...)
 				total_consts = {}
 				for input_data in self.primary_inputs.values():
 						for const, amount in input_data.get("constituents", {}).items():
@@ -340,8 +356,19 @@ class ProductionStep:
 								except (ValueError, TypeError):
 										continue
 
-				if not total_consts:
+				if total_consts == {}:
 						raise ValueError(f"No primary input constituents found for step {self.step_id}.")
+				# Constituents exist, assign to step 
+				self.constituents = total_consts
+
+				return total_consts
+
+		def apply_reagents(self):
+				"""
+				Apply reagent effects to the current step.
+				Updates constituent removal and records per-unit reagent usage.
+				"""
+				total_consts = self.aggregate_inputs()
 
 				# Apply reagents
 				for reagent_name, props in self.secondary_inputs.items():
@@ -370,6 +397,8 @@ class ProductionStep:
 				# Update primary output constituents if output chemistry is dependent on inputs
 				if not self.primary_outputs:
 						raise ValueError(f"No primary outputs defined for step {self.step_id}.")
+
+				# For now, assumign only one primary output. Could install a filter later. 
 				output_name = next(iter(self.primary_outputs))
 				if self.primary_outputs[output_name]["chemistry_dependence"]: # Only overwrite if output explicitly depends on input chemistry.
 						self.primary_outputs[output_name]["constituents"] = total_consts
@@ -383,17 +412,18 @@ class ProductionStep:
 						return
 
 				output_name, output_data = next(iter(self.primary_outputs.items())) # Assume only one primary output for now
-				total_consts = output_data.get("constituents", {})
+				if output_data["chemistry_dependence"]: # Only continue if output explicitly depends on input chemistry.
+						total_consts = output_data.get("constituents", {})
 
-				for next_step in self.next_steps.values():
-						if output_name in next_step.primary_inputs:
-								next_step.primary_inputs[output_name]["constituents"] = copy.deepcopy(total_consts)
+						for next_step in self.next_steps.values():
+								if output_name in next_step.primary_inputs:
+										next_step.primary_inputs[output_name]["constituents"] = copy.deepcopy(total_consts)
 
-								if next_step.primary_inputs[output_name].get("chemistry_dependence") and propagate:
-										next_step.apply_reagents()
-										next_step.propagate_chemistry(propagate=True)
-						else:
-								raise KeyError(f"Output {output_name} not found in next step {next_step.step_id} inputs.")
+										if next_step.primary_inputs[output_name].get("chemistry_dependence") and propagate:
+												next_step.apply_reagents()
+												next_step.propagate_chemistry(propagate=True)
+								else:
+										raise KeyError(f"Output {output_name} not found in next step {next_step.step_id} inputs.")
 
 		def compute_step_pv(self, propagate: bool = False):
 				"""
@@ -407,39 +437,54 @@ class ProductionStep:
 								raise ValueError(f"Next step {next_step.step_id} volume not yet calculated.")
 
 						if self.volume_defining_output in next_step.primary_inputs:
-								target_volume = next_step.step_pv
-						else:
-								raise KeyError(f"Volume-defining output {self.volume_defining_output} not in next step inputs.")
+								# Get the amount from next step's input needed
+								target_volume = next_step.primary_inputs[self.volume_defining_output]["input_needed"] 
+						else: # not a primary output, check the constituents of the primary outputs to get the primary output
+								volume_def_output = None # Needs a better name, probably 
+								for output,props in self.primary_outputs.items():
+										if self.volume_defining_output in props["constituents"]:
+												volume_def_output = output
+												break
+								if volume_def_output in next_step.primary_inputs:
+										target_volume = next_step.primary_inputs[volume_def_output]["input_needed"] 
+								else:
+										raise KeyError(f"Volume-defining output {self.volume_defining_output} not in next step inputs.")
 				else:
 						if self.facility.apv is None:
 								raise ValueError("Facility APV must be set for terminal steps.")
 						target_volume = self.facility.apv
 
+				self.aggregate_inputs()
+
 				# --- Ratios ---
-				output_props = next(iter(self.primary_outputs.values()))  # Assuming only one primary input for now
+				output_props = next(iter(self.primary_outputs.values()))  # Assuming only one primary output for now
 				yield_rate = output_props["yield_rate"]
 
 				if self.volume_defining_output in self.primary_outputs:
-						output_ratio = 1.0
+						output_ratio = output_props["conversion_factor"]
 				else: # not a primary output, check the constituents
 						output_consts = output_props.get("constituents", {})
 						if self.volume_defining_output in output_consts:
-								output_ratio = output_consts[self.volume_defining_output]
+								# ratio = conversion factor
+								output_ratio = output_props["conversion_factor"] / output_consts[self.volume_defining_output]
 						else:
 								raise KeyError(f"Volume-defining output '{self.volume_defining_output}' not found in step {self.step_id}.")
 
-				if self.volume_defining_input in self.primary_inputs:
-						input_ratio = self.primary_inputs[self.volume_defining_input]["conversion_factor"]
+				if self.volume_defining_basis == self.step_basis:
+						conversion_ratio = 1
 				else: # not a primary input, check the constituents
-						primary_input = next(iter(self.primary_inputs.values())) # Assuming only one primary input for now
-						input_consts = primary_input.get("constituents", {})
-						if self.volume_defining_input in input_consts:
-								# Multiply here because pv is being divided by input ratio - check to ensure
-								input_ratio = primary_input["conversion_factor"] * input_consts[self.volume_defining_input] 
+						if self.volume_defining_basis in self.constituents:
+								print(self.constituents, self.volume_defining_basis)
+								conversion_ratio = self.constituents[self.volume_defining_basis] 
 						else:
-								raise KeyError(f"Volume-defining input {self.volume_defining_input} not found in step {self.step_id}.")
+								raise KeyError(f"Volume-defining input {self.volume_defining_basis} not found in step {self.step_id}.")
 
-				self.step_pv = (target_volume / yield_rate) * (output_ratio / input_ratio)
+				self.step_pv = (target_volume / yield_rate) / output_ratio / conversion_ratio 
+
+				# CALCULATE USAGE / DEMAND FOR ALL INPUTS
+				for primary_input,input_props in self.primary_inputs.items():
+						needed = self.step_pv * input_props["conversion_factor"]
+						self.primary_inputs[primary_input]["input_needed"] = needed
 
 				# --- Scale reagents ---
 				self.scale_reagents()
@@ -478,9 +523,7 @@ class ProductionStep:
 
 						abs_usage = usage_fraction * self.step_pv
 						props["abs_usage"] = abs_usage
-						props["total_cost"] = abs_usage * self.facility.material_costs.get(reagent_name, 0.0)
-
-		from typing import Dict, Any
+						props["total_cost"] = abs_usage * self.facility.material_costs.get(reagent_name, 0.0) # Make flag here
 
 		def calculate_environmental_impacts(self, impact_factors: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
 				"""

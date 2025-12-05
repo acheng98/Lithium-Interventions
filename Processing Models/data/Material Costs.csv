@@ -1,9 +1,21 @@
-material,cost ($),unit,notes / source
-lime,0.00000015,$/mt --> $/mg,"From mg/L for brine concentration. Estimates from https://www.accio.com/plp/cost-of-bulk-hydrated-lime, https://www.made-in-china.com/products-search/hot-china-products/Lime_Chemical_Price.html"
-boron_package,0.00012,$/kg --> $/mg,Rough guess
-regen,0.0000003,$/mt --> $/mg,Rough guess
-organic_package,15,$/L,Rough guess
-strip_acid,0.0000002,$/mt --> $/mg,
-scrub_makeup,0.15,$/L,Dominated by price of weak salt (e.g. NaCl)
-soda_ash,0.0000003,$/ --> $/mg,"From mg/L for brine concentration. Prices have varied quite a bit, but estimate to be about ~$USD300/ton https://tradingeconomics.com/commodity/soda-ash"
-wash_water,0.003,$/m^3 --> $/L,https://www.bluefieldresearch.com/ns/u-s-water-and-sewer-bill-has-increased-24-in-five-years-raising-affordability-concerns/
+material,raw cost,unit,cost,unit,notes / source
+lime,150,$/mt,0.00000015,$/mg,"From mg/L for brine concentration. Estimates from https://www.accio.com/plp/cost-of-bulk-hydrated-lime, https://www.made-in-china.com/products-search/hot-china-products/Lime_Chemical_Price.html"
+boron_package,120000,$/mt,0.00012,$/mg,Rough guess
+regen,3000,$/mt,0.000003,$/mg,Rough guess
+organic_package,15,$/L,15,$/L,Rough guess
+strip_acid,200,$/mt,0.0000002,$/mg,Rough guess
+scrub_makeup,0.15,$/L,0.15,$/L,Dominated by price of weak salt (e.g. NaCl)
+soda_ash,300,$/mt,0.0000003,$/mg,"From mg/L for brine concentration. Prices have varied quite a bit, but estimate to be about ~$USD300/ton https://tradingeconomics.com/commodity/soda-ash"
+wash_water,3,$/m^3,0.003,$/L,https://www.bluefieldresearch.com/ns/u-s-water-and-sewer-bill-has-increased-24-in-five-years-raising-affordability-concerns/
+explosives,2,$/kg,2,$/kg,Rough guess
+,,,,,
+delivery_lime_TLC,3,$/mt,,,
+delivery_other_reagent_TLC,48,$/mt,,,
+sulfur_TLC,100,$/mt,,,
+soda_ash_TLC,270,$/mt,,,
+limestone_TLC,35,$/mt,,,
+quicklime_TLC,121,$/mt,,,
+flocculant_TLC,4960,$/mt,,,
+methanol_TLC,1154,$/mt,,,
+natural_gas_TLC,6.5,$/GJ,,,
+raw_water_TLC,0.5,$/m^3,,,

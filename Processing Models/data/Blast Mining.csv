@@ -1,0 +1,104 @@
+variable_name,Description,Blasting,Excavation/Loading
+step_id,Step ID (unique),1,2
+step_name,Human-readable process step,Blasting with drilling and explosives,Loading with excavator
+key_chemical,Key chemical equation evaluated in this step.,N/A,N/A
+notes,"Key information, notes",,Discrete numbers of excavators moving material to hauling trucks; EX374 used as baseline.
+sources,,,
+process_type,continuous or batch,batch,batch
+base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",1,3.6
+base_volume_unit,"Not used directly in calculation, but for human readability",metric tonnes,m^3 effective volume (90% fill factor)
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,ore_being_blasted,ore_being_moved
+scaling_exponent_throughput,,,
+batch_cycle_time,,1,0.01111111111
+batch_cycle_time_unit,,unit,hour
+batch_setup_time,,0,0
+batch_setup_time_unit,,n/a,hour
+dedicated_line,,TRUE,TRUE
+electricity_base_total,"Reference electricity use, for base volume",0,0
+electricity_base_total_unit,,kWh/h,kWh/h
+natural_gas_base_total,Reference gas consumption,0,0
+natural_gas_base_total_unit,,therm/h,therm/h
+process_water_base_total,Makeup water,0,0
+process_water_base_total_unit,,m³/h,m³/h
+cooling_water_base_total,Reference cooling water,0,0
+cooling_water_base_total_unit,,m³/h,m³/h
+diesel_base_total,Reference diesel usage,,37.66
+diesel_base_total_unit,,L/h,L/h
+steam_base_total,Reference steam use,0,0
+steam_base_total_unit,,kg/h,kg/h
+compressed_air_base_total,Reference compressed air,0,0
+compressed_air_base_total_unit,,Nm³/h,Nm³/h
+prim_equip_price_base,Reference equipment capex,0,"$1,407,000"
+prim_equip_price_base_unit,,2025USD,2025USD
+prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",,1
+prim_equip_life,Expected equipment life,,20
+prim_equip_life_unit,,years,n/a
+tooling_cost_base,Reference tooling cost,,
+tooling_cost_base_unit,,,# Tires
+tooling_scaling_exponent,Scale exponent,,1
+footprint_base,Plot area incl. access,0,0
+footprint_base_unit,,m²,m²
+footprint_scaling_exponent,Scale exponent,1,1
+dedicated_labor,,FALSE,FALSE
+labor_base,Reference labor requirement,0,0
+labor_base_unit,,FTE,FTE
+labor_scaling_exponent,Labor efficiency with scale,1,1
+opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as function of capex",0.05,0.05
+unplanned_downtime,Fraction of entire facility uptime,0.1,0
+proc_avail_factor,Uptime excluding planned outages,0.9,1
+scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.05,0
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",ore_being_blasted,ore_being_moved
+volume_defining_basis_unit,What unit is the process volume or constituent in?,,
+volume_defining_output,What is the output or output constituent that needs to be converted to,blasted_ore,excavated_ore
+volume_defining_output_unit,What unit is that output in?,,
+primary_input_1_name,,raw_material,blasted_ore
+primary_input_1_constituents,Names of input constituents,,
+primary_input_1_constituent_fractions,Values of input constituents,,
+primary_input_1_constituent_units,Units for each input constituent,ppm (wt),ppm (wt)
+primary_input_1_conversion_factor,Conversion factor of input into step basis. >1 means more inputs are needed than the step basis.,1,1
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE,FALSE
+reagent_1_name,Reagent name,explosives,
+reagent_1_name_long,Long/descriptive reagent name,Explosive material,
+reagent_1_target_constituents,,raw_material,
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,0,
+reagent_1_units,,kg explosives/ton raw material,
+reagent_2_name,Reagent name,,
+reagent_2_name_long,Long/descriptive reagent name,,
+reagent_2_target_constituents,,,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_2_units,,,
+reagent_3_name,Reagent name,,
+reagent_3_name_long,Long/descriptive reagent name,,
+reagent_3_target_constituents,,,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_3_units,,,
+primary_output_1_name,Output stream/material,blasted_ore,excavated_ore
+primary_output_1_step,The step or waste material tracker that this output goes to,2,Final
+primary_output_1_yield_rate,Yield Rate,1,1
+primary_output_1_conversion_factor,Convert from step-units to output units,1,
+primary_output_1_units,Units after conversion is applied,,
+primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4
+primary_output_1_constituent_units,,,
+primary_output_1_constituent_fractions,,,
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE
+coproduct_1_name,,,waste
+coproduct_1_sink,,,waste_pile
+coproduct_1_conversion_factor,,,
+coproduct_1_units,,,
+coproduct_1_constituents,,,
+coproduct_1_constituent_fractions,,,
+coproduct_2_name,,,
+coproduct_2_sink,,,
+coproduct_2_conversion_factor,,,
+coproduct_2_units,,,
+coproduct_2_constituents,,,
+coproduct_2_constituent_fractions,,,
+coproduct_3_name,,,
+coproduct_3_sink,,,
+coproduct_3_conversion_factor,,,
+coproduct_3_units,,,
+coproduct_3_constituents,,,
+coproduct_3_constituent_fractions,,,

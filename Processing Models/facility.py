@@ -1,8 +1,9 @@
 from typing import Dict, Any, List, Optional
 import copy
+from collections import defaultdict
 
 from production_step import ProductionStep
-from helpers import plot_breakdown, plot_production_curve
+from helpers import plot_stacked_bars, plot_production_curve
 
 # Define a class for the production environment
 class Facility:
@@ -42,9 +43,9 @@ class Facility:
 			self.pb = pb # Hours of paid breaks/shift
 			self.dr = dr # Discount Rate
 			self.wage = wage # Direct Wage (w/benefits)
-			self.enpt = enpt # Energy Cost, as % of material and labor costs
 			self.elec_price = elec # Electricity cost, $/kwh
 			self.gas_price = gas # Gas cost, $/MMBTU
+			self.diesel_price = gas # Gas cost, $/MMBTU
 			self.proc_water_price = proc_water # Cost of water used for processing, $/m^3
 			self.cool_water_price = cool_water # Cost of cooled water, $/m^3. Assume an increase over the process water cost.
 			self.steam_price = steam # Cost of steam, $/kg. Assume ~1.2 cents / pound, or 2.65 cents / kg
@@ -114,11 +115,15 @@ class Facility:
 
 				if len(order) != len(self.steps):
 						raise ValueError("Cycle detected in facility flow graph.")
+
+				self.fwd = order
+				self.rev = list(reversed(self.fwd))
+
 				return order
 
 		def step_names(self):
-				for step in self.steps.values():
-						yield step.step_id
+				for step in self.fwd:
+						yield step.step_name
 
 		def step_costs(self, detail = 1):
 				if detail == 3:
@@ -138,7 +143,7 @@ class Facility:
 				'''
 				Get the production volume at the first step
 				'''
-				first_step = next(iter(self.fwd))
+				first_step = self.fwd[0]
 				return first_step.step_pv
 
 		# ============================================================
@@ -187,7 +192,13 @@ class Facility:
 				# Get first step
 				if target_step_id not in self.steps:
 						raise KeyError(f"Target step with id '{target_step_id}' not found in facility.")
-				step = self.steps[target_step_id]
+				elif target_step_id is None:
+						# Flag if no steps exist
+						self.topo_order()
+						step = self.fwd[0]
+				else:
+						step = self.steps[target_step_id]
+
 				if target not in step.primary_inputs and target not in step.primary_outputs:
 						raise KeyError(f"Input '{target}' not found in step {target_step_id} as either an input or output.")
 				step.set_constituents(target, composition, propagate=propagate)
@@ -217,6 +228,8 @@ class Facility:
 				for key, value in location_data.items():
 						if hasattr(self, key):
 								setattr(self, key, value)
+						else:
+								print(f"Attribute {key} in the location data is not defined as a facility attributes.")
 
 				# --- Recalculate dependent values ---
 				self.crf = self.calc_crf(self.dr, self.crp)   # Capital recovery factor
@@ -331,10 +344,10 @@ class Facility:
 				"""
 				Sums all step totals into facility-wide totals (same categories).
 				"""
-				by_step = self.calculate_step_environmental_impacts(update)
+				by_step = self.get_step_environmental_impacts(update)
 				totals = {}
 				for step_dict in by_step.values():
-						for cat, val in step_dict["total_impacts"].items():
+						for cat, val in step_dict["total_step_impacts"].items():
 								totals[cat] = totals.get(cat, 0.0) + val
 				return totals
 
@@ -381,11 +394,10 @@ class Facility:
 						self.apv = apv
 
 				# Get steps in topoligical order
-				self.fwd = self.topo_order()
-				self.rev = reversed(self.fwd)
+				self.topo_order()
 				
 				# 1) Forward - chemistry: inputs → outputs, once per step
-				s = next(iter(self.fwd))
+				s = self.fwd[0]
 				s.apply_reagents()
 				s.propagate_chemistry(True) # When propagating, it recursively calls apply_reagents at each following step
 
@@ -417,6 +429,8 @@ class Facility:
 				# --- Store results for scenario tracking ---
 				self.prod_map[self.apv] = [self.tot_var_cost, self.tot_fixed_cost, self.tot_cost]
 
+				emissions_totals = self.get_total_environmental_impacts()
+
 				return {
 						"apv": self.apv,
 						"tot_var_cost": self.tot_var_cost,
@@ -424,7 +438,8 @@ class Facility:
 						"tot_cost": self.tot_cost,
 						"avg_var_cost": self.avg_var_cost,
 						"avg_fixed_cost": self.avg_fixed_cost,
-						"avg_cost": self.avg_cost
+						"avg_cost": self.avg_cost,
+						"emissions_totals": emissions_totals
 				}
 
 		# ============================================================
