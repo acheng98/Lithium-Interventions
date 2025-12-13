@@ -1,0 +1,106 @@
+variable_name,Description,Soda Ash Precipitation,Pressing,Washing & purification,Drying & Packaging
+step_id,Step ID (unique),1,2,3,4
+step_name,Human-readable process step,Soda ash precipitation (Li₂CO₃),Pressing,Washing & purification,Drying & packaging
+key_equation,"Key equation, chemical or physical, evaluated in this step.",Li+ + (CO3)2- --> Li2CO3 via addition of Na2CO3. Assume output is 20% Li2CO3. Conversion factor of L_brine to L_slurry: calculated via determined by density_slurry mg/L * (mg Li2CO3 / mg slurry) * (mg Li / mg Li2CO3) where density_slurry = wt slurry/ L_slurry = 1.118 g/cm^3 = 1.118 mg/L (see step 5 notes). wt Li2CO3 / wt slurry = 20% from assumption. wt Li / wt Li2CO3 = 2*6.94/73.89 = 0.188 --> 1.118*0.20*0.188 mg Li / L slurry. Multiply by 10^3 to get mg Li / m3 slurry. This would be multiplied by the L_slurry and divided by Li concentration from input brine concentration (* 1 / (mg Li / L brine))) to get the L of brine. ,"Pressing for higher density. 20% Li2CO3 --> 70% Li2CO3, using equation defined in step 7 (also at end of this note), takes 1.118 g/cm^3 slurry to 1.58 g/cm^3 cake. We go from ~223.6 kg Li2CO3 and 894.4 kg water in the slurry per m^3 to 223.6 kg Li2CO3 and 95.8 kg water in the 70/30 cake. 319.4 kg / 1.58 kg/m^3 ≈ 0.202 m^3 cake per 1 m^3 slurry. equation: density = 1 / (r_Li2CO3 / rho_Li2CO3 + (1 - r_Li2CO3) / (rho_water))",Removal of any remaining soluble Na/K/Mg from cake via water washing,"Based on density (function of constituent fractions); mass_Li2CO3 (V_cake) = V_cake / (r_Li2CO3 / rho_Li2CO3 + (1 - r_Li2CO3) / (rho_water)) * yield, where r_Li2CO3 is the ratio of Li2CO3 to total cake mass, in this case assumed to be 70%. With rho_Li2CO3 = 2.11 g/cm3 and assuming relatively pure water (rho_water ≈ 1 g/cm3), we need roughly 0.903 L of cake per kg Li2CO3. Since the conversion is from m3 of cake to tonnes Li2CO3, divide 1 (m3-->L but kg-->tonnes) by 0.903"
+notes,"Key information, notes",Li precipitation as carbonate at pH ~10.5; 5% Na2CO3 excess. ,Prepare filter cake via pressing,"Wash to remove residual Na, K, Mg","Drying to ~99% Li₂CO₃, bagging for sale"
+sources,,Khakmardan 2024,Khakmardan 2024,Khakmardan 2024,Khakmardan 2024; costs and electricity usage from EverBatt
+process_type,continuous or batch,continuous,batch,batch,continuous
+base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",60000,60,60,2.5
+base_volume_unit,"Not used directly in calculation, but for human readability",L polished brine/h,m3 lithium slurry being pressed,m3 Li2CO3 cake being washed,tonnes Li2CO3 cake being dried & packed
+oversizing_factor,Process volume ≠ design volume,1.25,1.25,1.25,1
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,polish_brine_throughput,slurry_press_throughput,cake_wash_throughput,cake_dry_throughput
+scaling_exponent_throughput,,0.7,,,1
+batch_cycle_time,,,1,1,
+batch_cycle_time_unit,,,h,h,
+batch_setup_time,,,0.2,0.2,
+batch_setup_time_unit,,,h,h,
+dedicated_line,,TRUE,TRUE,TRUE,TRUE
+electricity_base_total,"Reference electricity use, for base volume",100,50,120,0
+electricity_base_total_unit,,kWh/h,kWh/h,kWh/h,kWh/h
+natural_gas_base_total,Reference gas consumption,0,0,0,50
+natural_gas_base_total_unit,,MMBTU/h,MMBTU/h,MMBTU/h,MMBTU/h
+process_water_base_total,Makeup water,0.5,0,0,0
+process_water_base_total_unit,,m3/h,m3/h,,m3/h
+cooling_water_base_total,Reference cooling water,0,0.05,0.2,0.1
+cooling_water_base_total_unit,,m3/h,m3/h,m3/h,m3/h
+diesel_base_total,Reference diesel usage,,,,
+diesel_base_total_unit,,,,,
+steam_base_total,Reference steam use,0,0,0,0
+steam_base_total_unit,,kg/h,kg/h,kg/h,kg/h
+compressed_air_base_total,Reference compressed air,2,2,1,0.5
+compressed_air_base_total_unit,,Nm3/h,Nm3/h,Nm3/h,Nm3/h
+prim_equip_price_base,Reference equipment capex,"2,000,000","1,000,000","600,000","1,034,663"
+prim_equip_price_base_unit,,2025USD,2025USD,2025USD,2025USD
+prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",0.7,0.7,0.7,0.6
+prim_equip_life,Expected equipment life,20,20,20,20
+prim_equip_life_unit,,years,years,years,years
+tooling_cost_base,Reference tooling cost,,,,
+tooling_cost_base_unit,,,,,
+tooling_scaling_exponent,Scale exponent,,,,
+footprint_base,Plot area incl. access,150,80,100,120
+footprint_base_unit,,m2,m2,m2,m2
+footprint_scaling_exponent,Scale exponent,0.7,0.7,0.7,0.7
+dedicated_labor,,FALSE,FALSE,FALSE,FALSE
+labor_base,Reference labor requirement,0.4,0.3,1,1
+labor_base_unit,,FTE,FTE,FTE,FTE
+labor_scaling_exponent,Labor efficiency with scale,0.85,0.85,0.85,0.85
+opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as function of capex",0.05,0.05,0.05,0.05
+unplanned_downtime,Fraction of entire facility uptime,0.1,0.1,0.1,0.1
+proc_avail_factor,Uptime excluding planned outages,0.9,0.9,0.9,0.9
+scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.05,0.05,0.05,0.05
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",Li,slurry_press_throughput,cake_wash_throughput,Li2CO3
+volume_defining_basis_unit,What unit is the process volume or constituent in?,mg Li,m3 slurry,m3 cake_wash_throughput,tonnes lithium carbonate
+volume_defining_output,What is the output or output constituent that needs to be converted to,Li2CO3,unwashed_lithium_cake,lithium_cake,Li2CO3
+volume_defining_output_unit,What unit is that output in?,kg Li2CO3,m3 unwashed_lithium_cake,m3 lithium_cake,tonnes Li2CO3
+primary_input_1_name,,brine_post_polishing,lithium_slurry,unwashed_lithium_cake,lithium_cake
+primary_input_1_units,Units after conversion is applied,L polished brine,m3 slurry,m3 unwashed_lithium_cake,m3 lithium_cake
+primary_input_1_conversion_factor,Conversion factor of input into step basis. >1 means more inputs are needed than the step basis.,1,1,1,1.583
+primary_input_1_constituents,Names of input constituents,Li; Na; CO3,Li2CO3; H2O,Li2CO3; H2O,Li2CO3; H2O
+primary_input_1_constituent_fractions,Values of input constituents,,0.20; 0.80,0.70; 0.30,0.70; 0.30
+primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,"wt%, wt%","wt%, wt%","wt%, wt%"
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,FALSE,FALSE,FALSE
+reagent_1_name,Reagent name,soda_ash,,wash_water,
+reagent_1_name_long,Long/descriptive reagent name,Soda ash (Na2CO3),,Wash water,
+reagent_1_target_constituents,,Li,,cake_wash_throughput,
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),1.05,,0.1,
+reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,0,,0,
+reagent_1_units,,kg/m3,,m3 water/m3 feed,
+reagent_2_name,Reagent name,,,,
+reagent_2_name_long,Long/descriptive reagent name,,,,
+reagent_2_target_constituents,,,,,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,,,
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,,,
+reagent_2_units,,,,,
+reagent_3_name,Reagent name,,,,
+reagent_3_name_long,Long/descriptive reagent name,,,,
+reagent_3_target_constituents,,,,,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,,,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,,,
+reagent_3_units,,,,,
+primary_output_1_name,Output stream/material,lithium_slurry,unwashed_lithium_cake,lithium_cake,carbonate
+primary_output_1_step,The step or waste material tracker that this output goes to,2,3,4,Final
+primary_output_1_yield_rate,Yield Rate,0.95,1,0.98,0.995
+primary_output_1_conversion_factor,Convert from step-units to output units,4.76E-09,0.2022,1,1
+primary_output_1_units,Units after conversion is applied,m3 lithium slurry,m3 unwashed lithium cake,m3 washed lithium cake,tonnes Li2CO3
+primary_output_1_constituents,,Li2CO3; H2O,Li2CO3; H2O,Li2CO3; H2O,Li2CO3
+primary_output_1_constituent_units,,,,,
+primary_output_1_constituent_fractions,,0.20; 0.80,0.70; 0.30,0.70; 0.30,1
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,FALSE,FALSE,TRUE,FALSE
+coproduct_1_name,,,pressed_water,wash_water,evaporated_water
+coproduct_1_sink,,,wastewater_treatment,wastewater_treatment,atmosphere
+coproduct_1_conversion_factor,,,0.8,0.1,0.4286
+coproduct_1_units,,,,,
+coproduct_1_constituents,,,Various ions but mostly water,Na; K; Mg,H2O
+coproduct_1_constituent_fractions,,,1,1,1
+coproduct_2_name,,,,,
+coproduct_2_sink,,,,,
+coproduct_2_conversion_factor,,,,,
+coproduct_2_units,,,,,
+coproduct_2_constituents,,,,,
+coproduct_2_constituent_fractions,,,,,
+coproduct_3_name,,,,,
+coproduct_3_sink,,,,,
+coproduct_3_conversion_factor,,,,,
+coproduct_3_units,,,,,
+coproduct_3_constituents,,,,,
+coproduct_3_constituent_fractions,,,,,

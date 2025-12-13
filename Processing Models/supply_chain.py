@@ -42,10 +42,6 @@ class SupplyChain:
 		if to_fac.fac_id not in self.facilities:
 			raise KeyError(f"Target facility '{to_fac.fac_id}' not found.")
 
-		key = (from_fac, to_fac)
-		if key not in self.links:
-			self.links[key] = {}
-
 		# Validate products exist
 		from_outputs = self.facilities[from_fac.fac_id].collect_primary_outputs()
 		to_inputs = self.facilities[to_fac.fac_id].collect_primary_inputs()
@@ -57,7 +53,12 @@ class SupplyChain:
 				raise KeyError(f"Product '{product}' not found in {to_fac} inputs.")
 
 		# Validate transport_route is a TransportRoute class
+		if transport_route is not None and not(isinstance(transport_route,TransportRoute)):
+			raise ValueError(f"Input transport_route is not actually a TransportRoute object")
 
+		key = (from_fac, to_fac)
+		if key not in self.links:
+			self.links[key] = {}
 		self.links[key] = [products,transport_route]
 
 	def topo_order(self):
@@ -162,6 +163,7 @@ class SupplyChain:
 							break
 						else:
 							cur_apv = fac.get_initial_pv()
+							print(cur_apv)
 
 			self.avg_var_cost = self.tot_var_cost / self.apv
 			self.avg_fixed_cost = self.tot_fixed_cost / self.apv
@@ -177,6 +179,30 @@ class SupplyChain:
 				"avg_fixed_cost": self.avg_fixed_cost,
 				"avg_cost": self.avg_cost
 			}
+
+	def get_steps(self,transp = False):
+		steps = []
+		for node in self.topo_order_transp():
+			if isinstance(node, Facility):
+				for step in node.fwd:
+					steps.append(step)
+			elif isinstance(node, TransportRoute) and transp:
+				for leg in node.legs:
+					steps.append(leg)
+		return steps
+
+	def get_step_constituents(self):
+		consts = []
+		for step in self.get_steps():
+			consts.append([step.step_name, step.constituents])
+		return consts
+
+	def get_step_reagent_usage(self):
+		reagent_usages = []
+		for step in self.get_steps():
+			for reagent_name, props in step.secondary_inputs.items():
+				reagent_usages.append([step.step_name, reagent_name, props["abs_usage"], props["total_cost"]])
+		return reagent_usages
 
 	def get_detailed_pvs(self):
 		pvs = []

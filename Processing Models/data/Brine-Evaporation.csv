@@ -1,13 +1,14 @@
 variable_name,Description,Pumping,Evaporation
 step_id,Step ID (unique),1,2
 step_name,Human-readable process step,Brine pumping,Evaporation Ponds
-key_chemical,Key chemical equation evaluated in this step.,N/A,Concentration of lithium brine via evaporation
+key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A,Concentration of lithium brine via evaporation
 notes,"Key information, notes","Includes cost of installation and other capex, estimated to be roughly $1M per input data. Electricity usage depends on depth of drilling, but not represented here either.",
 sources,,,
 process_type,continuous or batch,batch,batch
 base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",36000,1
 base_volume_unit,"Not used directly in calculation, but for human readability",L/h,n/a (cost is wholly a footprint cost)
-step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_being_pumped,evaporating_brine
+oversizing_factor,Process volume ≠ design volume,,
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_pump_throughput,brine_evaporation_throughput
 scaling_exponent_throughput,,,
 batch_cycle_time,,1,1
 batch_cycle_time_unit,,unit,unit
@@ -47,15 +48,16 @@ opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as functio
 unplanned_downtime,Fraction of entire facility uptime,0.1,0
 proc_avail_factor,Uptime excluding planned outages,0.9,1
 scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.05,0
-volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",brine_being_pumped,Li
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",brine_pump_throughput,Li
 volume_defining_basis_unit,What unit is the process volume or constituent in?,mg/L,mg/L
 volume_defining_output,What is the output or output constituent that needs to be converted to,pumped_brine,Li
 volume_defining_output_unit,What unit is that output in?,mg/L,mg/L
 primary_input_1_name,,raw_brine_from_ground,pumped_brine
+primary_input_1_units,Units after conversion is applied,,
+primary_input_1_conversion_factor,Conversion factor of input into step basis. >1 means more inputs are needed than the step basis.,1,1
 primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Ca; Na; B; SO4
 primary_input_1_constituent_fractions,Values of input constituents,,
 primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
-primary_input_1_conversion_factor,Conversion factor of input into step basis. >1 means more inputs are needed than the step basis.,1,1
 primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE,TRUE
 reagent_1_name,Reagent name,,
 reagent_1_name_long,Long/descriptive reagent name,,
@@ -77,7 +79,7 @@ reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by t
 reagent_3_units,,,
 primary_output_1_name,Output stream/material,pumped_brine,concentrated_lithium_brine
 primary_output_1_step,The step or waste material tracker that this output goes to,2,Final
-primary_output_1_yield_rate,Yield Rate,1,0.56
+primary_output_1_yield_rate,Yield Rate,1,
 primary_output_1_conversion_factor,Convert from step-units to output units,1,1
 primary_output_1_units,Units after conversion is applied,L/h,L/h
 primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4

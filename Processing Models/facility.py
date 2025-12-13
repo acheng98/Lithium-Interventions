@@ -200,7 +200,7 @@ class Facility:
 						step = self.steps[target_step_id]
 
 				if target not in step.primary_inputs and target not in step.primary_outputs:
-						raise KeyError(f"Input '{target}' not found in step {target_step_id} as either an input or output.")
+						raise KeyError(f"Input '{target}' not found in step {target_step_id} of facility {self.fac_id} as either an input or output.")
 				step.set_constituents(target, composition, propagate=propagate)
 
 		# ============================================================

@@ -8,6 +8,11 @@ scrub_makeup,0.15,$/L,0.15,$/L,Dominated by price of weak salt (e.g. NaCl)
 soda_ash,300,$/mt,0.0000003,$/mg,"From mg/L for brine concentration. Prices have varied quite a bit, but estimate to be about ~$USD300/ton https://tradingeconomics.com/commodity/soda-ash"
 wash_water,3,$/m^3,0.003,$/L,https://www.bluefieldresearch.com/ns/u-s-water-and-sewer-bill-has-increased-24-in-five-years-raising-affordability-concerns/
 explosives,2,$/kg,2,$/kg,Rough guess
+limestone,35,$/mt,0.035,$/kg,From TLC
+flocculant,4960,$/mt,4.96,$/kg,From TLC
+sulfuric_acid,0.12,$/kg,0.12,$/kg,
+dispersant,1,$/kg,1,$/kg,"Heavily dependent on type of dispersant & specific formulation, run sensitivity analysis"
+neutralizing_agent,0.1,$/kg,0.1,$/kg,
 ,,,,,
 delivery_lime_TLC,3,$/mt,,,
 delivery_other_reagent_TLC,48,$/mt,,,

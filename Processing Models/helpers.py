@@ -73,10 +73,11 @@ def parse_list_field(val: str, delim =";", cast=str) -> List[Any]:
 		return []
 	return [cast(x.strip()) for x in val.split(delim)]
 
-def parse_transport_string(s: str):
+def parse_keys_string(s: str, output="list"):
 	"""
-	Parse a transport string of the form:
+	Parse a key string of the form:
 		"truck: 250; barge: 1000; truck: 400"
+		"Li: 82100; K: 8000; Mg: 10000; Ca: 1000..."
 	into:
 		[("truck", 250.0), ("barge", 1000.0), ("truck", 400.0)]
 	Raises ValueError on bad formatting.
@@ -163,7 +164,7 @@ def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 		material_flows["primary_inputs"][in_name] = {
 			"constituents": dict(zip(constituents, fractions)),
 			"units": step_vars.get(f"primary_input_{i}_constituent_units"),
-			"conversion_factor": float(step_vars.get(f"primary_input_{i}_conversion_factor", 1.0)),
+			"conversion_factor": safe_float(step_vars.get(f"primary_input_{i}_conversion_factor"),default=1.0),
 			"chemistry_dependence": chemistry_dependence,
 			"input_needed": 0,
 		}
@@ -199,8 +200,8 @@ def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 			fractions = [""]*len(constituents)
 		material_flows["primary_outputs"][out_name] = {
 			"next_step": step_vars.get(f"primary_output_{i}_step"),
-			"yield_rate": float(step_vars.get(f"primary_output_{i}_yield_rate", 1.0)),
-			"conversion_factor": float(step_vars.get(f"primary_output_{i}_conversion_factor", 1.0)),
+			"yield_rate": safe_float(step_vars.get(f"primary_output_{i}_yield_rate"),default=1.0),
+			"conversion_factor": safe_float(step_vars.get(f"primary_output_{i}_conversion_factor"),default=1.0),
 			"units": step_vars.get(f"primary_output_{i}_units"),
 			"constituents": dict(zip(constituents, fractions)),
 			"chemistry_dependence": chemistry_dependence,
@@ -219,7 +220,7 @@ def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 			fractions = [""]*len(constituents)
 		material_flows["secondary_outputs"][co_name] = {
 			"sink": step_vars.get(f"coproduct_{i}_sink"),
-			"conversion_factor": float(step_vars.get(f"coproduct_{i}_conversion_factor", 1.0)),
+			"conversion_factor": safe_float(step_vars.get(f"coproduct_{i}_conversion_factor"),default=1.0),
 			"units": step_vars.get(f"coproduct_{i}_units"),
 			"constituents": dict(zip(constituents, fractions)),
 		}
@@ -371,8 +372,6 @@ def plot_stacked_bars(labels, series_dict, *,
 
 	labels = list(labels)
 	n = len(labels)
-
-	print(series_dict.items())
 
 	# Validate and scale data
 	data = {}

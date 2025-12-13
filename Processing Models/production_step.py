@@ -14,7 +14,7 @@ class ProductionStep:
 							step_name: Optional[str] = None,
 							# Step details
 							step_basis: Optional[str] = None,
-							key_chemical: Optional[str] = None,
+							key_equation: Optional[str] = None,
 							notes: Optional[str] = None,
 							sources: Optional[Any] = None,
 							# Process parameters grouped
@@ -31,7 +31,7 @@ class ProductionStep:
 				self.facility = facility
 				self.step_id = step_id
 				self.step_name = step_name or step_id
-				self.key_chemical = key_chemical # The key chemical equation used in this production step
+				self.key_equation = key_equation # The key equation, chemical or mechanical, used in this production step
 				self.notes = notes
 				self.sources = sources
 
@@ -166,7 +166,6 @@ class ProductionStep:
 						sink = props["sink"]
 
 						self.secondary_outputs[coproduct_name]["volume"] = 0.0 # will be computed later
-
 						# Check if next step id is in facility
 						if sink in self.facility.sinks:
 								# Add coproduct to sink
@@ -175,17 +174,17 @@ class ProductionStep:
 								raise KeyError(f"Co-product sink {sink} is not defined in the facility.")
 
 				# --------- Inputs ---------
+				self.aggregate_inputs()
 
-				# Check to make sure volume_defining_input (defined in production_step input data) is in the primary inputs or is a constituent
-				# --> NEED TO ADAPT THIS TO CHECK <<PROCESS VOLUME BASIS / CONSTITUENTS>> RATHER THAN INPUTS DIRECTLY. 
-				# --> NAME WAS CHANGED 
-				# valid_inputs = set(self.primary_inputs.keys()) # Gather all valid outputs
-				# for input_data in self.primary_inputs.values():
-				# 		valid_inputs.update(input_data["constituents"].keys())
-				# if self.volume_defining_input not in valid_inputs and self.volume_defining_input != "":
-				# 		raise KeyError(
-				# 				f"Volume defining input '{self.volume_defining_input}' is not defined as a primary input or as a constituent in this step {self.step_name}."
-				# 		)
+				valid_bases = set([self.step_basis])
+				for input_data in self.primary_inputs.values():
+						valid_bases.update(self.constituents.keys())
+
+				# Check to make sure volume_defining_basis is the basis or a constituent
+				if self.volume_defining_basis not in valid_bases and self.volume_defining_basis != "":
+						raise KeyError(
+								f"Volume defining input '{self.volume_defining_basis}' is not defined as the step basis or as a constituent in this step {self.step_name}."
+						)
 
 				for reagent_name, props in self.secondary_inputs.items():
 						# Check to make sure reagent has a cost associated with it
@@ -193,7 +192,6 @@ class ProductionStep:
 								raise KeyError(f"Reagent '{reagent_name}' does not have a recorded cost at the facility level.")
 
 						# Check if target constituents are in the primary input or the primary input
-						valid_inputs = set(self.primary_inputs.keys())
 						target_consts = props["targets"]  # dict: {constituent: {"ratio": r, "elim": e, "usage": 0, ...}}
 
 						# Collect all constituents across primary inputs in a set
@@ -203,10 +201,10 @@ class ProductionStep:
 								for const in input_data["constituents"].keys()
 						}
 
-						# Verify each reagent target constituent is present in the primary inputs
+						# Verify each reagent target constituent is present in the <<primary inputs>> process step constituents
 						for target in target_consts:
-								if target not in valid_inputs and target not in all_primary_constituents:
-										raise KeyError(f"Reagent '{reagent_name}' requires constituent '{target}', which is not present in any primary input.")
+								if target not in valid_bases and target not in all_primary_constituents:
+										raise KeyError(f"Reagent '{reagent_name}' requires constituent '{target}', which is not present in any primary input or the step basis.")
 
 				# All other checks passed, add to facility
 				self.facility.steps[self.step_id] = self
@@ -291,7 +289,7 @@ class ProductionStep:
 							step_id=step_vars["step_id"],
 							step_name=step_vars.get("step_name"),
 							step_basis=step_vars.get("step_basis"),
-							key_chemical=step_vars.get("key_chemical"),
+							key_equation=step_vars.get("key_equation"),
 							notes=step_vars.get("notes"),
 							sources=step_vars.get("sources"),
 							process_params=process_params,
@@ -349,7 +347,7 @@ class ProductionStep:
 				for input_data in self.primary_inputs.values():
 						for const, amount in input_data.get("constituents", {}).items():
 								if amount in ("", None):
-										continue
+										total_consts[const] = total_consts.get(const, 0.0) # Still set to 0 if it doesn't exist
 								try:
 										numeric_amount = float(amount)
 										total_consts[const] = total_consts.get(const, 0.0) + numeric_amount
@@ -381,11 +379,12 @@ class ProductionStep:
 								if target in total_consts:
 										remove_amount = elim * total_consts[target]
 										total_consts[target] = max(0.0, total_consts[target] - remove_amount)
-								elif target in self.primary_inputs:
-										# Reduce input conversion factor
-										conv = self.primary_inputs[target]["conversion_factor"]
-										self.primary_inputs[target]["conversion_factor"] = conv * (1 - elim)
-										remove_amount = conv * elim
+								elif target in self.step_basis:
+										# Effectively reverse yield; more step production volume is needed to balance this elimination
+										# This is still a ratio though, so effectively we are just multiplying by 1 (removing from the whole step production volume)
+										remove_amount = elim
+										for const in total_consts:
+												total_consts[const] = max(0.0, total_consts[const] * (1-elim))
 								else:
 										raise KeyError(f"Reagent '{reagent_name}' targets '{target}' which is not present.")
 
@@ -465,7 +464,6 @@ class ProductionStep:
 				else: # not a primary output, check the constituents
 						output_consts = output_props.get("constituents", {})
 						if self.volume_defining_output in output_consts:
-								# ratio = conversion factor
 								output_ratio = output_props["conversion_factor"] / output_consts[self.volume_defining_output]
 						else:
 								raise KeyError(f"Volume-defining output '{self.volume_defining_output}' not found in step {self.step_id}.")
@@ -474,16 +472,16 @@ class ProductionStep:
 						conversion_ratio = 1
 				else: # not a primary input, check the constituents
 						if self.volume_defining_basis in self.constituents:
-								print(self.constituents, self.volume_defining_basis)
 								conversion_ratio = self.constituents[self.volume_defining_basis] 
 						else:
 								raise KeyError(f"Volume-defining input {self.volume_defining_basis} not found in step {self.step_id}.")
 
+				print((target_volume, yield_rate), output_ratio, conversion_ratio )
 				self.step_pv = (target_volume / yield_rate) / output_ratio / conversion_ratio 
 
 				# CALCULATE USAGE / DEMAND FOR ALL INPUTS
 				for primary_input,input_props in self.primary_inputs.items():
-						needed = self.step_pv * input_props["conversion_factor"]
+						needed = self.step_pv / input_props["conversion_factor"] # Conversion factor > 1 = 
 						self.primary_inputs[primary_input]["input_needed"] = needed
 
 				# --- Scale reagents ---
@@ -523,7 +521,9 @@ class ProductionStep:
 
 						abs_usage = usage_fraction * self.step_pv
 						props["abs_usage"] = abs_usage
-						props["total_cost"] = abs_usage * self.facility.material_costs.get(reagent_name, 0.0) # Make flag here
+						if reagent_name not in self.facility.material_costs:
+								raise KeyError (f"Reagent {reagent_name} not found in facility {self.facility.fac_id}'s listed materials with costs.")
+						props["total_cost"] = abs_usage * self.facility.material_costs[reagent_name]
 
 		def calculate_environmental_impacts(self, impact_factors: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
 				"""
@@ -669,7 +669,7 @@ class ProductionStep:
 				else:
 						self.machines_required = self.ltr / self.lta
 
-				self.scaled_equip_price = self.machines_required * self.prim_equip_price_base
+				self.scaled_equip_cost = self.machines_required * self.prim_equip_price_base
 
 				# Labor required
 				if self.dedicated_labor:
@@ -693,7 +693,7 @@ class ProductionStep:
 
 				# Equipment scaling
 				self.machines_required = 1
-				self.scaled_equip_price = (self.prim_equip_price_base *
+				self.scaled_equip_cost = (self.prim_equip_price_base *
 																		(volume_ratio ** self.prim_equip_scaling_exponent))
 
 				# Utility scaling
@@ -745,9 +745,9 @@ class ProductionStep:
 				# --- Machine cost ---
 				if self.prim_equip_life is not None:
 						equip_crf = self.facility.calc_crf(self.facility.dr, self.prim_equip_life)
-						self.machine_cost = equip_crf * self.scaled_equip_price
+						self.machine_cost = equip_crf * self.scaled_equip_cost
 				else:
-						self.machine_cost = self.facility.crf * self.scaled_equip_price # Assume machine life is life of facility
+						self.machine_cost = self.facility.crf * self.scaled_equip_cost # Assume machine life is life of facility
 
 				# --- Tool cost ---
 				if hasattr(self, "tool_price") and self.tool_price:
