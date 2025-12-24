@@ -1,0 +1,100 @@
+variable_name,Description,Batch Treatment,Separation
+step_id,Step ID (unique),1,2
+step_name,Human-readable process step,Batch treatment of brine (Lime [CaCO3] + soda ash [Na2CO3]),Solid–liquid separation (settling + filtration lumped)
+key_equation,"Key equation, chemical or physical, evaluated in this step.",Mg2+ + (OH)-2 --> Mg(OH)2(s); Ca2+ + CO3^2- -> CaCO3(s),
+notes,"Key information, notes","Batch reactor/tanks with agitation. Purpose is impurity precipitation (Mg, Ca) while keeping Li in solution.",Primary tunable is Li loss to solids.
+sources,,,
+process_type,continuous or batch,batch,continuous
+base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",100,100
+base_volume_unit,"Not used directly in calculation, but for human readability",m3/batch concentrated brine,m3/h treated slurry equivalent (pseudo-continuous)
+oversizing_factor,Process volume ≠ design volume,1.15,1.15
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,concentrated_brine_throughput,treated_slurry_throughput
+scaling_exponent_throughput,Exponent for operations vis-a-vis process rate,0.7,0.7
+batch_cycle_time,,6,
+batch_cycle_time_unit,,hr,
+batch_setup_time,,1,
+batch_setup_time_unit,,hr,
+dedicated_line,,TRUE,TRUE
+electricity_base_total,"Reference electricity use, for base volume",10,20
+electricity_base_total_unit,,kWh/h,kWh/h
+natural_gas_base_total,Reference gas consumption,0,0
+natural_gas_base_total_unit,,MMBTU/h,MMBTU/h
+process_water_base_total,Makeup water,0.2,0.5
+process_water_base_total_unit,,m3/h,m3/h
+cooling_water_base_total,Reference cooling water,0,0
+cooling_water_base_total_unit,,m3/h,m3/h
+diesel_base_total,Reference diesel usage,0,0
+diesel_base_total_unit,,L/h,L/h
+steam_base_total,Reference steam use,0,0
+steam_base_total_unit,,kg/h,kg/h
+compressed_air_base_total,Reference compressed air,0,0
+compressed_air_base_total_unit,,Nm3/h,Nm3/h
+prim_equip_price_base,Reference equipment capex,1500000,3000000
+prim_equip_price_base_unit,,2025USD,2025USD
+prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",0.6,0.6
+prim_equip_life,Expected equipment life,20,20
+prim_equip_life_unit,,years,years
+tooling_cost_base,Reference tooling cost,0,0
+tooling_cost_base_unit,,2025USD,2025USD
+tooling_scaling_exponent,Scale exponent,0.6,0.6
+footprint_base,Plot area incl. access,300,600
+footprint_base_unit,,m2,m2
+footprint_scaling_exponent,Scale exponent,0.6,0.6
+dedicated_labor,,TRUE,FALSE
+labor_base,Reference labor requirement,0.5,0.5
+labor_base_unit,,FTE,FTE
+labor_scaling_exponent,Labor efficiency with scale,0.3,0.3
+opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as function of capex",0.05,0.05
+unplanned_downtime,Fraction of entire facility uptime,0.05,0.05
+proc_avail_factor,Uptime excluding planned outages,0.95,0.95
+scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.1,0.1
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",concentrated_brine_throughput,treated_slurry_throughput
+volume_defining_basis_unit,What unit is the process volume or constituent in?,L concentrated_lithium_brine,L brine_post_lime
+volume_defining_output,What is the output or output constituent that needs to be converted to,treated_slurry,brine_post_polishing
+volume_defining_output_unit,What unit is that output in?,L brine_post_lime,L brine_post_polish
+primary_input_1_name,,concentrated_lithium_brine,treated_slurry
+primary_input_1_units,Units after conversion is applied,L concentrated_lithium_brine,L treated slurry
+primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,1
+primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg(OH)2; CaCO3; Na; B; SO4
+primary_input_1_constituent_fractions,Values of input constituents,,
+primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE
+reagent_1_name,Reagent name,lime,filter_aid
+reagent_1_name_long,Long/descriptive reagent name,Slaked lime (Ca(OH)2) for Mg precipitation / pH adjustment,"precoat (e.g., diatomaceous earth)"
+reagent_1_target_constituents,,Mg,treated_slurry_throughput
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),3.700,0.020
+reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,0.95,0.005
+reagent_1_units,,kg Ca(OH)2 per kg Mg,kg_filter_aid per m3 treated slurry
+reagent_2_name,Reagent name,soda_ash,
+reagent_2_name_long,Long/descriptive reagent name,Soda ash (Na2CO3) for Ca precipitation as CaCO3,
+reagent_2_target_constituents,,Ca,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),3.200,
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,0.9,
+reagent_2_units,,kg Na2CO3 per kg Ca,
+reagent_3_name,Reagent name,,
+reagent_3_name_long,Long/descriptive reagent name,,
+reagent_3_target_constituents,,,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_3_units,,,
+primary_output_1_name,Output stream/material,treated_slurry,brine_post_polishing
+primary_output_1_step,The step or waste material tracker that this output goes to,2,Final
+primary_output_1_yield_rate,Yield Rate,1,0.995
+primary_output_1_units,Convert from step basis units to output units (step basis * CF = output),L brine-post lime,L brine post de-boron
+primary_output_1_conversion_factor,Units after conversion is applied,1,1
+primary_output_1_constituents,,Li; K; Mg(OH)2; CaCO3; Na; B; SO4,Li; Na; K; Cl; SO4; H2O
+primary_output_1_constituent_units,,,
+primary_output_1_constituent_fractions,,,
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,TRUE
+coproduct_1_name,,,residue
+coproduct_1_sink,,,landfill
+coproduct_1_conversion_factor,,,0.005
+coproduct_1_units,,,m3_wet_solids per m3 treated slurry
+coproduct_1_constituents,,,Mg(OH)2; CaCO3; brine
+coproduct_1_constituent_fractions,,,0.25; 0.25; 0.50
+coproduct_2_name,,,wash_liquor
+coproduct_2_sink,,,wastewater_treatment
+coproduct_2_conversion_factor,,,0
+coproduct_2_units,,,m3 per m3 treated slurry
+coproduct_2_constituents,,,
+coproduct_2_constituent_fractions,,,

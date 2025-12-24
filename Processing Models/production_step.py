@@ -18,12 +18,9 @@ class ProductionStep:
 							notes: Optional[str] = None,
 							sources: Optional[Any] = None,
 							# Process parameters grouped
-							process_params: Optional[Dict[str, Any]] = None,  # e.g., {"process_type": "batch", "base_volume": 1000, ...}
-							batch_params: Optional[Dict[str, Any]] = None,    # e.g., {"cycle_time": 1.0, "setup_time": 0.2, ...}
-							utilities: Optional[Dict[str, Any]] = None,       # e.g., {"electricity": 1000, "natural_gas": 500, ...}
-							equipment: Optional[Dict[str, Any]] = None,       # e.g., {"price": 10000, "life": 10, ...}
-							labor: Optional[Dict[str, Any]] = None,           # e.g., {"dedicated": True, "base": 100, ...}
-							downtime: Optional[Dict[str, float]] = None,      # {"unplanned": 0.05, "scheduled": 0.02}
+							machines: Optional[List[str]] = None,
+							machine_default: Optional[str] = None,
+							machine_data: Optional[Dict[str, Any]] = None,
 							material_flows: Optional[Dict[str, Dict[str, Any]]] = None  # primary_inputs, primary_outputs, reagents, etc.
 					):
 
@@ -38,77 +35,78 @@ class ProductionStep:
 				self.step_basis = step_basis # The unit of measure of the intermediate volume in the step
 				self.step_pv = None # Amount of production volume of step basis 
 				self.constituents = None # Chemical constituents of the step basis
+				self.machines: List[str] = machines or ([] if machine_default is None else [machine_default])
+				self.machine_id = None # Machine or machine system modeled in this step
 
 				# Default dictionaries if not provided
 				# Maybe should probably raise errors instead of using empty dicts? we use default values
 				# below but may want to inherit sometimes from facility or otherwise flag. Hard to say
-				process_params = process_params or {}
-				batch_params = batch_params or {}
-				utilities = utilities or {}
-				equipment = equipment or {}
-				labor = labor or {}
-				downtime = downtime or {}
+				machine_params = machine_params or {}
 				material_flows = material_flows or {}
 
+				if machine_default not in machine_params:
+						raise KeyError(f"Machine {machine_default} is not defined in input machine data.")
+
 				# Process parameters
-				self.process_type: str = process_params.get("process_type", "batch")
-				self.base_volume: Optional[float] = process_params.get("base_volume")
-				self.base_volume_unit: Optional[str] = process_params.get("base_volume_unit")
-				self.scaling_exponent: float = process_params.get("scaling_exponent", 1.0)
-				self.dedicated_line: bool = process_params.get("dedicated_line", False)
-				self.volume_defining_basis: str = process_params.get("volume_defining_basis")
-				self.volume_defining_output: str = process_params.get("volume_defining_output")
+				self.process_type: str = machine_params.get("process_type", "batch")
+				self.base_volume: Optional[float] = machine_params.get("base_volume")
+				self.base_volume_unit: Optional[str] = machine_params.get("base_volume_unit")
+				self.scaling_exponent: float = machine_params.get("scaling_exponent", 1.0)
+				self.dedicated_line: bool = machine_params.get("dedicated_line", False)
+				self.volume_defining_basis: str = machine_params.get("volume_defining_basis")
+				self.volume_defining_output: str = machine_params.get("volume_defining_output")
+				# self.scrap_rate: float = machine_params.get("scrap_rate", 0.0)
+				self.yield_rate: float = machine_params.get("yield_rate")
 
 				# Batch
-				self.batch_cycle_time: Optional[float] = batch_params.get("cycle_time")
-				self.batch_cycle_time_unit: Optional[str] = batch_params.get("cycle_time_unit")
-				self.batch_setup_time: Optional[float] = batch_params.get("setup_time")
-				self.batch_setup_time_unit: Optional[str] = batch_params.get("setup_time_unit")
-				self.scrap_rate: float = batch_params.get("scrap_rate", 0.0)
+				self.batch_cycle_time: Optional[float] = machine_params.get("cycle_time")
+				self.batch_cycle_time_unit: Optional[str] = machine_params.get("cycle_time_unit")
+				self.batch_setup_time: Optional[float] = machine_params.get("setup_time")
+				self.batch_setup_time_unit: Optional[str] = machine_params.get("setup_time_unit")
 
 				# Utilities
-				self.electricity_base_total: float = utilities.get("electricity_base_total", 0.0)
-				self.electricity_base_total_unit: Optional[str] = utilities.get("electricity_base_total_unit")
-				self.electricity_source: Optional[str] = utilities.get("electricity_source")
+				self.electricity_base_total: float = machine_params.get("electricity_base_total", 0.0)
+				self.electricity_base_total_unit: Optional[str] = machine_params.get("electricity_base_total_unit")
+				self.electricity_source: Optional[str] = machine_params.get("electricity_source")
 
-				self.natural_gas_base_total: float = utilities.get("natural_gas_base_total", 0.0)
-				self.natural_gas_base_total_unit: Optional[str] = utilities.get("natural_gas_base_total_unit")
-				self.natural_gas_source: Optional[str] = utilities.get("natural_gas_source")
+				self.natural_gas_base_total: float = machine_params.get("natural_gas_base_total", 0.0)
+				self.natural_gas_base_total_unit: Optional[str] = machine_params.get("natural_gas_base_total_unit")
+				self.natural_gas_source: Optional[str] = machine_params.get("natural_gas_source")
 
-				self.process_water_base_total: float = utilities.get("process_water_base_total", 0.0)
-				self.process_water_base_total_unit: Optional[str] = utilities.get("process_water_base_total_unit")
+				self.process_water_base_total: float = machine_params.get("process_water_base_total", 0.0)
+				self.process_water_base_total_unit: Optional[str] = machine_params.get("process_water_base_total_unit")
 
-				self.cooling_water_base_total: float = utilities.get("cooling_water_base_total", 0.0)
+				self.cooling_water_base_total: float = machine_params.get("cooling_water_base_total", 0.0)
 				self.cooling_water_base_total_unit: Optional[str] = utilities.get("cooling_water_base_total_unit")
 
-				self.steam_base_total: float = utilities.get("steam_base_total", 0.0)
-				self.steam_base_total_unit: Optional[str] = utilities.get("steam_base_total_unit")
+				self.steam_base_total: float = machine_params.get("steam_base_total", 0.0)
+				self.steam_base_total_unit: Optional[str] = machine_params.get("steam_base_total_unit")
 
-				self.compressed_air_base_total: float = utilities.get("compressed_air_base_total", 0.0)
-				self.compressed_air_base_total_unit: Optional[str] = utilities.get("compressed_air_base_total_unit")
+				self.compressed_air_base_total: float = machine_params.get("compressed_air_base_total", 0.0)
+				self.compressed_air_base_total_unit: Optional[str] = machine_params.get("compressed_air_base_total_unit")
 
 				# Equipment
-				self.prim_equip_price_base: float = equipment.get("price", 0.0)
-				self.prim_equip_price_base_unit: Optional[str] = equipment.get("unit")
-				self.prim_equip_scaling_exponent: float = equipment.get("scaling_exponent", 1.0)
-				self.prim_equip_life: float = equipment.get("life")
-				self.prim_equip_life_unit: Optional[str] = equipment.get("life_unit")
-				self.tooling_cost_base: float = equipment.get("tooling_cost", 0.0)
-				self.tooling_cost_base_unit: Optional[str] = equipment.get("tooling_unit")
-				self.tooling_scaling_exponent: float = equipment.get("tooling_scaling_exponent", 1.0)
-				self.footprint_base: float = equipment.get("footprint_base", 0.0)
-				self.footprint_base_unit: Optional[str] = equipment.get("footprint_unit")
-				self.footprint_scaling_exponent: float = equipment.get("footprint_scaling_exponent", 1.0)
+				self.prim_equip_price_base: float = machine_params.get("price", 0.0)
+				self.prim_equip_price_base_unit: Optional[str] = machine_params.get("unit")
+				self.prim_equip_scaling_exponent: float = machine_params.get("scaling_exponent", 1.0)
+				self.prim_equip_life: float = machine_params.get("life")
+				self.prim_equip_life_unit: Optional[str] = machine_params.get("life_unit")
+				self.tooling_cost_base: float = machine_params.get("tooling_cost", 0.0)
+				self.tooling_cost_base_unit: Optional[str] = machine_params.get("tooling_unit")
+				self.tooling_scaling_exponent: float = machine_params.get("tooling_scaling_exponent", 1.0)
+				self.footprint_base: float = machine_params.get("footprint_base", 0.0)
+				self.footprint_base_unit: Optional[str] = machine_params.get("footprint_unit")
+				self.footprint_scaling_exponent: float = machine_params.get("footprint_scaling_exponent", 1.0)
 
 				# Labor
-				self.dedicated_labor: bool = labor.get("dedicated", False)
-				self.labor_base: float = labor.get("base", 0.0)
-				self.labor_base_unit: Optional[str] = labor.get("unit")
-				self.labor_scaling_exponent: float = labor.get("scaling_exponent", 1.0)
+				self.dedicated_labor: bool = machine_params.get("dedicated", False)
+				self.labor_base: float = machine_params.get("base", 0.0)
+				self.labor_base_unit: Optional[str] = machine_params.get("unit")
+				self.labor_scaling_exponent: float = machine_params.get("scaling_exponent", 1.0)
 
 				# Downtime
-				self.unplanned_downtime: float = downtime.get("unplanned", self.facility.upd)
-				self.scheduled_maintenance: float = downtime.get("scheduled", self.facility.scm)
+				self.unplanned_downtime: float = machine_params.get("unplanned", self.facility.upd)
+				self.scheduled_maintenance: float = machine_params.get("scheduled", self.facility.scm)
 
 				# Material flows
 				self.primary_inputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("primary_inputs", {}))
@@ -318,6 +316,7 @@ class ProductionStep:
 				elif target_name in self.primary_outputs:
 						self.primary_outputs[target_name]["constituents"] = constituents
 						if propagate:
+								self.apply_reagents() # Ensure output composition exists to propagate.
 								self.propagate_chemistry()
 				elif target_name in self.secondary_outputs:
 						self.secondary_outputs[target_name]["constituents"] = constituents
@@ -332,7 +331,7 @@ class ProductionStep:
 						self.primary_inputs[target_name]["conversion_factor"] = factor
 				elif target_name in self.primary_outputs:
 						if change_yield:
-								self.primary_outputs[target_name]["yield"] = factor
+								self.primary_outputs[target_name]["yield_rate"] = factor
 						else:
 								self.primary_outputs[target_name]["conversion_factor"] = factor
 				elif target_name in self.secondary_outputs:
@@ -377,19 +376,23 @@ class ProductionStep:
 								elim  = tprops["elim"]
 
 								if target in total_consts:
+										base_amount = total_consts[target] # the base amount of the constituent targeted. Will be mutated later with removal.
 										remove_amount = elim * total_consts[target]
+
+										# Apply the removal to the running state (for downstream mass balance)
 										total_consts[target] = max(0.0, total_consts[target] - remove_amount)
 								elif target in self.step_basis:
 										# Effectively reverse yield; more step production volume is needed to balance this elimination
 										# This is still a ratio though, so effectively we are just multiplying by 1 (removing from the whole step production volume)
+										base_amount = 1 # CHECK IF WE WANT TO MAKE THIS SORT OF REVERSE YIELD ASSUMPTION
 										remove_amount = elim
 										for const in total_consts:
 												total_consts[const] = max(0.0, total_consts[const] * (1-elim))
 								else:
 										raise KeyError(f"Reagent '{reagent_name}' targets '{target}' which is not present.")
 
-								reagent_usage += ratio * remove_amount
-								tprops["per_unit_usage"] = tprops.get("per_unit_usage", 0.0) + ratio * remove_amount
+								reagent_usage += ratio * base_amount
+								tprops["per_unit_usage"] = tprops.get("per_unit_usage", 0.0) + ratio * base_amount
 
 						props["usage"] = reagent_usage
 
@@ -397,10 +400,10 @@ class ProductionStep:
 				if not self.primary_outputs:
 						raise ValueError(f"No primary outputs defined for step {self.step_id}.")
 
-				# For now, assumign only one primary output. Could install a filter later. 
-				output_name = next(iter(self.primary_outputs))
-				if self.primary_outputs[output_name]["chemistry_dependence"]: # Only overwrite if output explicitly depends on input chemistry.
-						self.primary_outputs[output_name]["constituents"] = total_consts
+				# For now, assuming only one primary output. Could install a filter later. 
+				for output_name in self.primary_outputs:
+						if self.primary_outputs[output_name]["chemistry_dependence"]: # Only overwrite if output explicitly depends on input chemistry.
+								self.primary_outputs[output_name]["constituents"] = total_consts
 
 		def propagate_chemistry(self, propagate: bool = True):
 				"""
@@ -410,19 +413,20 @@ class ProductionStep:
 				if not self.primary_outputs:
 						return
 
-				output_name, output_data = next(iter(self.primary_outputs.items())) # Assume only one primary output for now
-				if output_data["chemistry_dependence"]: # Only continue if output explicitly depends on input chemistry.
-						total_consts = output_data.get("constituents", {})
+				# For now, assuming only one primary output. Could install a filter later. 
+				for output_name, output_data in self.primary_outputs.items():
+						if output_data["chemistry_dependence"]: # Only continue if output explicitly depends on input chemistry.
+								total_consts = output_data.get("constituents", {})
 
-						for next_step in self.next_steps.values():
-								if output_name in next_step.primary_inputs:
-										next_step.primary_inputs[output_name]["constituents"] = copy.deepcopy(total_consts)
+								for next_step in self.next_steps.values():
+										if output_name in next_step.primary_inputs:
+												next_step.primary_inputs[output_name]["constituents"] = copy.deepcopy(total_consts)
 
-										if next_step.primary_inputs[output_name].get("chemistry_dependence") and propagate:
-												next_step.apply_reagents()
-												next_step.propagate_chemistry(propagate=True)
-								else:
-										raise KeyError(f"Output {output_name} not found in next step {next_step.step_id} inputs.")
+												if next_step.primary_inputs[output_name].get("chemistry_dependence") and propagate:
+														next_step.apply_reagents()
+														next_step.propagate_chemistry(propagate=True)
+										else:
+												raise KeyError(f"Output {output_name} not found in next step {next_step.step_id} inputs.")
 
 		def compute_step_pv(self, propagate: bool = False):
 				"""
@@ -459,6 +463,7 @@ class ProductionStep:
 				output_props = next(iter(self.primary_outputs.values()))  # Assuming only one primary output for now
 				yield_rate = output_props["yield_rate"]
 
+
 				if self.volume_defining_output in self.primary_outputs:
 						output_ratio = output_props["conversion_factor"]
 				else: # not a primary output, check the constituents
@@ -476,7 +481,7 @@ class ProductionStep:
 						else:
 								raise KeyError(f"Volume-defining input {self.volume_defining_basis} not found in step {self.step_id}.")
 
-				print((target_volume, yield_rate), output_ratio, conversion_ratio )
+				# print((target_volume, yield_rate), output_ratio, conversion_ratio)
 				self.step_pv = (target_volume / yield_rate) / output_ratio / conversion_ratio 
 
 				# CALCULATE USAGE / DEMAND FOR ALL INPUTS
@@ -486,7 +491,7 @@ class ProductionStep:
 
 				# --- Scale reagents ---
 				self.scale_reagents()
-
+				
 				# --- Co-product volumes ---
 				for coproduct_name, props in self.secondary_outputs.items():
 						conv = props["conversion_factor"]
@@ -515,6 +520,7 @@ class ProductionStep:
 						raise ValueError(f"Step {self.step_id} step_pv must be set before scaling reagents.")
 
 				for reagent_name, props in self.secondary_inputs.items():
+						print(self.step_name,reagent_name,props)
 						usage_fraction = props.get("usage")
 						if usage_fraction is None:
 								raise ValueError(f"Reagent {reagent_name} has no per-unit usage (run apply_reagents first).")
@@ -689,7 +695,7 @@ class ProductionStep:
 				'''
 				Scale throughput, labor, and utilities for continuous process
 				'''
-				volume_ratio = self.step_pv / self.base_volume if self.base_volume else 1.0
+				volume_ratio = self.step_pv / (self.base_volume * self.lta) if self.base_volume else 1.0 # Assume base volumes are always units per hour
 
 				# Equipment scaling
 				self.machines_required = 1
@@ -705,7 +711,10 @@ class ProductionStep:
 				self.compressed_air_consumed = self.compressed_air_base_total * (volume_ratio ** self.scaling_exponent)
 
 				# Labor scaling
-				self.labor_required = self.labor_base * (volume_ratio ** self.labor_scaling_exponent)
+				if self.dedicated_labor:
+						self.labor_required = math.ceil(self.labor_base * (volume_ratio ** self.labor_scaling_exponent))
+				else:
+						self.labor_required = self.labor_base * (volume_ratio ** self.labor_scaling_exponent)
 
 		def _calc_material_costs(self):
 				'''
@@ -713,13 +722,9 @@ class ProductionStep:
 				'''
 				self.tot_mat_cost = 0
 
-				# New structure: reagents in secondary_inputs
+				# Assume only secondary inputs (i.e. reagents) are new to system and thus have costs 
 				for reagent, props in self.secondary_inputs.items():
 						self.tot_mat_cost += props.get("total_cost", 0)
-
-				# Structure for primary_inputs - not currently used
-				# for primary_input, props in self.primary_inputs.items():
-				#     self.tot_mat_cost += props.get("total_cost", 0)
 
 		def _calc_labor_costs(self):
 				'''

@@ -7,6 +7,7 @@ from transportation import Transportation, TransportRoute
 import pandas as pd
 from collections import defaultdict
 from copy import deepcopy
+from pprint import pprint
 
 # Probably should incorporate this into 'from_table'
 def import_steps(fac,steps_dict):
@@ -41,10 +42,12 @@ def lithium_evaporation(sc,facility_steps,locations,transp_data,transports,chems
 						sinks = ["landfill","atmosphere"]) # Potassium?
 	import_steps(evap_ponds,facility_steps[0])
 	evap_ponds.update_location(locations[0],locations_dict[locations[0]])
-
-	products = {"concentrated_lithium_brine": 1}
+	# Set conversion factor for yield from ponds
+	evap = evap_ponds.fwd[1]
+	evap.set_conversion_factor("concentrated_lithium_brine",brine_factors["Pond Recovery Efficiency"],change_yield=True)
 
 	# Transportation
+	products = {"concentrated_lithium_brine": 1}
 	if transports[0] is None: 
 		# In certain locations - namely Silver Peak - brine is processed on-site with the ponds
 		sc.add_facility(evap_ponds, next_fac=conc_brine, products=products)
@@ -56,17 +59,14 @@ def lithium_evaporation(sc,facility_steps,locations,transp_data,transports,chems
 		sc.add_facility(evap_ponds, next_fac=conc_brine, products=products, transport_route=brine_truck_route)
 
 	# Fix Chemistries
-	evap_ponds.add_target_comp(target = "concentrated_lithium_brine", composition = chems[1], target_step_id = "2", propagate = True)
 	evap_ponds.add_target_comp(target = "raw_brine_from_ground", composition = chems[0], target_step_id = "1", propagate = True)
+	evap_ponds.add_target_comp(target = "concentrated_lithium_brine", composition = chems[1], target_step_id = "2", propagate = True)
 	conc_brine.add_target_comp(target = "concentrated_lithium_brine", composition = chems[1], target_step_id = "1", propagate = True)
 	lithium_extraction.add_target_comp(target = "brine_post_polishing", 
-		composition = conc_brine.fwd[2].primary_outputs["brine_post_polishing"]["constituents"], # Would be nice to make a get function for this
+		composition = conc_brine.fwd[-1].primary_outputs["brine_post_polishing"]["constituents"], # Would be nice to make a get function for this
 		target_step_id = "1", propagate = True
 		)
-
-	# Set conversion factor for yield from ponds
-	evap = evap_ponds.fwd[1]
-	evap.set_conversion_factor("concentrated_lithium_brine",brine_factors["Pond Recovery Efficiency"],change_yield=True)
+	print(conc_brine.fwd[-1].primary_outputs["brine_post_polishing"]["constituents"])
 
 	return sc 
 
@@ -133,6 +133,7 @@ def clay_lepidolite(sc,facility_steps,locations,transp_data,transports,chems,mat
 	material_refining.add_target_comp(target = "rom_ore_feed", composition = composition, target_step_id = "1", propagate = True)
 
 	interm_chem = chems[1]["Li"]
+	print(interm_chem)
 	# material_refining.add_target_comp(target = "purified_Li_solution", composition = ) don't have this intermediate composition yet 
 	lithium_extraction.add_target_comp()
 	# material_extraction.add_target_comp(target = "excavated_ore", composition = chems[0], target_step_id = "2", propagate = True) <-- target acid leaching
@@ -198,48 +199,55 @@ def evaluate_project(project_data, material_costs, locations_dict, transp_data, 
 	# for target_pv in target_pvs:
 	target_pv = project_data["Production Volume (Tonnes LCE / Year)"] # convert to kg
 	print(sc.update_apv(target_pv))
-	print(sc.get_detailed_pvs())
-	print(sc.get_step_constituents())
-	print(sc.get_step_reagent_usage())
+	# pprint(sc.get_total_reagents())
+	# pprint(sc.get_total_utilities())
+	# pprint(sc.get_step_labor())
 	# print(sc.get_detailed_pvs())
-	sc.plot_tot_steps_costs()
+	# print(sc.get_detailed_inputs())
+	# print(sc.get_step_constituents())
+	print(sc.get_step_reagent_usage())
+	# pprint(sc.get_step_utilities_detailed())
+	# print(sc.get_detailed_pvs())
+	# sc.plot_tot_steps_costs()
 	# sc.plot_tot_steps_impacts()
 
 	# sc.plot_unit_cc()
 	# sc.plot_total_cc()
 
 if __name__ == '__main__':
-	data_folder = "./data/"
+	data_folder = "./interm-data/"
+	material_costs = load_csv(data_folder+"Material Costs.csv")
 
-	# Material Costs #
-	material_costs_df = pd.read_csv(data_folder+"Material Costs.csv", dtype=str).fillna("")
-	# Assumes first column is material name; *fourth* column is converted unit cost
-	material_costs = {
-		str(row[0]): safe_float(row[3])
-		for row in material_costs_df.itertuples(index=False, name=None)
-		if pd.notna(row[0]) and pd.notna(row[3])
-	}
+	# # Material Costs #
+	# material_costs_df = pd.read_csv(data_folder+"Material Costs.csv", dtype=str).fillna("")
+	# # Assumes first column is material name; *fourth* column is converted unit cost
+	# material_costs = {
+	# 	str(row[0]): safe_float(row[3])
+	# 	for row in material_costs_df.itertuples(index=False, name=None)
+	# 	if pd.notna(row[0]) and pd.notna(row[3])
+	# }
 
-	# Locational data
-	locational_data_df = pd.read_csv(data_folder+"Locational Data.csv", dtype=str).fillna("") 
-	header_ld = list(locational_data_df.columns)
-	rows_ld = locational_data_df.values.tolist()
-	locational_data = [header_ld] + rows_ld # as lists
-	locations_dict = build_locations_dict(locational_data)
+	# # Locational data
+	# locational_data_df = pd.read_csv(data_folder+"Locational Data.csv", dtype=str).fillna("") 
+	# header_ld = list(locational_data_df.columns)
+	# rows_ld = locational_data_df.values.tolist()
+	# locational_data = [header_ld] + rows_ld # as lists
+	# locations_dict = build_locations_dict(locational_data)
 
-	# Transportation data
-	transp_data_df = pd.read_csv(data_folder+"Transportation Data.csv", dtype=str).fillna("") 
+	# # Transportation data
+	# transp_data_df = pd.read_csv(data_folder+"Transportation Data.csv", dtype=str).fillna("") 
 
-	# Project-Specific Data
-	projects_data_df = pd.read_csv(data_folder+"Project-Specific Data.csv", dtype=str).fillna("") 
-	projects_data = build_projects_dict(projects_data_df)
+	# # Project-Specific Data
+	# projects_data_df = pd.read_csv(data_folder+"Project-Specific Data.csv", dtype=str).fillna("") 
+	# projects_data = build_projects_dict(projects_data_df)
 
-	################
-	# Pick project #
-	################
-	project_data = projects_data["Salar de Atacama-SQM"]
+	# ################
+	# # Pick project #
+	# ################
+	# # project_data = projects_data["Salar de Atacama-SQM"]
+	# project_data = projects_data["Silver Peak"]
 
-	evaluate_project(project_data,material_costs,locations_dict,transp_data_df,data_folder)
+	# evaluate_project(project_data,material_costs,locations_dict,transp_data_df,data_folder)
 
 
 

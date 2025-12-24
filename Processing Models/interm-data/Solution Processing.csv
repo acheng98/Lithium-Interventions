@@ -6,7 +6,7 @@ notes,"Key information, notes",Li precipitation as carbonate at pH ~10.5; 5% Na2
 sources,,Khakmardan 2024,Khakmardan 2024,Khakmardan 2024,Khakmardan 2024; costs and electricity usage from EverBatt
 process_type,continuous or batch,continuous,batch,batch,continuous
 base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",60000,60,60,2.5
-base_volume_unit,"Not used directly in calculation, but for human readability",L polished brine/h,m3 lithium slurry being pressed,m3 Li2CO3 cake being washed,tonnes Li2CO3 cake being dried & packed/h
+base_volume_unit,"Not used directly in calculation, but for human readability",L polished brine/h,m3 lithium slurry being pressed,m3 Li2CO3 cake being washed,tonnes Li2CO3 cake being dried & packed
 oversizing_factor,Process volume ≠ design volume,1.25,1.25,1.25,1
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,polish_brine_throughput,slurry_press_throughput,cake_wash_throughput,cake_dry_throughput
 scaling_exponent_throughput,Exponent for operations vis-a-vis process rate,0.7,,,1

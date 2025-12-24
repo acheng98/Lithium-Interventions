@@ -1,0 +1,100 @@
+variable_name,Description,CSTR Liming Step,Boron Removal,Solvent-extraction (SX) Lithium Concentration & Polishing Unit
+step_id,Step ID (unique),1,2,3
+step_name,Human-readable process step,Lime treatment (CSTR + clarifier),Boron removal (solvent extraction/adsorption),Solvent exchange + settlers/polishing filter
+key_equation,"Key equation, chemical or physical, evaluated in this step.",Mg2+ + Ca(OH)2 --> Mg(OH)2 + Ca2+,B + resin/solvent --> precipitate,Li + organic extractant; strip to aqueous
+notes,"Key information, notes",Mg removal via Ca(OH)2 at pH ~10.8–11.2; 15% excess over stoichiometric ratio of Ca(OH)2 to Mg2+ ions; lime slurry ~10 wt %; clarifier SOR ~33–49 m3/m2/d; mixing sized on P/V; Ca removal deferred to soda ash step.,Boron extraction with resin or solvent; typical removal 90–95%,Multi-stage extraction of Li+ into organic; scrub to reduce co-extracted Na/K; strip to produce a LiCl aqueous concentrate; typical 2–4 extraction stages + 1 scrub + 1–2 strip stages; organic = extractant + modifier + diluent; Li recovery per pass 80–95%; eluate sent to carbonate precipitation.
+sources,,"https://watertap.readthedocs.io/en/stable/technical_reference/costing/cstr.html, https://www.osmre.gov/sites/default/files/inline-files/reactionTank_amdtreatHelp_final508_0.pdf, https://www.pdhonline.com/courses/g127/g127content.pdf, https://www.saltworkstech.com/articles/lithium-brine-extraction-technologies-and-approaches/, https://www.veritoengineering.com/lime-dosing-system.php, https://sites.engineering.ucsb.edu/~jbraw/chemreacfun/ch6/slides-enbal-2up.pdf, https://s3.amazonaws.com/suncam/docs/278.pdf ",,"https://www.frontiersin.org/journals/chemical-engineering/articles/10.3389/fceng.2022.1008680/full, https://docs.nrel.gov/docs/fy21osti/79178.pdf, https://pmc.ncbi.nlm.nih.gov/articles/PMC11694342/, https://www.sciencedirect.com/science/article/abs/pii/S0011916423001753"
+process_type,continuous or batch,continuous,continuous,continuous
+base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",100000,100000,50000
+base_volume_unit,"Not used directly in calculation, but for human readability",L concentrated brine/h,L limed concentrated brine/h,L de-boronated concentrated brine/h
+oversizing_factor,Process volume ≠ design volume,,,
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_lime_throughput,brine_deboron_throughput,brine_SX_throughput
+scaling_exponent_throughput,Exponent for process rate,0.7,0.7,0.7
+batch_cycle_time,,,,
+batch_cycle_time_unit,,,,
+batch_setup_time,,,,
+batch_setup_time_unit,,,,
+dedicated_line,,TRUE,TRUE,TRUE
+electricity_base_total,"Reference electricity use, for base volume",450,150,200
+electricity_base_total_unit,,kWh/h,kWh/h,kWh/h
+natural_gas_base_total,Reference gas consumption,0,0,0
+natural_gas_base_total_unit,,therm/h,therm/h,therm/h
+process_water_base_total,Makeup water,7.6,1,1.5
+process_water_base_total_unit,,m3/h,m3/h,m3/h
+cooling_water_base_total,Reference cooling water,0,0,0
+cooling_water_base_total_unit,,m3/h,m3/h,m3/h
+diesel_base_total,Reference diesel usage,,,
+diesel_base_total_unit,,L/h,L/h,
+steam_base_total,Reference steam use,0,0,0
+steam_base_total_unit,,kg/h,kg/h,kg/h
+compressed_air_base_total,Reference compressed air,2,1,1
+compressed_air_base_total_unit,,Nm3/h,Nm3/h,Nm3/h
+prim_equip_price_base,Reference equipment capex,500000,200000,600000
+prim_equip_price_base_unit,,2025USD,2025USD,2025USD
+prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",0.71,0.7,0.7
+prim_equip_life,Expected equipment life,20,15,15
+prim_equip_life_unit,,years,years,years
+tooling_cost_base,Reference tooling cost,,,
+tooling_cost_base_unit,,,,
+tooling_scaling_exponent,Scale exponent,,,
+footprint_base,Plot area incl. access,120,60,250
+footprint_base_unit,,m2,m2,m2
+footprint_scaling_exponent,Scale exponent,0.7,0.7,0.7
+dedicated_labor,,FALSE,FALSE,FALSE
+labor_base,Reference labor requirement,0.5,0.3,0.6
+labor_base_unit,,FTE,FTE,FTE
+labor_scaling_exponent,Labor efficiency with scale,0.85,0.85,0.85
+opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as function of capex",0.05,0.05,0.05
+unplanned_downtime,Fraction of entire facility uptime,0.1,0.1,0.1
+proc_avail_factor,Uptime excluding planned outages,0.9,0.9,0.9
+scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.05,0.05,0.05
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",brine_lime_throughput,brine_deboron_throughput,brine_SX_throughput
+volume_defining_basis_unit,What unit is the process volume or constituent in?,L concentrated_lithium_brine,L brine_post_lime,L brine_post_boron
+volume_defining_output,What is the output or output constituent that needs to be converted to,brine_post_lime,brine_post_boron,brine_post_polishing
+volume_defining_output_unit,What unit is that output in?,L brine_post_lime,L brine_post_boron,L brine_post_polish
+primary_input_1_name,,concentrated_lithium_brine,brine_post_lime,brine_post_boron
+primary_input_1_units,Units after conversion is applied,L concentrated_lithium_brine,L brine-post lime,L brine post de-boron
+primary_input_1_conversion_factor,Conversion factor of input into step basis; <1 means process number is numerically less than input number,1,1,1
+primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Ca; Na; B; SO4,Li; Ca; Na; SO4
+primary_input_1_constituent_fractions,Values of input constituents,,,
+primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE,TRUE
+reagent_1_name,Reagent name,lime,boron_package,organic_package
+reagent_1_name_long,Long/descriptive reagent name,Lime (Ca(OH)2),B-removal package (resin+regen),"Li-SX organic package (extractant + modifier + diluent, plus composite)"
+reagent_1_target_constituents,,Mg,B,Li
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),3.506,1,0.5
+reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,1,1,0
+reagent_1_units,,kg Ca(OH)2 per kg Mg,kg package per kg B removed,kg organic losses per kg Li recovered
+reagent_2_name,Reagent name,,regen,strip_acid
+reagent_2_name_long,Long/descriptive reagent name,,Regeneration reagent,Strip Acid (HCl)
+reagent_2_target_constituents,,,B,Li
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,1.1,1
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,0
+reagent_2_units,,,mol reagent/mol B,kg HCl (100%) per kg Li recovered
+reagent_3_name,Reagent name,,,scrub_makeup
+reagent_3_name_long,Long/descriptive reagent name,,,Scrub/makeup (wash water or weak salt)
+reagent_3_target_constituents,,,,brine_SX_throughput
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,,0.01
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,,0
+reagent_3_units,,,,m3 per m3 brine
+primary_output_1_name,Output stream/material,brine_post_lime,brine_post_boron,brine_post_polishing
+primary_output_1_step,The step or waste material tracker that this output goes to,2,3,Final
+primary_output_1_yield_rate,Yield Rate,0.9,0.95,0.9
+primary_output_1_units,Units after conversion is applied,L brine-post lime,L brine post de-boron,L polished brine
+primary_output_1_conversion_factor,Convert from step-units to output units; <1 means output number is numerically less than process number,1,1,1
+primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4,Li; K; Mg; Ca; Na; SO4
+primary_output_1_constituent_units,,,,
+primary_output_1_constituent_fractions,,,,
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,TRUE,TRUE
+coproduct_1_name,,sludge_lime,boron_residue,brine_waste
+coproduct_1_sink,,landfill,resin_regeneration,wastewater_treatment
+coproduct_1_conversion_factor,,0.05,0.1,0.04
+coproduct_1_units,,,,
+coproduct_1_constituents,,Mg_Ca_sludge,B_organics,residual_salts
+coproduct_1_constituent_fractions,,1,1,1
+coproduct_2_name,,wastewater,,organic_loss
+coproduct_2_sink,,wastewater_treatment,,solvent_recovery
+coproduct_2_conversion_factor,,0.05,,0.01
+coproduct_2_units,,,,
+coproduct_2_constituents,,blowdown,,SX_organic
+coproduct_2_constituent_fractions,,1,,1

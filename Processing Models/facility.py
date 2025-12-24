@@ -244,7 +244,7 @@ class Facility:
 						self.calculate_all()
 						notif = "not "
 
-				print(f"Facility location updated to '{location_name}'. (Facility production details {notif}updated.)")
+				# print(f"Location of facility '{self.fac_id}' updated to '{location_name}'. (Facility production details {notif}updated.)")
 
 		def update_apv(self,apv: float):
 				"""

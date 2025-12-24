@@ -1,13 +1,25 @@
 from typing import Dict, Any, List, Optional
 import numpy as np
 import pandas as pd
+import csv
 import matplotlib.pyplot as plt
 import textwrap
 import re
 from collections import defaultdict
 
 # robust helpers
-def load_csv(name):
+def load_csv(path: str) -> Dict[str, Dict[str, str]]:
+    with open(path, newline="") as f:
+        r = csv.DictReader(f)
+        row_key = r.fieldnames[0]
+        cols = r.fieldnames[1:]
+        out = {c: {} for c in cols}
+        for row in r:
+            for c in cols:
+                out[c][row[row_key]] = row[c]
+        return out
+
+def load_csv_old(name):
     return pd.read_csv(f"{name}.csv", dtype=str).fillna("")
 
 def safe_float(x, default=0.0):
@@ -137,6 +149,7 @@ def build_steps_dict(input_data_df) -> Dict[str, Dict[str, str]]:
 			steps_dict[step][varname] = val
 	return steps_dict
 
+# REALLY SHOULD MOVE INSIDE THE CLASS 
 def build_material_flows(step_vars: Dict[str, str]) -> Dict[str, Any]:
 	"""
 	Construct material flows (inputs, outputs, reagents, coproducts) from parsed step variables.
