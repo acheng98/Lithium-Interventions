@@ -9,15 +9,16 @@ from helpers import plot_stacked_bars, plot_production_curve
 class Facility:
 
 		# Instance attribute
-		def __init__(self, fac_id, material_costs, sinks, apv=0, location=None, locations_dict=None, impact_factors=None,
+		def __init__(self, fac_id, supply_chain, sinks, apv=0, steps=None, location=None, impact_factors=None,
 								dpy=330, upd=0.2, scm=0, spd=3, hps=8, ub=0.5, pb=0.5, dr=0.10,
 								wage=18, enpt=0.03, elec=0.08, gas=3.46, proc_water=3, cool_water=4, steam=0.0265, comp_air=0.04,
 								build=3000, crp=6, brp=20, aux_equip=0.10, maint=0.10, fixed_over = 0.35):
 			
 			self.fac_id = fac_id
 			self.apv = apv
+			self.sc = supply_chain # The supply chain object this facility is associated with 
+			self.material_data = copy.deepcopy(self.sc.material_data) # to be updated with location-specific overrides as specified
 			self.location = location # Location name
-			self.material_costs = material_costs # material: cost. Gotta be careful of units
 			self.steps = {}
 			self.primary_inputs = {}   # facility-level "imports"
 			self.primary_outputs = {}  # facility-level "exports"
@@ -76,11 +77,15 @@ class Facility:
 			self.avg_fixed_cost = 0
 			self.avg_cost = 0
 
+			# If steps are specified, import them
+			if steps is not None and type(steps) == dict:
+					self.import_steps(steps)
+
 			# If location specified, override defaults
-			if location and locations_dict:
-					if location not in locations_dict:
-							raise ValueError(f"Location '{location}' not found in provided locations_dict.")
-					self.update_location(location, locations_dict[location])
+			if location is not None:
+					if location not in self.sc.loc_data:
+							raise ValueError(f"Location '{location}' not found in supply chain locations.")
+					self.update_location(location)
 
 		@staticmethod
 		def calc_crf(dr: float, period: float) -> float:
@@ -96,6 +101,13 @@ class Facility:
 		# ============================================================
 		# STEP ACCESSORS / ORGANIZERS / REPORTING
 		# ============================================================
+		def import_steps(self,steps_dict):
+				steps = []
+				for step_name in reversed(list(steps_dict.keys())):
+						step = ProductionStep(facility=self, step_params=steps_dict[step_name])
+						steps.append(step.step_name)
+				self.topo_order()
+				# print("Ingested steps:", list(reversed(steps)))
 
 		def topo_order(self):
 				"""
@@ -191,7 +203,7 @@ class Facility:
 		def add_target_comp(self, target: str, composition: dict, target_step_id = None, propagate = True):
 				# Get first step
 				if target_step_id not in self.steps:
-						raise KeyError(f"Target step with id '{target_step_id}' not found in facility.")
+						raise KeyError(f"Target step with id '{target_step_id}' not found in facility {self.fac_id}.")
 				elif target_step_id is None:
 						# Flag if no steps exist
 						self.topo_order()
@@ -207,7 +219,7 @@ class Facility:
 		# SCENARIO & LOCATION MANAGEMENT
 		# ============================================================
 
-		def update_location(self, location_name: str, location_data: dict, recalculate: bool = False):
+		def update_location(self, location_name: str, recalculate: bool = False):
 				"""
 				Update facility-level parameters based on the specified location.
 				Recalculates all dependent values automatically.
@@ -222,15 +234,22 @@ class Facility:
 						Dictionary of parameters for this location. Keys should match Facility attributes.
 						Example keys: ["dpy", "spd", "hps", "ub", "pb", "dr", "wage", "elec_price", ...]
 				"""
-				self.location = location_name
+				loc_data = self.sc.loc_data.get(location_name)
+				if loc_data is None:
+						raise KeyError(f"Location {location_name} is not defined in the supply chain's input location data.")
 
 				# --- Update all provided parameters (only if present in location_data) ---
-				for key, value in location_data.items():
+				self.location = location_name
+				for key, value in loc_data.items():
 						if hasattr(self, key):
 								setattr(self, key, value)
+						elif key == "material_data":
+								for material,cat_val in value.items():
+										for category,val in cat_val.items():
+												self.material_data[material][category] = val
 						else:
 								print(f"Attribute {key} in the location data is not defined as a facility attributes.")
-
+ 
 				# --- Recalculate dependent values ---
 				self.crf = self.calc_crf(self.dr, self.crp)   # Capital recovery factor
 				self.bcrf = self.calc_crf(self.dr, self.brp) # Building recovery factor
@@ -246,12 +265,15 @@ class Facility:
 
 				# print(f"Location of facility '{self.fac_id}' updated to '{location_name}'. (Facility production details {notif}updated.)")
 
-		def update_apv(self,apv: float):
+		def update_apv(self,apv,recalc=False):
 				"""
 				Update APV and trigger full production cost calculation.
 				Wrapper around calculate_all.
 				"""
-				if apv not in self.prod_map: # Don't need to re-run if already recorded
+				if not recalc and apv in self.prod_map: # Don't need to re-run if already recorded
+						print("Input production volume has already been calculated.")
+						return
+				else:
 						return self.calculate_all(apv=apv)
 
 		# ============================================================

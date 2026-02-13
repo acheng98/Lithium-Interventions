@@ -1,68 +1,27 @@
 variable_name,Description,Crushing,Attrition Scrubbing,Classification,Thickening (to ~55 wt% solids leach feed),Acid Leaching (at ~33 wt% solids after adding acid + liquid),Neutralization,Primary CCD / Leach Residue Thickening (multistage),Impurity Removal
-step_id,Step ID (unique),1,2,3,4,5,6,7,8
+step_id,Step ID (unique),crushing,scrubbing,classifying,thickening,acid_leaching,neutralizing,ccd,impurity_removal
 step_name,Human-readable process step,Crushing,Attrition Scrubbing,Classification,Thickening,Acid Leaching,Neutralization,Primary CCD / Leach Residue Thickening,Impurity Removal
 key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A (mechanical),"N/A (mechanical). However, inputs to this step are: crushed claystone, recycled coarse materials, recycled water, and makeup water. Assuming a target of ~20 wt% solids, a grain density of 2.6 t/m3 and water density of 1 t/m3. r_mix = 1 / (w_s / rho_s + (1 - w_s) / (rho_water)) --> phi_s = w_s/rho_s * r_mix ≈ 0.08772. Assuming 20% of this comes from the recycling in step 3, we have a conversion factor of ≈0.070",N/A (size separation),N/A (Solid-liquid settling),"Acid leaching of Li-bearing clays (simplified): Li₂O·nSiO₂·mH₂O (s) + H₂SO₄ (aq) → Li₂SO₄ (aq) + nSiO₂ (s) + (m+1)H₂O. Other gangue elements (Al, Mg, Ca, Fe) form soluble sulfates or secondary solids.","Two neutralizations (pH 0->4, gypsum, Fe/Al precip) + (ph 4->6.5, Ca/Mg/B): e.g. CaCO₃ + H₂SO₄ → CaSO₄·2H₂O(s) + CO₂↑","N/A (multi-stage CCD solid–liquid separation and washing; no net chemistry beyond minor neutralization). Not present in Thacker Pass but in TLC, Bonnie Claire, previous Thacker pass disclosures.","Impurity precipitation / neutralization, e.g. Fe³⁺ + 3OH⁻ → Fe(OH)₃(s); Mg²⁺ + CO₃²⁻ → MgCO₃(s); Ca²⁺ + CO₃²⁻ → CaCO₃(s); Al³⁺ + 3OH⁻ → Al(OH)₃(s). Lithium remains mostly in solution."
-notes,"Key information, notes","Primary & secondary crushing, generates crushed ore for wet circuit","Deagglomeration, create pumpable slurry",Hydrocyclones+screens to split coarse vs fine; assume coarse refeed to achieve input/output; fines feed thickener,"Concentration of slurry, recovery of process water",Heated or ambient acid leach in agitated tanks or pachuca-type reactors; converts Li-bearing minerals to soluble Li sulfate solution while leaving gangue largely solid; output is leach slurry (solution + residue).,,Counter-current decantation (CCD) of leach slurry to separate pregnant Li solution from residual solids and wash entrained Li from residue; produces pregnant leach solution (PLS) and leach residue to tailings.,"Chemical removal of impurities (Mg, Ca, Fe, Al, etc.) via pH adjustment and precipitation; produces purified Li solution for downstream recovery and an impurity sludge for disposal."
-sources,,"Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure","Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure","Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure","Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure","Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure","Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure","Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure","Khakmardan 2024, Thacker Pass disclosure, Bonnie Claire disclosure (2024), TLC disclosure"
-process_type,continuous or batch,continuous,continuous,continuous,continuous,continuous,continuous,continuous,continuous
-base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",100,100,100,100,100,100,100,100
-base_volume_unit,"Not used directly in calculation, but for human readability",m^3/h,m^3/h,m^3/h,m^3/h,m^3,m^3,m^3,m^3
-oversizing_factor,Process volume ≠ design volume,1.15,1.15,1.15,1.15,1.15,1.15,1.15,1.15
+notes,"Key information, notes","Primary & secondary crushing, generates crushed ore for wet circuit","Deagglomeration, create pumpable slurry",Hydrocyclones+screens to split coarse vs fine; assume coarse refeed to achieve input/output; fines feed thickener,"Concentration of slurry, recovery of process water",Heated or ambient acid leach in agitated tanks or pachuca-type reactors; converts Li-bearing minerals to soluble Li sulfate solution while leaving gangue largely solid; output is leach slurry (solution + residue).,"Two-stage neutralization: Stage 1 uses limestone to raise pH from ~0 to ~4 and precipitate Fe/Al hydroxides; Stage 2 uses recycled Mg(OH)₂ to raise pH to ~6.5 and precipitate gypsum, calcium borate, additional metal hydroxides and residual clays. Output is a neutralized slurry ready for CCD/thickening.",Counter-current decantation (CCD) of leach slurry to separate pregnant Li solution from residual solids and wash entrained Li from residue; produces pregnant leach solution (PLS) and leach residue to tailings.,"Chemical removal of impurities (Mg, Ca, Fe, Al, etc.) via pH adjustment and precipitation; produces purified Li solution for downstream recovery and an impurity sludge for disposal."
+machine_options,,crushing_cycle.conservative; crushing_cycle.midpoint; crushing_cycle.optimistic,attrition_scrubber,classifier_generic,thickener_generic,acid_leach_circuit.conservative; acid_leach_circuit.midpoint; acid_leach_circuit.optimistic,two_stage_neutralizing_circuit,multi_stage_ccd_thickening,impurity_removal
+machine_default,,crushing_cycle.midpoint,attrition_scrubber,classifier_generic,thickener_generic,acid_leach_circuit.midpoint,two_stage_neutralizing_circuit,multi_stage_ccd_thickening,impurity_removal
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,crushed_ore_throughput,scrubbed_slurry_throughput,classified_slurry_throughput,thickener_feed_throughput,leach_slurry_throughput,neutralizing_throughput,CCD_feed_throughput,pregnant_solution_throughput
-scaling_exponent_throughput,,,,,,,,,
-batch_cycle_time,,-,-,-,-,-,-,-,-
-batch_cycle_time_unit,,unit,unit,unit,unit,unit,unit,unit,unit
-batch_setup_time,,-,-,-,-,-,-,-,-
-batch_setup_time_unit,,n/a,n/a,n/a,n/a,n/a,n/a,n/a,n/a
-dedicated_line,,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE
-electricity_base_total,"Reference electricity use, for base volume",300,150,100,50,200,80,80,120
-electricity_base_total_unit,,kWh/h,kWh/h,kWh/h,kWh/h,kWh/h,kWh/h,kWh/h,kWh/h
-natural_gas_base_total,Reference gas consumption,0,0,0,0,0,0,0,0
-natural_gas_base_total_unit,,therm/h,therm/h,therm/h,therm/h,therm/h,therm/h,therm/h,therm/h
-process_water_base_total,Makeup water,0,40,0,0,0,10,10,5
-process_water_base_total_unit,,m³/h,m³/h,m³/h,m³/h,m³/h,m³/h,m³/h,m³/h
-cooling_water_base_total,Reference cooling water,0,0,0,0,0,0,0,0
-cooling_water_base_total_unit,,m³/h,m³/h,m³/h,m³/h,m³/h,m³/h,m³/h,m³/h
-diesel_base_total,Reference diesel usage,0,0,0,0,0,0,0,0
-diesel_base_total_unit,,L/h,L/h,L/h,L/h,L/h,L/h,L/h,L/h
-steam_base_total,Reference steam use,0,0,0,0,8000,0,0,0
-steam_base_total_unit,,kg/h,kg/h,kg/h,kg/h,kg/h,kg/h,kg/h,kg/h
-compressed_air_base_total,Reference compressed air,0,0,0,0,0,0,0,0
-compressed_air_base_total_unit,,Nm³/h,Nm³/h,Nm³/h,Nm³/h,Nm³/h,Nm³/h,Nm³/h,Nm³/h
-prim_equip_price_base,Reference equipment capex,"8,000,000","5,000,000","6,000,000","4,000,000","15,000,000","8,000,000","8,000,000","10,000,000"
-prim_equip_price_base_unit,,2025USD,2025USD,2025USD,2025USD,2025USD,2025USD,2025USD,2025USD
-prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6
-prim_equip_life,Expected equipment life,15,15,15,15,15,15,15,15
-prim_equip_life_unit,,years,n/a,n/a,n/a,years,years,years,years
-tooling_cost_base,Reference tooling cost,0,0,0,0,0,0,0,0
-tooling_cost_base_unit,,-,-,-,-,-,-,-,-
-tooling_scaling_exponent,Scale exponent,-,-,-,-,-,-,-,-
-footprint_base,Plot area incl. access,500,300,400,400,800,500,500,500
-footprint_base_unit,,m²,m²,m²,m²,m²,m²,m²,m²
-footprint_scaling_exponent,Scale exponent,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7
-dedicated_labor,,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
-labor_base,Reference labor requirement,1,1,1,1,1,1,1,1
-labor_base_unit,,FTE,FTE,FTE,FTE,FTE,FTE,FTE,FTE
-labor_scaling_exponent,Labor efficiency with scale,,,,,,,,
-opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as function of capex",0.05,0.05,0.05,0.05,0.06,0.05,0.05,0.05
-unplanned_downtime,Fraction of entire facility uptime,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03
-proc_avail_factor,Uptime excluding planned outages,0.92,0.92,0.92,0.92,0.92,0.92,0.92,0.92
-scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05
+step_basis_unit,,m^3/h,m^3/h,m^3/h,m^3/h,m^3,m^3,m^3,m^3
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",crushed_ore_throughput,scrubbed_slurry_throughput,classified_slurry_throughput,thickener_feed_throughput,leach_slurry_throughput,neutralizing_throughput,CCD_feed_throughput,pregnant_solution_throughput
 volume_defining_basis_unit,What unit is the process volume or constituent in?,m^3/h,m^3/h,m^3/h,m^3/h,m^3,m^3,m^3,m^3
-volume_defining_output,What is the output or output constituent that needs to be converted to,crushed_ore,scrubbed_slurry,classified_slurry,thick_leach_feed,leach_slurry,neutralized_slurry,pregnant_leach_solution,purified_Li_solution
+volume_defining_output,What is the output or output constituent that needs to be converted to,crushed_ore,scrubbed_slurry,classified_slurry,thick_leach_feed,leach_slurry,neutralized_slurry,pregnant_leach_solution,brine_post_polishing
 volume_defining_output_unit,What unit is that output in?,m^3/h,m^3/h,m^3/h,m^3/h,m^3,m^3,m^3,m^3
 primary_input_1_name,,rom_ore_feed,crushed_ore,scrubbed_slurry,classified_slurry,thick_leach_feed,leach_slurry,neutralized_slurry,pregnant_leach_solution
 primary_input_1_units,Units after conversion is applied,,,,,,,,
-primary_input_1_conversion_factor,Conversion factor of input into step basis. >1 means more inputs are needed than the step basis.,1,0.070,1,1,0.50,1,1,1
-primary_input_1_constituents,Names of input constituents,,,,,,,,
+primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,0.070,1,1,0.50,1,1,1
+primary_input_1_constituents,Names of input constituents,Li,Li,Li,Li,Li,Li,Li,Li
 primary_input_1_constituent_fractions,Values of input constituents,,,,,,,,
 primary_input_1_constituent_units,Units for each input constituent,,,,,,,,
 primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE
 reagent_1_name,Reagent name,,dispersant,,flocculant,sulfuric_acid,limestone,flocculant,neutralizing_agent
 reagent_1_name_long,Long/descriptive reagent name,,Slurry dispersant for clay/silt,,Polymer flocculant for thickener underflow,Sulfuric acid (or other leach acid) for Li extraction,Limestone (CaCO₃) for first of two-stage neutralization,High-molecular-weight flocculant for CCD overflow/underflow separation,Lime / limestone / NaOH / similar reagents mix for impurity precipitation and pH control.
 reagent_1_target_constituents,,,scrubbed_slurry_throughput,,thickener_feed_throughput,leach_slurry_throughput,neutralizing_throughput,CCD_feed_throughput,pregnant_solution_throughput
-reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.001,,0.0001,0.300,0.050,0.0005,0.010
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.001,,0.00026,0.300,0.050,0.0005,0.010
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,0,0,0,0,0
 reagent_1_units,,,kg/kg solids,,kg/kg solids,kg/kg solids,kg/kg solids,kg/kg solids,kg/kg solution
 reagent_2_name,Reagent name,,,,,,neutralizing_agent,,
@@ -77,10 +36,9 @@ reagent_3_target_constituents,,,,,,,,,
 reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,,,,,,,
 reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,,,,,,,
 reagent_3_units,,,,,,,,,
-primary_output_1_name,Output stream/material,crushed_ore,scrubbed_slurry,classified_slurry,thick_leach_feed,leach_slurry,neutralized_slurry,pregnant_leach_solution,purified_Li_solution
-primary_output_1_step,The step or waste material tracker that this output goes to,2,3,4,5,6,7,8,Final
-primary_output_1_yield_rate,Yield Rate,0.99,0.995,0.92,0.995,0.9,0.99,0.99,0.965
-primary_output_1_conversion_factor,Convert from step-units to output units,1,1,0.8,0.27,1,1,0.7,0.95
+primary_output_1_name,Output stream/material,crushed_ore,scrubbed_slurry,classified_slurry,thick_leach_feed,leach_slurry,neutralized_slurry,pregnant_leach_solution,brine_post_polishing
+primary_output_1_step,The step or waste material tracker that this output goes to,scrubbing,classifying,thickening,acid_leaching,neutralizing,ccd,impurity_removal,Final
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,1,0.67,0.27,1,1,0.7,1
 primary_output_1_units,Units after conversion is applied,m3/h,m3/h,m3/h,m3/h,m3/h,m3/h,m3/h,m3/h
 primary_output_1_constituents,,,,,,,,,
 primary_output_1_constituent_units,,,,,,,,,

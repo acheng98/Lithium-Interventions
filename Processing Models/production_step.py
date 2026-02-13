@@ -3,125 +3,66 @@ import copy
 import math
 from collections import defaultdict
 
-from helpers import safe_float, safe_bool, build_material_flows
+from helpers import safe_float, safe_bool
 
 
 # Define a class for each step of the PBCM
 class ProductionStep:
 		def __init__(self,
 							facility,
-							step_id: str,
-							step_name: Optional[str] = None,
-							# Step details
-							step_basis: Optional[str] = None,
-							key_equation: Optional[str] = None,
-							notes: Optional[str] = None,
-							sources: Optional[Any] = None,
-							# Process parameters grouped
-							machines: Optional[List[str]] = None,
-							machine_default: Optional[str] = None,
-							machine_data: Optional[Dict[str, Any]] = None,
-							material_flows: Optional[Dict[str, Dict[str, Any]]] = None  # primary_inputs, primary_outputs, reagents, etc.
+							step_params
 					):
 
 				# Step-level details
 				self.facility = facility
-				self.step_id = step_id
-				self.step_name = step_name or step_id
-				self.key_equation = key_equation # The key equation, chemical or mechanical, used in this production step
-				self.notes = notes
-				self.sources = sources
+				self.step_id = step_params.get("step_id")
+				self.step_name = step_params.get("step_name",self.step_id)
+				self.key_equation = step_params.get("key_equation") # The key equation, chemical or mechanical, used in this production step
+				self.notes = step_params.get("notes")
+				self.sources = step_params.get("sources")
 
-				self.step_basis = step_basis # The unit of measure of the intermediate volume in the step
+				self.machine_block = step_params.get("machine_default") # Machine or machine block modeled in this step
+				self.machine_blocks = step_params.get("machine_options",[self.machine_block])
+
+				self.step_basis = step_params.get("step_basis") # The unit of measure of the intermediate volume in the step
+				self.volume_defining_basis = step_params.get("volume_defining_basis")
+				self.volume_defining_output = step_params.get("volume_defining_output")
+
 				self.step_pv = None # Amount of production volume of step basis 
-				self.constituents = None # Chemical constituents of the step basis
-				self.machines: List[str] = machines or ([] if machine_default is None else [machine_default])
-				self.machine_id = None # Machine or machine system modeled in this step
+				self.constituents = None # Chemical constituents of the step basis, aggregated from inputs
+				
+				# ERROR CHECKING
+				missing = [name for name, value in {"step_id": self.step_id,
+																						"machine_default": self.machine_block,
+																						"step_basis": self.step_basis,
+																						"volume_defining_basis": self.volume_defining_basis,
+																						"volume_defining_output": self.volume_defining_output,
+																						}.items()
+									if value is None]
 
-				# Default dictionaries if not provided
-				# Maybe should probably raise errors instead of using empty dicts? we use default values
-				# below but may want to inherit sometimes from facility or otherwise flag. Hard to say
-				machine_params = machine_params or {}
-				material_flows = material_flows or {}
+				if missing:
+						raise ValueError(f"Missing required step parameters: {', '.join(missing)}")
 
-				if machine_default not in machine_params:
-						raise KeyError(f"Machine {machine_default} is not defined in input machine data.")
+				# Check if step is already in facility
+				if self.step_id in self.facility.steps:
+						raise KeyError(f"Step with ID '{step_id}' already exists in the facility.")
 
 				# Process parameters
-				self.process_type: str = machine_params.get("process_type", "batch")
-				self.base_volume: Optional[float] = machine_params.get("base_volume")
-				self.base_volume_unit: Optional[str] = machine_params.get("base_volume_unit")
-				self.scaling_exponent: float = machine_params.get("scaling_exponent", 1.0)
-				self.dedicated_line: bool = machine_params.get("dedicated_line", False)
-				self.volume_defining_basis: str = machine_params.get("volume_defining_basis")
-				self.volume_defining_output: str = machine_params.get("volume_defining_output")
-				# self.scrap_rate: float = machine_params.get("scrap_rate", 0.0)
-				self.yield_rate: float = machine_params.get("yield_rate")
-
-				# Batch
-				self.batch_cycle_time: Optional[float] = machine_params.get("cycle_time")
-				self.batch_cycle_time_unit: Optional[str] = machine_params.get("cycle_time_unit")
-				self.batch_setup_time: Optional[float] = machine_params.get("setup_time")
-				self.batch_setup_time_unit: Optional[str] = machine_params.get("setup_time_unit")
-
-				# Utilities
-				self.electricity_base_total: float = machine_params.get("electricity_base_total", 0.0)
-				self.electricity_base_total_unit: Optional[str] = machine_params.get("electricity_base_total_unit")
-				self.electricity_source: Optional[str] = machine_params.get("electricity_source")
-
-				self.natural_gas_base_total: float = machine_params.get("natural_gas_base_total", 0.0)
-				self.natural_gas_base_total_unit: Optional[str] = machine_params.get("natural_gas_base_total_unit")
-				self.natural_gas_source: Optional[str] = machine_params.get("natural_gas_source")
-
-				self.process_water_base_total: float = machine_params.get("process_water_base_total", 0.0)
-				self.process_water_base_total_unit: Optional[str] = machine_params.get("process_water_base_total_unit")
-
-				self.cooling_water_base_total: float = machine_params.get("cooling_water_base_total", 0.0)
-				self.cooling_water_base_total_unit: Optional[str] = utilities.get("cooling_water_base_total_unit")
-
-				self.steam_base_total: float = machine_params.get("steam_base_total", 0.0)
-				self.steam_base_total_unit: Optional[str] = machine_params.get("steam_base_total_unit")
-
-				self.compressed_air_base_total: float = machine_params.get("compressed_air_base_total", 0.0)
-				self.compressed_air_base_total_unit: Optional[str] = machine_params.get("compressed_air_base_total_unit")
-
-				# Equipment
-				self.prim_equip_price_base: float = machine_params.get("price", 0.0)
-				self.prim_equip_price_base_unit: Optional[str] = machine_params.get("unit")
-				self.prim_equip_scaling_exponent: float = machine_params.get("scaling_exponent", 1.0)
-				self.prim_equip_life: float = machine_params.get("life")
-				self.prim_equip_life_unit: Optional[str] = machine_params.get("life_unit")
-				self.tooling_cost_base: float = machine_params.get("tooling_cost", 0.0)
-				self.tooling_cost_base_unit: Optional[str] = machine_params.get("tooling_unit")
-				self.tooling_scaling_exponent: float = machine_params.get("tooling_scaling_exponent", 1.0)
-				self.footprint_base: float = machine_params.get("footprint_base", 0.0)
-				self.footprint_base_unit: Optional[str] = machine_params.get("footprint_unit")
-				self.footprint_scaling_exponent: float = machine_params.get("footprint_scaling_exponent", 1.0)
-
-				# Labor
-				self.dedicated_labor: bool = machine_params.get("dedicated", False)
-				self.labor_base: float = machine_params.get("base", 0.0)
-				self.labor_base_unit: Optional[str] = machine_params.get("unit")
-				self.labor_scaling_exponent: float = machine_params.get("scaling_exponent", 1.0)
-
-				# Downtime
-				self.unplanned_downtime: float = machine_params.get("unplanned", self.facility.upd)
-				self.scheduled_maintenance: float = machine_params.get("scheduled", self.facility.scm)
+				self.load_machine_data(machine_block=self.machine_block)
 
 				# Material flows
-				self.primary_inputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("primary_inputs", {}))
-				self.secondary_inputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("secondary_inputs", {}))
-				self.primary_outputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("primary_outputs", {}))
-				self.secondary_outputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("secondary_outputs", {}))
+				material_flows = step_params.get("material_flows", {})
+				if material_flows is {}:
+						raise ValueError(f"Material flows for step {self.step_name} are not defined, check the inputs.")
+				else:
+						self.primary_inputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("primary_inputs", {}))
+						self.secondary_inputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("secondary_inputs", {}))
+						self.primary_outputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("primary_outputs", {}))
+						self.secondary_outputs: Dict[str, Dict[str, float]] = copy.deepcopy(material_flows.get("secondary_outputs", {}))
 
 				# Steps linkage
 				self.next_steps: Dict[str, "ProductionStep"] = {}
 				self.previous_steps: Dict[str, "ProductionStep"] = {}
-
-				# Add self to facility steps
-				if step_id in self.facility.steps:
-						raise KeyError(f"Step with ID '{step_id}' already exists in the facility.")
-				self.facility.steps[step_id] = self
 
 				###########################
 				# LOAD INPUTS AND OUTPUTS #
@@ -186,8 +127,8 @@ class ProductionStep:
 
 				for reagent_name, props in self.secondary_inputs.items():
 						# Check to make sure reagent has a cost associated with it
-						if reagent_name not in self.facility.material_costs:
-								raise KeyError(f"Reagent '{reagent_name}' does not have a recorded cost at the facility level.")
+						if reagent_name not in self.facility.material_data:
+								raise KeyError(f"Reagent '{reagent_name}' does not have associated data at the facility level.")
 
 						# Check if target constituents are in the primary input or the primary input
 						target_consts = props["targets"]  # dict: {constituent: {"ratio": r, "elim": e, "usage": 0, ...}}
@@ -212,96 +153,132 @@ class ProductionStep:
 				self.wlt = self.facility.wlt # Worked labor time
 				self.lta = self.wlt*(1-self.unplanned_downtime-self.scheduled_maintenance) # Line time available
 
-		##############################################
-		# CLASS METHODS - DATA IMPORT (HERE FOR NOW) #
-		##############################################
-
-		@classmethod
-		def from_table(cls, facility, step_vars: Dict[str, str]):
-					"""Factory to build ProductionStep from a step_vars dictionary (one column)."""
-					process_params = {
-							"process_type": step_vars.get("process_type"),
-							"base_volume": safe_float(step_vars.get("base_volume", 0.0)),
-							"base_volume_unit": step_vars.get("base_volume_unit"),
-							"scaling_exponent": safe_float(step_vars.get("scaling_exponent", 1.0)),
-							"dedicated_line": safe_bool(step_vars.get("dedicated_line", False)),
-							"volume_defining_basis": step_vars.get("volume_defining_basis"),
-							"volume_defining_output": step_vars.get("volume_defining_output"),
-					}
-
-					batch_params = {
-							"cycle_time": safe_float(step_vars.get("batch_cycle_time", 0.0)),
-							"cycle_time_unit": step_vars.get("batch_cycle_time_unit"),
-							"setup_time": safe_float(step_vars.get("batch_setup_time", 0.0)),
-							"setup_time_unit": step_vars.get("batch_setup_time_unit"),
-							"scrap_rate": safe_float(step_vars.get("scrap_rate", 0.0)),
-					}
-
-					utilities = {
-							"electricity_base_total": safe_float(step_vars.get("electricity_base_total", 0.0)),
-							"electricity_base_total_unit": step_vars.get("electricity_base_total_unit"),
-							"electricity_source": step_vars.get("electricity_source"),
-							"natural_gas_base_total": safe_float(step_vars.get("natural_gas_base_total", 0.0)),
-							"natural_gas_base_total_unit": step_vars.get("natural_gas_base_total_unit"),
-							"natural_gas_source": step_vars.get("natural_gas_source"),
-							"process_water_base_total": safe_float(step_vars.get("process_water_base_total", 0.0)),
-							"process_water_base_total_unit": step_vars.get("process_water_base_total_unit"),
-							"cooling_water_base_total": safe_float(step_vars.get("cooling_water_base_total", 0.0)),
-							"cooling_water_base_total_unit": step_vars.get("cooling_water_base_total_unit"),
-							"steam_base_total": safe_float(step_vars.get("steam_base_total", 0.0)),
-							"steam_base_total_unit": step_vars.get("steam_base_total_unit"),
-							"compressed_air_base_total": safe_float(step_vars.get("compressed_air_base_total", 0.0)),
-							"compressed_air_base_total_unit": step_vars.get("compressed_air_base_total_unit"),
-					}
-
-					equipment = {
-							"price": safe_float(step_vars.get("prim_equip_price_base", 0.0)),
-							"unit": step_vars.get("prim_equip_price_base_unit"),
-							"scaling_exponent": safe_float(step_vars.get("prim_equip_scaling_exponent", 1.0)),
-							"life": safe_float(step_vars.get("prim_equip_life", 0.0)),
-							"life_unit": step_vars.get("prim_equip_life_unit"),
-							"tooling_cost": safe_float(step_vars.get("tooling_cost_base", 0.0)),
-							"tooling_unit": step_vars.get("tooling_cost_base_unit"),
-							"tooling_scaling_exponent": safe_float(step_vars.get("tooling_scaling_exponent", 1.0)),
-							"footprint_base": safe_float(step_vars.get("footprint_base", 0.0)),
-							"footprint_unit": step_vars.get("footprint_base_unit"),
-							"footprint_scaling_exponent": safe_float(step_vars.get("footprint_scaling_exponent", 1.0)),
-					}
-
-					labor = {
-							"dedicated": safe_bool(step_vars.get("dedicated_labor", False)),
-							"base": safe_float(step_vars.get("labor_base", 0.0)),
-							"unit": step_vars.get("labor_base_unit"),
-							"scaling_exponent": safe_float(step_vars.get("labor_scaling_exponent", 1.0)),
-					}
-
-					downtime = {
-							"unplanned": safe_float(step_vars.get("unplanned_downtime", 0.0)),
-							"scheduled": safe_float(step_vars.get("scheduled_maintenance", 0.0)),
-					}
-
-					material_flows = build_material_flows(step_vars)
-
-					return cls(
-							facility=facility,
-							step_id=step_vars["step_id"],
-							step_name=step_vars.get("step_name"),
-							step_basis=step_vars.get("step_basis"),
-							key_equation=step_vars.get("key_equation"),
-							notes=step_vars.get("notes"),
-							sources=step_vars.get("sources"),
-							process_params=process_params,
-							batch_params=batch_params,
-							utilities=utilities,
-							equipment=equipment,
-							labor=labor,
-							downtime=downtime,
-							material_flows=material_flows
-					)
-
 		#######################
 		# PROCESS DEFINITIONS #
 		#######################
+
+		def load_machine_data(self, machine_block: Optional[str] = None, machine_input: Optional[Dict[str, Any]] = None) -> None:
+				"""
+				Load machine parameters from a machine_data dict if inputted; set ProductionStep attributes.
+				"""
+				if machine_block is None:
+						machine_block = self.machine_block
+				else:
+						self.machine_block = machine_block
+
+				if machine_input is None:
+						machine_data = self.facility.sc.machine_data.get(machine_block)
+				else:
+						machine_data = machine_input
+
+				if machine_data is None:
+						raise KeyError(f"Machine block with name {machine_block} is not found in input machine data. ({self.facility.fac_id}, {self.step_name})")
+
+				# -------------------------
+				# Identification / metadata
+				# -------------------------
+				self.machine_long_name: Optional[str] = machine_data.get("block_long_name")
+				self.machine_block_type: Optional[str] = machine_data.get("machine_block_type")
+				self.machine_notes = machine_data.get("notes")
+
+				# -------------------------
+				# Core sizing / throughput
+				# -------------------------
+				self.process_type: str = machine_data.get("process_type", "batch")
+				self.base_volume: float = machine_data.get("base_volume")
+				self.base_volume_unit: Optional[str] = machine_data.get("base_volume_unit")
+				self.scaling_exponent: float = machine_data.get("scaling_exponent_throughput",1.0)
+				self.oversizing_factor: float = machine_data.get("oversizing_factor", 1.0)
+				self.yield_rate: float = machine_data.get("yield_rate")
+				self.dedicated_line = machine_data.get("dedicated_line", True)
+
+				# -------------------------
+				# Batch parameters (if any)
+				# -------------------------
+				self.batch_cycle_time: Optional[float] = machine_data.get("batch_cycle_time")
+				self.batch_cycle_time_unit: Optional[str] = machine_data.get("batch_cycle_time_unit")
+				self.batch_setup_time: Optional[float] = machine_data.get("batch_setup_time")
+				self.batch_setup_time_unit: Optional[str] = machine_data.get("batch_setup_time_unit")
+
+				# -------------------------
+				# Utilities (base totals)
+				# -------------------------
+				self.electricity_base_total: float = machine_data.get("electricity_base_total",0.0)
+				self.electricity_base_total_unit: Optional[str] = machine_data.get("electricity_base_total_unit")
+
+				self.natural_gas_base_total: float = machine_data.get("natural_gas_base_total",0.0)
+				self.natural_gas_base_total_unit: Optional[str] = machine_data.get("natural_gas_base_total_unit")
+
+				self.process_water_base_total: float = machine_data.get("process_water_base_total",0.0)
+				self.process_water_base_total_unit: Optional[str] = machine_data.get("process_water_base_total_unit")
+
+				self.cooling_water_base_total: float = machine_data.get("cooling_water_base_total",0.0)
+				self.cooling_water_base_total_unit: Optional[str] = machine_data.get("cooling_water_base_total_unit")
+
+				self.steam_base_total: float = machine_data.get("steam_base_total", 0.0)
+				self.steam_base_total_unit: Optional[str] = machine_data.get("steam_base_total_unit")
+
+				self.compressed_air_base_total: float = machine_data.get("compressed_air_base_total", 0.0)
+				self.compressed_air_base_total_unit: Optional[str] = machine_data.get("compressed_air_base_total_unit")
+
+				# Optional fuels not currently used elsewhere, but keep them for completeness
+				self.diesel_base_total: float = machine_data.get("diesel_base_total", 0.0)
+				self.diesel_base_total_unit: Optional[str] = machine_data.get("diesel_base_total_unit")
+
+				# -------------------------
+				# Equipment / CAPEX
+				# -------------------------
+				self.prim_equip_price_base: float = machine_data.get("prim_equip_price_base", 0.0)
+				self.prim_equip_price_base_unit: Optional[str] = machine_data.get("prim_equip_price_base_unit")
+
+				self.prim_equip_scaling_exponent: float = machine_data.get("prim_equip_scaling_exponent", 1.0)
+				self.prim_equip_life: float = machine_data.get("prim_equip_life")
+				self.prim_equip_life_unit: Optional[str] = machine_data.get("prim_equip_life_unit")
+
+				self.tooling_cost_base: float = machine_data.get("tooling_cost_base", 0.0)
+				self.tooling_cost_base_unit: Optional[str] = machine_data.get("tooling_cost_base_unit")
+				self.tooling_scaling_exponent: float = machine_data.get("tooling_scaling_exponent", 1.0)
+
+				self.footprint_base: float = machine_data.get("footprint_base", 0.0)
+				self.footprint_base_unit: Optional[str] = machine_data.get("footprint_base_unit")
+				self.footprint_scaling_exponent: float = machine_data.get("footprint_scaling_exponent", 1.0)
+
+				# -------------------------
+				# Labor
+				# -------------------------
+				self.dedicated_labor = machine_data.get("dedicated_labor", False)
+				self.labor_base: float = machine_data.get("labor_base", 0.0)
+				self.labor_base_unit: Optional[str] = machine_data.get("labor_base_unit")
+				self.labor_scaling_exponent: float = machine_data.get("labor_scaling_exponent", 1.0)
+
+				# -------------------------
+				# Opex / availability / downtime
+				# -------------------------
+				self.opex_fraction_of_capex: float = machine_data.get("opex_fraction_of_capex", 0.0)
+				self.unplanned_downtime: float = machine_data.get("unplanned_downtime", 0.0)
+				self.proc_avail_factor: float = machine_data.get("proc_avail_factor", 1.0)
+				self.scheduled_maintenance: float = machine_data.get("scheduled_maintenance", 0.0)
+
+				# Keep facility time assumptions consistent and recompute availability
+				self.plt = self.facility.plt
+				self.wlt = self.facility.wlt
+				self.lta = self.wlt * (1 - self.unplanned_downtime - self.scheduled_maintenance)
+
+				# Invalidate any previously calculated results that depend on machine parameters 
+				# to avoid stale references in tornado plots
+				for name in [
+						"ltr", "machines_required", "scaled_equip_cost",
+						"labor_required",
+						"electricity_consumed", "natural_gas_consumed", "process_water_consumed",
+						"cooling_water_consumed", "steam_consumed", "compressed_air_consumed",
+						"electricity_cost", "natural_gas_cost", "process_water_cost",
+						"cooling_water_cost", "steam_cost", "compressed_air_cost",
+						"tot_var_cost", "tot_fixed_cost", "tot_cost",
+						"machine_cost", "tool_cost", "building_cost", "aux_equip_cost",
+						"maint_cost", "fixed_over_cost",
+				]:
+						if hasattr(self, name):
+								setattr(self, name, None)
 
 		def set_constituents(self, target_name: str, constituents: dict, propagate: bool = False):
 				"""
@@ -520,16 +497,15 @@ class ProductionStep:
 						raise ValueError(f"Step {self.step_id} step_pv must be set before scaling reagents.")
 
 				for reagent_name, props in self.secondary_inputs.items():
-						print(self.step_name,reagent_name,props)
 						usage_fraction = props.get("usage")
 						if usage_fraction is None:
 								raise ValueError(f"Reagent {reagent_name} has no per-unit usage (run apply_reagents first).")
 
 						abs_usage = usage_fraction * self.step_pv
 						props["abs_usage"] = abs_usage
-						if reagent_name not in self.facility.material_costs:
-								raise KeyError (f"Reagent {reagent_name} not found in facility {self.facility.fac_id}'s listed materials with costs.")
-						props["total_cost"] = abs_usage * self.facility.material_costs[reagent_name]
+						if reagent_name not in self.facility.material_data:
+								raise KeyError (f"Reagent {reagent_name} not found in facility {self.facility.fac_id}'s listed materials with data.")
+						props["total_cost"] = abs_usage * self.facility.material_data[reagent_name]["cost"]
 
 		def calculate_environmental_impacts(self, impact_factors: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
 				"""
@@ -641,7 +617,7 @@ class ProductionStep:
 				elif self.process_type == "continuous":
 						self._calc_cont_scaling()
 				else:
-						raise ValueError(f"Unknown process type {self.process_type}")
+						raise ValueError(f"Unknown process type {self.process_type} for machine {self.machine_block}.")
 
 				# --- STEP 2: Common operational costs ---
 				self._calc_material_costs()

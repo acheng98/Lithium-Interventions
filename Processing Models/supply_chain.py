@@ -1,14 +1,16 @@
 from typing import Dict, Any, List, Optional
+from collections import OrderedDict
 import copy
 from collections import defaultdict
 
 from facility import Facility
+from production_step import ProductionStep
 from transportation import Transportation, TransportRoute
 from helpers import plot_stacked_bars, plot_production_curve
 
 # Define a class for the supply chain
 class SupplyChain:
-	def __init__(self):
+	def __init__(self,transp_data,loc_data,machine_data,material_data):
 		self.facilities = {}   # facility_id : Facility
 		self.links = {}        # (from_fac,to_fac): {products: fraction_transferred}
 		self.prod_map = {} #apv: [self.tot_var_cost,self.tot_fixed_cost,self.tot_cost]
@@ -17,6 +19,13 @@ class SupplyChain:
 		self.fwd_transp = []
 		self.rev_transp = []
 
+		# Default values for facilities to inherit
+		self.transp_data = transp_data
+		self.loc_data = loc_data
+		self.machine_data = machine_data
+		self.material_data = material_data
+
+		# Summary statistics
 		self.apv = 0
 		self.total_utilities = {}
 		self.tot_var_cost = 0
@@ -28,8 +37,12 @@ class SupplyChain:
 
 	def add_facility(self, fac, next_fac = None, products = None, transport_route = None):
 		self.facilities[fac.fac_id] = fac
-		if next_fac is not None and products is not None:
-			self.link_facilities(fac,next_fac,products,transport_route)
+		fac.supply_chain = self
+		if next_fac is not None:
+			if products == None:
+				raise ValueError("Intermediate products being transferred between facilities are not defined.")
+			else:
+				self.link_facilities(fac,next_fac,products,transport_route)
 
 	def link_facilities(self, from_fac, to_fac, products, transport_route):
 		'''
@@ -48,9 +61,9 @@ class SupplyChain:
 
 		for product in products.keys():
 			if product not in from_outputs:
-				raise KeyError(f"Product '{product}' not found in {from_fac} outputs.")
+				raise KeyError(f"Product '{product}' not found in {from_fac.fac_id} outputs.")
 			if product not in to_inputs:
-				raise KeyError(f"Product '{product}' not found in {to_fac} inputs.")
+				raise KeyError(f"Product '{product}' not found in {to_fac.fac_id} inputs.")
 
 		# Validate transport_route is a TransportRoute class
 		if transport_route is not None and not(isinstance(transport_route,TransportRoute)):
@@ -123,66 +136,75 @@ class SupplyChain:
 		self.rev_transp = list(reversed(topo_order_transp))
 		return topo_order_transp
 
-	def update_apv(self,apv):
-		if apv not in self.prod_map and apv is not None: # Don't need to re-run if already recorded
-			self.apv = apv
-			self.topo_order()
+	def update_apv(self,apv,recalc=False):
+		if type(apv) not in [float,int]: 
+			print("APV input is not a float or int, try again.")
+			return
 
-			# Reset these values across apv runs 
-			self.tot_var_cost   = 0.0
-			self.tot_fixed_cost = 0.0
-			self.tot_cost       = 0.0
-			self.avg_var_cost   = 0.0
-			self.avg_fixed_cost = 0.0
-			self.avg_cost       = 0.0
-			self.env_impacts = {}
+		if not recalc and apv in self.prod_map: # Don't need to re-run if already recorded
+			print("Input production volume has already been calculated.")
+			return
 
-			cur_apv = apv
-			for fac in self.rev:
-				updated_apv = False
-				summary = fac.update_apv(cur_apv)
-				self.tot_var_cost += summary["tot_var_cost"]
-				self.tot_fixed_cost += summary["tot_fixed_cost"]
-				self.tot_cost += summary["tot_cost"]
+		self.apv = apv
+		self.topo_order()
 
-				for k, v in summary["emissions_totals"].items():
-					self.env_impacts[k] = self.env_impacts.get(k, 0.0) + v
+		# Reset these values across apv runs 
+		self.tot_var_cost   = 0.0
+		self.tot_fixed_cost = 0.0
+		self.tot_cost       = 0.0
+		self.avg_var_cost   = 0.0
+		self.avg_fixed_cost = 0.0
+		self.avg_cost       = 0.0
+		self.env_impacts = {}
 
-				for (u, v),(products,transport_route) in self.links.items(): # This is O(n^2) which is technically inefficient, but n should be small
-					if v == fac:
-						if transport_route is not None:
-							res = transport_route.evaluate_total(new_volume=fac.get_initial_pv())
-							self.tot_var_cost += res["variable_cost"]
-							self.tot_fixed_cost += res["fixed_cost"]
-							self.tot_cost += res["total_cost"]
-					
-							for k, v in res["emissions_totals"].items():
-								self.env_impacts[k] = self.env_impacts.get(k, 0.0) + v
+		cur_apv = apv
+		for fac in self.rev:
+			updated_apv = False
+			summary = fac.update_apv(cur_apv,recalc)
+			self.tot_var_cost += summary["tot_var_cost"]
+			self.tot_fixed_cost += summary["tot_fixed_cost"]
+			self.tot_cost += summary["tot_cost"]
 
-							# Assume only one link per facility at this time
-							cur_apv = res["input_units"]
-							updated_apv = True
-							break
+			for k, v in summary["emissions_totals"].items():
+				self.env_impacts[k] = self.env_impacts.get(k, 0.0) + v
+
+			for (u, v),(products,transport_route) in self.links.items(): # This is O(n^2) which is technically inefficient, but n should be small
+				if v == fac:
+					if transport_route is not None:
+						res = transport_route.evaluate_total(total_volume=fac.get_initial_pv())
+						self.tot_var_cost += res["variable_cost"]
+						self.tot_fixed_cost += res["fixed_cost"]
+						self.tot_cost += res["total_cost"]
 				
-				if updated_apv is False: # No transportation link identified, just get the apv of this current facility
-					# TECHNICALLY SHOULD BE THE VALUE OF THE INPUT NEEDED FOR THE VOLUME-DEFINING INPUT
-					cur_apv = fac.get_initial_pv()
+						for k, v in res["emissions_totals"].items():
+							self.env_impacts[k] = self.env_impacts.get(k, 0.0) + v
+
+						# Assume only one link per facility at this time
+						cur_apv = res["initial_volume"]
+						updated_apv = True
+						break
+			
+			if updated_apv is False: # No transportation link identified, just get the apv of this current facility
+				# TECHNICALLY SHOULD BE THE VALUE OF THE INPUT NEEDED FOR THE VOLUME-DEFINING INPUT
+				cur_apv = fac.get_initial_pv()
 
 
-			self.avg_var_cost = self.tot_var_cost / self.apv
-			self.avg_fixed_cost = self.tot_fixed_cost / self.apv
-			self.avg_cost = self.tot_cost / self.apv
-			self.prod_map[self.apv] = [self.tot_var_cost, self.tot_fixed_cost, self.tot_cost]
+		self.avg_var_cost = self.tot_var_cost / self.apv
+		self.avg_fixed_cost = self.tot_fixed_cost / self.apv
+		self.avg_cost = self.tot_cost / self.apv
+		self.prod_map[self.apv] = [self.tot_var_cost, self.tot_fixed_cost, self.tot_cost]
 
-			return {
-				"apv": self.apv,
-				"tot_var_cost": self.tot_var_cost,
-				"tot_fixed_cost": self.tot_fixed_cost,
-				"tot_cost": self.tot_cost,
-				"avg_var_cost": self.avg_var_cost,
-				"avg_fixed_cost": self.avg_fixed_cost,
-				"avg_cost": self.avg_cost
-			}
+		return {
+			"apv": self.apv,
+			"tot_var_cost": self.tot_var_cost,
+			"tot_fixed_cost": self.tot_fixed_cost,
+			"tot_cost": self.tot_cost,
+			"avg_var_cost": self.avg_var_cost,
+			"avg_fixed_cost": self.avg_fixed_cost,
+			"avg_cost": self.avg_cost,
+			"total_co2": self.env_impacts["co2"],
+			"avg_co2": self.env_impacts["co2"]/self.apv,
+		}
 
 	# OVERALL SUMMARY STASTISTICS
 	def get_total_reagents(self):
@@ -208,6 +230,9 @@ class SupplyChain:
 
 				totals[reagent_name]["abs_usage"] += props.get("abs_usage", 0.0)
 				totals[reagent_name]["total_cost"] += props.get("total_cost", 0.0)
+
+		for reagent_name, info in totals.items():
+			info["output_avg_cost"] = info["total_cost"] / self.apv
 
 		return totals
 
@@ -242,6 +267,9 @@ class SupplyChain:
 				totals[utility]["consumed"] += getattr(step, consumed_attr, 0.0)
 				totals[utility]["cost"] += getattr(step, cost_attr, 0.0)
 
+		for utility, info in totals.items():
+			info["output_avg_cost"] = info["cost"] / self.apv
+
 		return totals
 
 	def get_total_labor(self):
@@ -257,11 +285,12 @@ class SupplyChain:
 		steps = []
 		for node in self.topo_order_transp():
 			if isinstance(node, Facility):
-				for step in node.fwd:
-					steps.append(step)
+				# Ensure the facility step ordering has been computed
+				if not getattr(node, "fwd", None):
+					node.topo_order()
+				steps.extend(list(node.fwd))
 			elif isinstance(node, TransportRoute) and transp:
-				for leg in node.legs:
-					steps.append(leg)
+				steps.extend(list(node.legs))
 		return steps
 
 	def get_step_constituents(self):
@@ -270,11 +299,17 @@ class SupplyChain:
 			consts.append([step.step_name, step.constituents])
 		return consts
 
+	def get_constituent_amount_at_steps(self,constituent):
+		amts = []
+		for step in self.get_steps():
+			amts.append([step.step_name, step.constituents.get(constituent,0)*step.step_pv])
+		return amts
+
 	def get_step_reagent_usage(self):
 		reagent_usages = []
 		for step in self.get_steps():
 			for reagent_name, props in step.secondary_inputs.items():
-				reagent_usages.append([step.step_name, reagent_name, props["abs_usage"], props["total_cost"]])
+				reagent_usages.append([step.step_name, reagent_name, {"usage":props["abs_usage"], "cost":props["total_cost"]}])
 		return reagent_usages
 
 	def get_step_electric(self):
@@ -322,35 +357,34 @@ class SupplyChain:
 	def get_step_utilities_detailed(self):
 		results = []
 		for step in self.get_steps():
-			results.append({
-				"step_name": step.step_name,
-				"total_utility_cost": step.utility_cost,
-
-				"electricity": {
+			results.append(OrderedDict([
+				("step_name", step.step_name),
+				("total_utility_cost",step.utility_cost),
+				("electricity", {
 					"consumed": step.electricity_consumed,
 					"cost": step.electricity_cost,
-				},
-				"natural_gas": {
+				}),
+				("natural_gas", {
 					"consumed": step.natural_gas_consumed,
 					"cost": step.natural_gas_cost,
-				},
-				"process_water": {
+				}),
+				("process_water", {
 					"consumed": step.process_water_consumed,
 					"cost": step.process_water_cost,
-				},
-				"cooling_water": {
+				}),
+				("cooling_water", {
 					"consumed": step.cooling_water_consumed,
 					"cost": step.cooling_water_cost,
-				},
-				"steam": {
+				}),
+				("steam", {
 					"consumed": step.steam_consumed,
 					"cost": step.steam_cost,
-				},
-				"compressed_air": {
+				}),
+				("compressed_air", {
 					"consumed": step.compressed_air_consumed,
 					"cost": step.compressed_air_cost,
-				},
-			})
+				}),
+				]))
 		return results
 
 	def get_step_labor(self):
@@ -379,6 +413,44 @@ class SupplyChain:
 						inputs.append([step.step_name, primary_input, items["input_needed"]])
 		return inputs
 
+	def get_step_costs(self,transp=False,detail=1):
+		prints = []
+		if detail == 1:
+			for step in self.get_steps(transp=transp):
+				if isinstance(step, ProductionStep):
+					prints.append([step.step_name, step.tot_var_cost, step.tot_fixed_cost])
+				elif isinstance(step,Transportation):
+					prints.append([step.name, step.variable_cost, step.fixed_cost])
+				else:
+					raise ValueError(f"Unidentified node in the supply chain's topographic order")
+		elif detail == 2:
+			for step in self.get_steps(transp=transp):
+				if isinstance(step, ProductionStep):
+					prints.append(OrderedDict([
+						("step_name",step.step_name),
+						("variable_costs", step.tot_var_cost),
+						("material_costs", step.tot_mat_cost),
+						("labor_costs", step.labor_cost),
+						("utility_costs", step.utility_cost),
+						("fixed_costs", step.tot_fixed_cost),
+						("machine_cost", step.machine_cost),
+						("tool_cost", step.tool_cost),
+						("building_cost", step.building_cost),
+						("aux_equip_cost", step.aux_equip_cost),
+						("maint_cost", step.maint_cost),
+						("fixed_over_cost", step.fixed_over_cost)
+					]))
+				elif isinstance(step,Transportation):
+					prints.append(OrderedDict([
+						("step_name", step.name),
+						("variable_costs", step.variable_cost),
+						("fixed_costs", step.fixed_cost),
+					]))
+				else:
+					raise ValueError(f"Unidentified node in the supply chain's topographic order")
+		return prints
+
+
 	def plot_tot_fac_costs(self,apv=None,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None):
 		if apv is not None:
 			self.update_apv(apv)
@@ -404,7 +476,8 @@ class SupplyChain:
 		plot_stacked_bars(labels,costs,stack_order=stack_order,xscale=xscale,yscale=yscale,
 			title=title,xlab=xlab,ylab=ylab,xlims=xlims,ylims=ylims)
 
-	def plot_tot_steps_costs(self,apv=None,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None):
+	def plot_tot_steps_costs(self,apv=None,show_var=True,show_fixed=True,
+		xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None):
 		if apv is not None:
 			self.update_apv(apv)
 		elif len(self.prod_map.keys()) == 0:
@@ -413,22 +486,14 @@ class SupplyChain:
 		labels = []
 		costs = defaultdict(list)
 
-		for node in self.topo_order_transp():
-			if isinstance(node, Facility):
-				for step in node.fwd:
-					labels.append(step.step_name)
-					costs["Variable Costs"].append(step.tot_var_cost)
-					costs["Fixed Costs"].append(step.tot_fixed_cost)
-			elif isinstance(node, TransportRoute):
-				for leg in node.legs:
-					labels.append(leg.name)
-					costs["Variable Costs"].append(leg.variable_cost)
-					costs["Fixed Costs"].append(leg.fixed_cost)
-			else:
-				raise ValueError(f"Unidentified node in the supply chain's topographic order")
-			
+		for node in self.get_step_costs(transp=True):
+			labels.append(node[0])
+			if show_var: costs["Variable Costs"].append(node[1])
+			if show_fixed: costs["Fixed Costs"].append(node[2])
 
-		stack_order = ["Fixed Costs","Variable Costs"]
+		stack_order = []
+		if show_fixed: stack_order.append("Fixed Costs")
+		if show_var: stack_order.append("Variable Costs")
 		plot_stacked_bars(labels,costs,stack_order=stack_order,xscale=xscale,yscale=yscale,
 			title=title,xlab=xlab,ylab=ylab,xlims=xlims,ylims=ylims)
 

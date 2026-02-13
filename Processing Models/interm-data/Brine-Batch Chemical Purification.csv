@@ -1,53 +1,12 @@
 variable_name,Description,Batch Treatment,Separation
-step_id,Step ID (unique),1,2
+step_id,Step ID (unique),batch_treatment,sls_step
 step_name,Human-readable process step,Batch treatment of brine (Lime [CaCO3] + soda ash [Na2CO3]),Solid–liquid separation (settling + filtration lumped)
 key_equation,"Key equation, chemical or physical, evaluated in this step.",Mg2+ + (OH)-2 --> Mg(OH)2(s); Ca2+ + CO3^2- -> CaCO3(s),
 notes,"Key information, notes","Batch reactor/tanks with agitation. Purpose is impurity precipitation (Mg, Ca) while keeping Li in solution.",Primary tunable is Li loss to solids.
-sources,,,
-process_type,continuous or batch,batch,continuous
-base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",100,100
-base_volume_unit,"Not used directly in calculation, but for human readability",m3/batch concentrated brine,m3/h treated slurry equivalent (pseudo-continuous)
-oversizing_factor,Process volume ≠ design volume,1.15,1.15
+machine_options,,batch_treatment_generic,solid_liquid_separation
+machine_default,,batch_treatment_generic,solid_liquid_separation
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,concentrated_brine_throughput,treated_slurry_throughput
-scaling_exponent_throughput,Exponent for operations vis-a-vis process rate,0.7,0.7
-batch_cycle_time,,6,
-batch_cycle_time_unit,,hr,
-batch_setup_time,,1,
-batch_setup_time_unit,,hr,
-dedicated_line,,TRUE,TRUE
-electricity_base_total,"Reference electricity use, for base volume",10,20
-electricity_base_total_unit,,kWh/h,kWh/h
-natural_gas_base_total,Reference gas consumption,0,0
-natural_gas_base_total_unit,,MMBTU/h,MMBTU/h
-process_water_base_total,Makeup water,0.2,0.5
-process_water_base_total_unit,,m3/h,m3/h
-cooling_water_base_total,Reference cooling water,0,0
-cooling_water_base_total_unit,,m3/h,m3/h
-diesel_base_total,Reference diesel usage,0,0
-diesel_base_total_unit,,L/h,L/h
-steam_base_total,Reference steam use,0,0
-steam_base_total_unit,,kg/h,kg/h
-compressed_air_base_total,Reference compressed air,0,0
-compressed_air_base_total_unit,,Nm3/h,Nm3/h
-prim_equip_price_base,Reference equipment capex,1500000,3000000
-prim_equip_price_base_unit,,2025USD,2025USD
-prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",0.6,0.6
-prim_equip_life,Expected equipment life,20,20
-prim_equip_life_unit,,years,years
-tooling_cost_base,Reference tooling cost,0,0
-tooling_cost_base_unit,,2025USD,2025USD
-tooling_scaling_exponent,Scale exponent,0.6,0.6
-footprint_base,Plot area incl. access,300,600
-footprint_base_unit,,m2,m2
-footprint_scaling_exponent,Scale exponent,0.6,0.6
-dedicated_labor,,TRUE,FALSE
-labor_base,Reference labor requirement,0.5,0.5
-labor_base_unit,,FTE,FTE
-labor_scaling_exponent,Labor efficiency with scale,0.3,0.3
-opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as function of capex",0.05,0.05
-unplanned_downtime,Fraction of entire facility uptime,0.05,0.05
-proc_avail_factor,Uptime excluding planned outages,0.95,0.95
-scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0.1,0.1
+step_basis_unit,,m3/batch concentrated brine,m3/h treated slurry equivalent (pseudo-continuous)
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",concentrated_brine_throughput,treated_slurry_throughput
 volume_defining_basis_unit,What unit is the process volume or constituent in?,L concentrated_lithium_brine,L brine_post_lime
 volume_defining_output,What is the output or output constituent that needs to be converted to,treated_slurry,brine_post_polishing
@@ -78,8 +37,7 @@ reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,
 reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,
 reagent_3_units,,,
 primary_output_1_name,Output stream/material,treated_slurry,brine_post_polishing
-primary_output_1_step,The step or waste material tracker that this output goes to,2,Final
-primary_output_1_yield_rate,Yield Rate,1,0.995
+primary_output_1_step,The step or waste material tracker that this output goes to,sls_step,Final
 primary_output_1_units,Convert from step basis units to output units (step basis * CF = output),L brine-post lime,L brine post de-boron
 primary_output_1_conversion_factor,Units after conversion is applied,1,1
 primary_output_1_constituents,,Li; K; Mg(OH)2; CaCO3; Na; B; SO4,Li; Na; K; Cl; SO4; H2O

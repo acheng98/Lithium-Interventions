@@ -1,4 +1,4 @@
-from helpers import safe_float, load_csv, build_steps_dict, build_locations_dict, build_projects_dict, parse_keys_string
+import helpers
 from supply_chain import SupplyChain
 from facility import Facility
 from production_step import ProductionStep
@@ -9,116 +9,108 @@ from collections import defaultdict
 from copy import deepcopy
 from pprint import pprint
 
-# Probably should incorporate this into 'from_table'
-def import_steps(fac,steps_dict):
-	steps = []
-	for step_name in reversed(list(steps_dict.keys())):
-		step_vars = steps_dict[step_name]
-		step = ProductionStep.from_table(facility=fac, step_vars=step_vars)
-		steps.append(step.step_name)
-
-	fac.topo_order()
-	# print("Ingested steps:", list(reversed(steps)))
-	return fac
-
-def lithium_evaporation(sc,facility_steps,locations,transp_data,transports,chems,material_costs,brine_factors):
+def lithium_evaporation(sc,project_data,data_folder):
 	# Pregnant Solution Processing facility
-	lithium_extraction = Facility(fac_id="Lithium Extraction", material_costs = material_costs,
-							sinks=["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"])
-	import_steps(lithium_extraction,facility_steps[2])
-	lithium_extraction.update_location(locations[1],locations_dict[locations[1]]) # Assume lithium extraction plant is adjacent to concentrated brine facility
+	lithium_extraction = Facility(fac_id="Lithium Extraction", supply_chain=sc,
+							sinks = ["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+							steps = helpers.build_facility_dict(data_folder,project_data["Pathway 3"]))
+	lithium_extraction.update_location(project_data["Location 2"]) # Assume lithium extraction plant is adjacent to concentrated brine facility
 	sc.add_facility(lithium_extraction)
 
 	# Concentrated Brine facility 	
-	conc_brine = Facility(fac_id="Concentrated Brine", material_costs = material_costs,
-						sinks = ["landfill","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"])
-
-	import_steps(conc_brine,facility_steps[1])
-	conc_brine.update_location(locations[1],locations_dict[locations[1]]) 
-	sc.add_facility(conc_brine)
+	conc_brine = Facility(fac_id="Concentrated Brine", supply_chain=sc,
+						sinks = ["landfill","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+						steps = helpers.build_facility_dict(data_folder,project_data["Pathway 2"]))
+	conc_brine.update_location(project_data["Location 2"]) 
+	sc.add_facility(conc_brine, next_fac=lithium_extraction, products={"brine_post_polishing": 1})
 
 	# Evaporation ponds 'facility' 
-	evap_ponds = Facility(fac_id="Evaporation Ponds", material_costs = material_costs,
-						sinks = ["landfill","atmosphere"]) # Potassium?
-	import_steps(evap_ponds,facility_steps[0])
-	evap_ponds.update_location(locations[0],locations_dict[locations[0]])
+	evap_ponds = Facility(fac_id="Evaporation Ponds", supply_chain=sc,
+						sinks = ["landfill","atmosphere"], # Potassium?
+						steps = helpers.build_facility_dict(data_folder,project_data["Pathway 1"]))
+	evap_ponds.update_location(project_data["Location 1"]) 
 	# Set conversion factor for yield from ponds
 	evap = evap_ponds.fwd[1]
-	evap.set_conversion_factor("concentrated_lithium_brine",brine_factors["Pond Recovery Efficiency"],change_yield=True)
+	evap.set_conversion_factor("pre-limed_brine",project_data["Pond Recovery Efficiency"],change_yield=True)
 
 	# Transportation
 	products = {"concentrated_lithium_brine": 1}
-	if transports[0] is None: 
+	if project_data["Transport 1"] is None: 
 		# In certain locations - namely Silver Peak - brine is processed on-site with the ponds
 		sc.add_facility(evap_ponds, next_fac=conc_brine, products=products)
-	elif len(transports[0]) > 0: 
-		transps = []
-		for transport in transports[0]: 
-			brine_trucks = Transportation("Brine transport via truck",transp_data,transport[0],distance=transport[1])
-		brine_truck_route = TransportRoute("Brine transport",[brine_trucks])
-		sc.add_facility(evap_ponds, next_fac=conc_brine, products=products, transport_route=brine_truck_route)
+	else:
+		brine_route = []
+		for leg,dist in project_data["Transport 1"].items():
+			brine_route.append(Transportation("Brine transport via truck",sc,leg,dist))
+		sc.add_facility(evap_ponds, next_fac=conc_brine, products=products, transport_route=TransportRoute("Brine transport",brine_route))
 
 	# Fix Chemistries
-	evap_ponds.add_target_comp(target = "raw_brine_from_ground", composition = chems[0], target_step_id = "1", propagate = True)
-	evap_ponds.add_target_comp(target = "concentrated_lithium_brine", composition = chems[1], target_step_id = "2", propagate = True)
-	conc_brine.add_target_comp(target = "concentrated_lithium_brine", composition = chems[1], target_step_id = "1", propagate = True)
+	evap_ponds.add_target_comp(target = "raw_brine_from_ground", 
+								composition = project_data["Initial Concentration"], 
+								target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
+	evap_ponds.add_target_comp(target = "pre-limed_brine", 
+								composition = project_data["Intermediate Concentration"], 
+								target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = True)
+	conc_brine.add_target_comp(target = "concentrated_lithium_brine", 
+								composition = project_data["Intermediate Concentration"], 
+								target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True) # Needs to be CSTR Generic for SQM
 	lithium_extraction.add_target_comp(target = "brine_post_polishing", 
-		composition = conc_brine.fwd[-1].primary_outputs["brine_post_polishing"]["constituents"], # Would be nice to make a get function for this
-		target_step_id = "1", propagate = True
-		)
-	print(conc_brine.fwd[-1].primary_outputs["brine_post_polishing"]["constituents"])
-
+								composition = conc_brine.fwd[-1].primary_outputs["brine_post_polishing"]["constituents"], # Would be nice to make a get function for this
+								target_step_id = "precipitation_step", propagate = True)
 	return sc 
 
-def clay_lepidolite(sc,facility_steps,locations,transp_data,transports,chems,material_costs,densities,mining_factors):
+def clay_lepidolite(sc,project_data,data_folder):
 	# Pregnant Solution Processing facility
-	lithium_extraction = Facility(fac_id="Lithium Extraction", material_costs = material_costs,
-							sinks=["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"])
-	import_steps(lithium_extraction,facility_steps[2])
-	lithium_extraction.update_location(locations[1],locations_dict[locations[1]]) # Assume lithium extraction is adjacent to leaching plant 
+	lithium_extraction = Facility(fac_id="Lithium Extraction", supply_chain=sc,
+								sinks=["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+								steps=helpers.build_facility_dict(data_folder,project_data["Pathway 3"]))
+	lithium_extraction.update_location(project_data["Location 2"]) # Assume lithium extraction is adjacent to leaching plant 
 	sc.add_facility(lithium_extraction)
 
 	# Communition and Leaching facility 
-	material_refining = Facility(fac_id="Material Refining", material_costs = material_costs,
-						sinks = ["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"])
-	import_steps(material_refining,facility_steps[1])
-	material_refining.update_location(locations[1],locations_dict[locations[1]])
-	sc.add_facility(material_refining, next_fac =lithium_extraction)
+	material_refining = Facility(fac_id="Material Refining", supply_chain=sc,
+								sinks = ["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+								steps=helpers.build_facility_dict(data_folder,project_data["Pathway 2"]))
+	material_refining.update_location(project_data["Location 2"])
+	sc.add_facility(material_refining, next_fac = lithium_extraction, products = {"brine_post_polishing": 1})
 
 	# Transportation
 	transps = []
-	for transport in transports[0]: 
-		transps.append(Transportation("Ore transport via truck",transp_data,transport[0],distance=transport[1]))
+	for leg,dist in project_data["Transport 1"].items(): 
+		transps.append(Transportation("Ore transport via truck",sc,leg,dist))
 	ore_truck_route = TransportRoute("Ore transport",transps)
 
 	# Mining 'facility' 
-	material_extraction = Facility(fac_id="Mining", material_costs = material_costs,
-						sinks = ["landfill","atmosphere","waste_pile"])
-	import_steps(material_extraction,facility_steps[0])
-	material_extraction.update_location(locations[0],locations_dict[locations[0]])
+	material_extraction = Facility(fac_id="Mining", supply_chain=sc,
+									sinks = ["landfill","atmosphere","waste_pile"],
+									steps=helpers.build_facility_dict(data_folder,project_data["Pathway 1"]))
+	material_extraction.update_location(project_data["Location 1"])
 
-	rho_bank  = densities[0]
-	swell_factor = mining_factors["Swell Factor"]
-	dilution = mining_factors["Dilution"] # Apply dilution directly to chemical composition instead
-	strip_ratio = mining_factors["Strip Ratio"]
+	rho_bank  = project_data["Initial Density"]
+	swell_factor = project_data["Swell Factor"]
+	dilution = project_data["Dilution"] # Apply dilution directly to chemical composition instead
+	strip_ratio = project_data["Strip Ratio"]
 	rho_loose = rho_bank / swell_factor
-	loss = mining_factors["Loss"]
+	loss = project_data["Loss"]
 	
-	composition = deepcopy(chems[0])
-	if not mining_factors["Composition_ROM"]: # If the reported grade is not the grade at ROM, need to dilute
-		composition["Li"] = composition["Li"] * (1 - dilution) # Apply dilution to composition - may need to apply to other minerals as well, or increase their makeup
+	init_conc = project_data["Initial Concentration"]
+	rom_comp = deepcopy(project_data["Initial Concentration"])
+	if not project_data["ROM feed?"]: # If the reported grade is not the grade at ROM, need to dilute
+		rom_comp["Li"] = rom_comp["Li"] * (1 - dilution) # Apply dilution to initial composition - may need to apply to other minerals as well, or increase their makeup
+	else: # ROM is reported grade
+		init_conc["Li"] = rom_comp["Li"] / (1 - dilution) # Back-calculate ore grade based on dilution 
 
-	if mining_factors["Powder Factor"] in ["","-",None]: # We do *not* have blasting
+	if project_data["Powder Factor"] in ["","-",None]: # We do *not* have blasting
 		# Update initial and final chemical compositions for extraction facility
-		material_extraction.add_target_comp(target = "raw_material", composition = chems[0], target_step_id = "1", propagate = False)
-		material_extraction.add_target_comp(target = "rom_ore_feed", composition = composition, target_step_id = "1", propagate = False)
+		material_extraction.add_target_comp(target = "raw_material", composition = init_conc, target_step_id = "excav_load", propagate = False)
+		material_extraction.add_target_comp(target = "rom_ore_feed", composition = rom_comp, target_step_id = "excav_load", propagate = False)
 
 		loading = material_extraction.fwd[0]
 		loading.set_conversion_factor("raw_material",1/rho_loose)	
 	else:
 		# Update initial and final chemical compositions for extraction facility
-		material_extraction.add_target_comp(target = "raw_material", composition = chems[0], target_step_id = "1", propagate = True)
-		material_extraction.add_target_comp(target = "rom_ore_feed", composition = composition, target_step_id = "2", propagate = False)
+		material_extraction.add_target_comp(target = "raw_material", composition = init_conc, target_step_id = "blasting", propagate = True)
+		material_extraction.add_target_comp(target = "rom_ore_feed", composition = rom_comp, target_step_id = "excav_load", propagate = False)
 
 		# Get second/last step and add yield
 		loading = material_extraction.fwd[1]
@@ -130,124 +122,101 @@ def clay_lepidolite(sc,facility_steps,locations,transp_data,transports,chems,mat
 	loading.set_conversion_factor("waste",rho_loose * (strip_ratio + loss)/(1+strip_ratio)) # (calculate waste = strip ratio + loss)
 
 	# Update initial and final chemical compositions for each subsequent facility module
-	material_refining.add_target_comp(target = "rom_ore_feed", composition = composition, target_step_id = "1", propagate = True)
-
-	interm_chem = chems[1]["Li"]
-	print(interm_chem)
-	# material_refining.add_target_comp(target = "purified_Li_solution", composition = ) don't have this intermediate composition yet 
-	lithium_extraction.add_target_comp()
-	# material_extraction.add_target_comp(target = "excavated_ore", composition = chems[0], target_step_id = "2", propagate = True) <-- target acid leaching
-
+	material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
+										target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
+	material_refining.add_target_comp(target = "brine_post_polishing", composition = project_data["Intermediate Concentration"], 
+										target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = False) 
+	lithium_extraction.add_target_comp(target = "brine_post_polishing", composition = project_data["Intermediate Concentration"],
+										target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True)
+	
 	products = {"rom_ore_feed": 1}
 	sc.add_facility(material_extraction, next_fac=material_refining, products=products, transport_route=ore_truck_route)	
 
 	return sc 
 
-def evaluate_project(project_data, material_costs, locations_dict, transp_data, data_folder):
+def evaluate_project(sc,project_data,data_folder):
+	summary = {}
 
 	project_type = project_data["Type"]
-	sc = SupplyChain()
-
 	if project_type == "Brine-Evaporative":
-		facility_steps = []
-		for k in ("Pathway 1","Pathway 2"):
-			facility_steps.append(build_steps_dict(load_csv(data_folder+project_data[k])))
-		facility_steps.append(build_steps_dict(load_csv(data_folder+"Solution Processing")))
-
-		locations = [project_data[k] for k in ("Location 1","Location 2")]
-
-		if project_data["Transport 1"] is not None:
-			transports = [parse_keys_string(project_data["Transport 1"])]
-		else:
-			transports = [None]
-
-		chem_strings = ["Initial Concentration","Intermediate Concentration"]
-		chems = [dict(parse_keys_string(project_data[string])) for string in chem_strings]
-		
-		densities = [project_data["Initial Density"],project_data["Intermediate Density"]] # not needed for now - would affect conversion factors. 
-		brine_factors = {"Pond Recovery Efficiency": project_data["Pond Recovery Efficiency"],
-						}
-		sc = lithium_evaporation(sc,facility_steps,locations,transp_data,transports,chems,material_costs,brine_factors)
+		sc = lithium_evaporation(sc,project_data,data_folder)
 	elif project_type == "Brine-DLE":
 		pass 
 	elif project_type == "Spodumene":
 		pass
 	elif project_type in ["Clays","Lepidolite"]:
-		facility_steps = []
-		for k in ("Pathway 1","Pathway 2"):
-			facility_steps.append(build_steps_dict(load_csv(data_folder+project_data[k])))
-		facility_steps.append(build_steps_dict(load_csv(data_folder+"Solution Processing")))
-
-		locations = [project_data[k] for k in ("Location 1","Location 2")]
-		transports = [parse_keys_string(project_data[k]) for k in ["Transport 1"]]
-
-		chem_strings = ["Initial Concentration","Intermediate Concentration"]
-		chems = [dict(parse_keys_string(project_data[string])) for string in chem_strings]
-		
-		densities = [project_data["Initial Density"],project_data["Intermediate Density"]]
-		mining_factors = {"Strip Ratio": project_data["Strip Ratio"],
-						"Dilution": project_data["Dilution"],
-						"Loss": project_data["Loss"],
-						"Swell Factor": project_data["Swell Factor"],
-						"Powder Factor": project_data["Powder Factor"],
-						"Composition_ROM": project_data["ROM feed?"]
-						}
-		sc = clay_lepidolite(sc,facility_steps,locations,transp_data,transports,chems,material_costs,densities,mining_factors)
+		sc = clay_lepidolite(sc,project_data,data_folder)
 	else:
 		raise ValueError(f"Project type '{project_type}' not defined.")
 
 	# for target_pv in target_pvs:
-	target_pv = project_data["Production Volume (Tonnes LCE / Year)"] # convert to kg
-	print(sc.update_apv(target_pv))
+	target_pv = project_data["Production Volume"] # convert to kg
+	# print("Summary statistics:")
+	summary_midpoint = sc.update_apv(target_pv)
+	summary["midpoint"] = summary_midpoint
+	# pprint(summary_midpoint)
+	# helpers.update_machines(sc,"conservative")
+	# summary_conservative = sc.update_apv(target_pv,recalc=True)
+	# summary["conservative"] = summary_conservative
+	# pprint(summary_conservative)
+	# helpers.update_machines(sc,"optimistic")
+	# summary_optimistic = sc.update_apv(target_pv,recalc=True)
+	# summary["optimistic"] = summary_optimistic
+	# pprint(summary_optimistic)
+	# print("\nReagents:")
 	# pprint(sc.get_total_reagents())
+	# print("\nUtilities:")
 	# pprint(sc.get_total_utilities())
 	# pprint(sc.get_step_labor())
-	# print(sc.get_detailed_pvs())
+	# print("\nStep Production volumes:", sc.get_detailed_pvs())
+	# print("\nCosts at each step:")
+	# pprint(sc.get_step_costs(transp=True,detail=2))
 	# print(sc.get_detailed_inputs())
 	# print(sc.get_step_constituents())
-	print(sc.get_step_reagent_usage())
+	# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
+	# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
+	# print(sc.get_step_reagent_usage())
 	# pprint(sc.get_step_utilities_detailed())
-	# print(sc.get_detailed_pvs())
-	# sc.plot_tot_steps_costs()
+	sc.plot_tot_steps_costs(show_fixed=False)
 	# sc.plot_tot_steps_impacts()
 
-	# sc.plot_unit_cc()
 	# sc.plot_total_cc()
+
+	return summary 
+
+def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data):
+	project_summaries = {}
+
+	for project in projects:
+		project_data = projects_data[project]
+		sc = SupplyChain(transp_data,loc_data,machine_data,material_data)
+		summary = evaluate_project(sc,project_data,data_folder)
+		project_summaries[project] = summary 
+		# pprint(summary)
+
+	# pprint(project_summaries)
+	# helpers.plot_project_summaries(project_summaries)
 
 if __name__ == '__main__':
 	data_folder = "./interm-data/"
-	material_costs = load_csv(data_folder+"Material Costs.csv")
 
-	# # Material Costs #
-	# material_costs_df = pd.read_csv(data_folder+"Material Costs.csv", dtype=str).fillna("")
-	# # Assumes first column is material name; *fourth* column is converted unit cost
-	# material_costs = {
-	# 	str(row[0]): safe_float(row[3])
-	# 	for row in material_costs_df.itertuples(index=False, name=None)
-	# 	if pd.notna(row[0]) and pd.notna(row[3])
-	# }
+	# Load in all data
+	projects_data = helpers.build_data_dict(data_folder,"Project-Specific Data")
+	transp_data = helpers.build_data_dict(data_folder,"Transportation Data", col=3)
+	loc_data = helpers.build_locations_dict(data_folder,"Locational Data")
+	machine_data = helpers.build_data_dict(data_folder,"Machine Blocks Data", skip_rows=["notes", "sources", "key_equation", "machine_block_type"])
+	material_data = helpers.build_data_dict(data_folder,"Material Data")
 
-	# # Locational data
-	# locational_data_df = pd.read_csv(data_folder+"Locational Data.csv", dtype=str).fillna("") 
-	# header_ld = list(locational_data_df.columns)
-	# rows_ld = locational_data_df.values.tolist()
-	# locational_data = [header_ld] + rows_ld # as lists
-	# locations_dict = build_locations_dict(locational_data)
-
-	# # Transportation data
-	# transp_data_df = pd.read_csv(data_folder+"Transportation Data.csv", dtype=str).fillna("") 
-
-	# # Project-Specific Data
-	# projects_data_df = pd.read_csv(data_folder+"Project-Specific Data.csv", dtype=str).fillna("") 
-	# projects_data = build_projects_dict(projects_data_df)
-
-	# ################
-	# # Pick project #
-	# ################
-	# # project_data = projects_data["Salar de Atacama-SQM"]
+	################
+	# Pick project #
+	################
+	# project_data = projects_data["Salar de Atacama-SQM"]
 	# project_data = projects_data["Silver Peak"]
+	# project_data = projects_data["Thacker Pass"]
+	# projects = ["Silver Peak","Thacker Pass"]
+	projects = ["Silver Peak"]
 
-	# evaluate_project(project_data,material_costs,locations_dict,transp_data_df,data_folder)
+	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data)
 
 
 

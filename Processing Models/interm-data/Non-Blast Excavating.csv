@@ -1,61 +1,20 @@
 variable_name,Description,Excavation/Loading
-step_id,Step ID (unique),1
+step_id,Step ID (unique),excav_load
 step_name,Human-readable process step,Loading with excavator
 key_equation,"Key equation, chemical or physical, evaluated in this step.",Initial conversion factor is simply density conversion to loose rock; conversion from loose rock being moved/hauled to target ore is based on ore:strip ratio (1/(1+strip)) accounting for loss (i.e. yield); the rest is assumed to go to waste [(strip+loss)/(1+strip)]
 notes,"Key information, notes",Discrete numbers of excavators moving material to hauling trucks; EX374 used as baseline.
-sources,,
-process_type,continuous or batch,batch
-base_volume,"Reference scale, as a rate for continuous, or as a quantity for batch",3.6
-base_volume_unit,"Not used directly in calculation, but for human readability",m^3 effective volume (90% fill factor)
-oversizing_factor,Process volume ≠ design volume,
+machine_options,,excavation_loading_generic.optimistic; excavation_loading_generic.midpoint; excavation_loading_generic.conservative
+machine_default,,excavation_loading_generic.midpoint
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,loose_rock_throughput
-scaling_exponent_throughput,,
-batch_cycle_time,,0.01111111111
-batch_cycle_time_unit,,hour
-batch_setup_time,,0
-batch_setup_time_unit,,hour
-dedicated_line,,TRUE
-electricity_base_total,"Reference electricity use, for base volume",0
-electricity_base_total_unit,,kWh/h
-natural_gas_base_total,Reference gas consumption,0
-natural_gas_base_total_unit,,therm/h
-process_water_base_total,Makeup water,0
-process_water_base_total_unit,,m³/h
-cooling_water_base_total,Reference cooling water,0
-cooling_water_base_total_unit,,m³/h
-diesel_base_total,Reference diesel usage,37.66
-diesel_base_total_unit,,L/h
-steam_base_total,Reference steam use,0
-steam_base_total_unit,,kg/h
-compressed_air_base_total,Reference compressed air,0
-compressed_air_base_total_unit,,Nm³/h
-prim_equip_price_base,Reference equipment capex,"$1,407,000"
-prim_equip_price_base_unit,,2025USD
-prim_equip_scaling_exponent,"Capex scaling exponent (usually based off of the sixth-tenths rule, or similar)",1
-prim_equip_life,Expected equipment life,20
-prim_equip_life_unit,,n/a
-tooling_cost_base,Reference tooling cost,
-tooling_cost_base_unit,,# Tires
-tooling_scaling_exponent,Scale exponent,1
-footprint_base,Plot area incl. access,0
-footprint_base_unit,,m²
-footprint_scaling_exponent,Scale exponent,1
-dedicated_labor,,FALSE
-labor_base,Reference labor requirement,0
-labor_base_unit,,FTE
-labor_scaling_exponent,Labor efficiency with scale,1
-opex_fraction_of_capex,"Additional operating costs (e.g. maintenace), as function of capex",0.05
-unplanned_downtime,Fraction of entire facility uptime,0
-proc_avail_factor,Uptime excluding planned outages,1
-scheduled_maintenance,"Scheduled maintenance, fraction of entire facility uptime",0
+step_basis_unit,,m^3 effective volume (90% fill factor)
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",loose_rock_throughput
 volume_defining_basis_unit,What unit is the process volume or constituent in?,
 volume_defining_output,What is the output or output constituent that needs to be converted to,rom_ore_feed
 volume_defining_output_unit,What unit is that output in?,
 primary_input_1_name,,raw_material
 primary_input_1_units,Units after conversion is applied,
-primary_input_1_conversion_factor,Conversion factor of input into step basis. >1 means more inputs are needed than the step basis.,
-primary_input_1_constituents,Names of input constituents,
+primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,
+primary_input_1_constituents,Names of input constituents,Li
 primary_input_1_constituent_fractions,Values of input constituents,
 primary_input_1_constituent_units,Units for each input constituent,ppm (wt)
 primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE
@@ -79,8 +38,7 @@ reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by t
 reagent_3_units,,
 primary_output_1_name,Output stream/material,rom_ore_feed
 primary_output_1_step,The step or waste material tracker that this output goes to,Final
-primary_output_1_yield_rate,Yield Rate,1
-primary_output_1_conversion_factor,Convert from step-units to output units,
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),
 primary_output_1_units,Units after conversion is applied,
 primary_output_1_constituents,,Li; K; Mg; Ca; Na; SO4
 primary_output_1_constituent_units,,
