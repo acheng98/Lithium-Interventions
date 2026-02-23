@@ -3,14 +3,14 @@ step_id,Step ID (unique),blasting,excav_load
 step_name,Human-readable process step,Blasting with drilling and explosives,Loading with excavator
 key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A,Initial conversion factor is simply density conversion to loose rock; conversion from loose rock being moved/hauled to target ore is based on ore:strip ratio (1/(1+strip)) accounting for loss (i.e. yield); the rest is assumed to go to waste [(strip+loss)/(1+strip)]
 notes,"Key information, notes",,Discrete numbers of excavators moving material to hauling trucks; EX374 used as baseline.
-machine_options,,blasting_generic,excavation_loading_generic.conservative; excavation_loading_generic.midpoint; excavation_loading_generic.optimistic
-machine_default,,blasting_generic,excavation_loading_generic.midpoint
+machine_options,,blasting_generic.conservative; blasting_generic.midpoint; blasting_generic.optimistic,excavation_loading_generic.conservative; excavation_loading_generic.midpoint; excavation_loading_generic.optimistic
+machine_default,,blasting_generic.midpoint,excavation_loading_generic.midpoint
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,rock_blast_throughput,loose_rock_throughput
 step_basis_unit,,metric tonnes,m^3 effective volume (90% fill factor)
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",rock_blast_throughput,loose_rock_throughput
-volume_defining_basis_unit,What unit is the process volume or constituent in?,,
+volume_defining_basis_unit,What unit is the process volume or constituent in?,metric tonnes blasted rock,m^3 loose rock
 volume_defining_output,What is the output or output constituent that needs to be converted to,blasted_rock,rom_ore_feed
-volume_defining_output_unit,What unit is that output in?,,
+volume_defining_output_unit,What unit is that output in?,metric tonnes blasted rock,m^3 loaded rock
 primary_input_1_name,,raw_material,blasted_rock
 primary_input_1_units,Units after conversion is applied,,
 primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,
@@ -20,7 +20,7 @@ primary_input_1_constituent_units,Units for each input constituent,ppm (wt),ppm 
 primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE
 reagent_1_name,Reagent name,explosives,
 reagent_1_name_long,Long/descriptive reagent name,Explosive material,
-reagent_1_target_constituents,,raw_material,
+reagent_1_target_constituents,,rock_blast_throughput,
 reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,0,
 reagent_1_units,,kg explosives/ton raw material,
@@ -40,7 +40,7 @@ primary_output_1_name,Output stream/material,blasted_rock,rom_ore_feed
 primary_output_1_step,The step or waste material tracker that this output goes to,excav_load,Final
 primary_output_1_yield_rate,Yield Rate,1,1
 primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,
-primary_output_1_units,Units after conversion is applied,,
+primary_output_1_units,Units after conversion is applied,metric tonnes blasted rock,m^3 loaded rock
 primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4
 primary_output_1_constituent_units,,,
 primary_output_1_constituent_fractions,,,

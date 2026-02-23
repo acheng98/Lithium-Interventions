@@ -31,7 +31,7 @@ def lithium_evaporation(sc,project_data,data_folder):
 	evap_ponds.update_location(project_data["Location 1"]) 
 	# Set conversion factor for yield from ponds
 	evap = evap_ponds.fwd[1]
-	evap.set_conversion_factor("pre-limed_brine",project_data["Pond Recovery Efficiency"],change_yield=True)
+	evap.set_conversion_factor("concentrated_lithium_brine",project_data["Pond Recovery Efficiency"],change_yield=True)
 
 	# Transportation
 	products = {"concentrated_lithium_brine": 1}
@@ -48,7 +48,7 @@ def lithium_evaporation(sc,project_data,data_folder):
 	evap_ponds.add_target_comp(target = "raw_brine_from_ground", 
 								composition = project_data["Initial Concentration"], 
 								target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
-	evap_ponds.add_target_comp(target = "pre-limed_brine", 
+	evap_ponds.add_target_comp(target = "concentrated_lithium_brine", 
 								composition = project_data["Intermediate Concentration"], 
 								target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = True)
 	conc_brine.add_target_comp(target = "concentrated_lithium_brine", 
@@ -100,13 +100,15 @@ def clay_lepidolite(sc,project_data,data_folder):
 	else: # ROM is reported grade
 		init_conc["Li"] = rom_comp["Li"] / (1 - dilution) # Back-calculate ore grade based on dilution 
 
+
+
 	if project_data["Powder Factor"] in ["","-",None]: # We do *not* have blasting
 		# Update initial and final chemical compositions for extraction facility
 		material_extraction.add_target_comp(target = "raw_material", composition = init_conc, target_step_id = "excav_load", propagate = False)
 		material_extraction.add_target_comp(target = "rom_ore_feed", composition = rom_comp, target_step_id = "excav_load", propagate = False)
 
 		loading = material_extraction.fwd[0]
-		loading.set_conversion_factor("raw_material",1/rho_loose)	
+		loading.set_conversion_factor("raw_material",1/rho_loose)
 	else:
 		# Update initial and final chemical compositions for extraction facility
 		material_extraction.add_target_comp(target = "raw_material", composition = init_conc, target_step_id = "blasting", propagate = True)
@@ -114,7 +116,10 @@ def clay_lepidolite(sc,project_data,data_folder):
 
 		# Get second/last step and add yield
 		loading = material_extraction.fwd[1]
-		loading.set_conversion_factor("blasted_rock",1/rho_loose)	
+		loading.set_conversion_factor("blasted_rock",1/rho_loose)
+		
+		blasting = material_extraction.fwd[0]
+		blasting.set_reagents("explosives",{'targets': {"rock_blast_throughput": {'ratio': project_data["Powder Factor"], 'elim': 0.0}}})
 		
 	# Get conversion factor from physical volume moved to tonnes diluted ore 
 	loading.set_conversion_factor("rom_ore_feed",1-loss,change_yield=True)
@@ -122,12 +127,25 @@ def clay_lepidolite(sc,project_data,data_folder):
 	loading.set_conversion_factor("waste",rho_loose * (strip_ratio + loss)/(1+strip_ratio)) # (calculate waste = strip ratio + loss)
 
 	# Update initial and final chemical compositions for each subsequent facility module
-	material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
-										target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
-	material_refining.add_target_comp(target = "brine_post_polishing", composition = project_data["Intermediate Concentration"], 
-										target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = False) 
-	lithium_extraction.add_target_comp(target = "brine_post_polishing", composition = project_data["Intermediate Concentration"],
-										target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True)
+	if project_data["Type"] == "Clays":
+		material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
+											target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
+		material_refining.add_target_comp(target = "brine_post_polishing", composition = project_data["Intermediate Concentration"], 
+											target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = False) 
+		lithium_extraction.add_target_comp(target = "brine_post_polishing", composition = project_data["Intermediate Concentration"],
+											target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True)
+	elif project_data["Type"] == "Lepidolite":
+		material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
+											target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
+		material_refining.add_target_comp(target = "roaster_feed", composition = project_data["Intermediate Concentration"], 
+											target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = False) 
+		material_refining.add_target_comp(target = "roaster_feed", composition = project_data["Intermediate Concentration"],
+											target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True)
+		
+		# TEMPORARY HOLD 
+		lithium_extraction.add_target_comp(target = "brine_post_polishing", composition = project_data["Intermediate Concentration"],
+											target_step_id = "precipitation_step", propagate = True)
+
 	
 	products = {"rom_ore_feed": 1}
 	sc.add_facility(material_extraction, next_fac=material_refining, products=products, transport_route=ore_truck_route)	
@@ -155,6 +173,30 @@ def evaluate_project(sc,project_data,data_folder):
 	summary_midpoint = sc.update_apv(target_pv)
 	summary["midpoint"] = summary_midpoint
 	# pprint(summary_midpoint)
+	
+	# print("\nReagents:")
+	# pprint(sc.get_total_reagents())
+	# print("\nUtilities:")
+	# pprint(sc.get_total_utilities())
+	# print("\nLabor:")
+	# pprint(sc.get_step_labor())
+	# print("\nStep Production volumes:", sc.get_detailed_pvs())
+	# print("\nCosts at each step:")
+	# pprint(sc.get_step_costs(transp=True,detail=2))
+	
+	# print(sc.get_detailed_inputs())
+	# print(sc.get_step_constituents())
+	# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
+	# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
+	# print(sc.get_step_reagent_usage())
+	# pprint(sc.get_step_utilities_detailed())
+	# sc.plot_tot_steps_costs(view="opex",detail=3)
+	# sc.plot_tot_steps_costs(view="opex",detail=2)
+	# sc.plot_tot_steps_costs(view="variable",detail=3)
+	# sc.plot_tot_steps_costs(view="variable",detail=2)
+	# sc.plot_tot_steps_impacts()
+
+
 	# helpers.update_machines(sc,"conservative")
 	# summary_conservative = sc.update_apv(target_pv,recalc=True)
 	# summary["conservative"] = summary_conservative
@@ -163,22 +205,7 @@ def evaluate_project(sc,project_data,data_folder):
 	# summary_optimistic = sc.update_apv(target_pv,recalc=True)
 	# summary["optimistic"] = summary_optimistic
 	# pprint(summary_optimistic)
-	# print("\nReagents:")
-	# pprint(sc.get_total_reagents())
-	# print("\nUtilities:")
-	# pprint(sc.get_total_utilities())
-	# pprint(sc.get_step_labor())
-	# print("\nStep Production volumes:", sc.get_detailed_pvs())
-	# print("\nCosts at each step:")
-	# pprint(sc.get_step_costs(transp=True,detail=2))
-	# print(sc.get_detailed_inputs())
-	# print(sc.get_step_constituents())
-	# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
-	# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
-	# print(sc.get_step_reagent_usage())
-	# pprint(sc.get_step_utilities_detailed())
-	sc.plot_tot_steps_costs(show_fixed=False)
-	# sc.plot_tot_steps_impacts()
+
 
 	# sc.plot_total_cc()
 
@@ -195,6 +222,18 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 		# pprint(summary)
 
 	# pprint(project_summaries)
+
+	extracted_data = {}
+	for key, value in project_summaries.items():
+		extracted_data[key] = {}
+		for sub_key, sub_value in value.items():
+			extracted_data[key][sub_key] = {
+				'apv': sub_value['apv'],
+				'avg_var_cost': sub_value['avg_var_cost'],
+				'avg_co2': sub_value['avg_co2']
+			}
+	pprint(extracted_data)
+
 	# helpers.plot_project_summaries(project_summaries)
 
 if __name__ == '__main__':
@@ -210,11 +249,10 @@ if __name__ == '__main__':
 	################
 	# Pick project #
 	################
-	# project_data = projects_data["Salar de Atacama-SQM"]
-	# project_data = projects_data["Silver Peak"]
-	# project_data = projects_data["Thacker Pass"]
-	# projects = ["Silver Peak","Thacker Pass"]
-	projects = ["Silver Peak"]
+	# projects = ["Silver Peak"]
+	# projects = ["Jianxiawo"]
+	# projects = ["Thacker Pass"]
+	projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
 	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data)
 

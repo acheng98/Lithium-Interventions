@@ -25,8 +25,11 @@ class ProductionStep:
 				self.machine_blocks = step_params.get("machine_options",[self.machine_block])
 
 				self.step_basis = step_params.get("step_basis") # The unit of measure of the intermediate volume in the step
+				self.step_basis_unit = step_params.get("step_basis_unit") # Get the units
 				self.volume_defining_basis = step_params.get("volume_defining_basis")
+				self.vdb_unit = step_params.get("volume_defining_basis_unit") # Get the units
 				self.volume_defining_output = step_params.get("volume_defining_output")
+				self.vdo_unit = step_params.get("volume_defining_output_unit") # Get the units
 
 				self.step_pv = None # Amount of production volume of step basis 
 				self.constituents = None # Chemical constituents of the step basis, aggregated from inputs
@@ -209,9 +212,6 @@ class ProductionStep:
 				self.natural_gas_base_total: float = machine_data.get("natural_gas_base_total",0.0)
 				self.natural_gas_base_total_unit: Optional[str] = machine_data.get("natural_gas_base_total_unit")
 
-				self.process_water_base_total: float = machine_data.get("process_water_base_total",0.0)
-				self.process_water_base_total_unit: Optional[str] = machine_data.get("process_water_base_total_unit")
-
 				self.cooling_water_base_total: float = machine_data.get("cooling_water_base_total",0.0)
 				self.cooling_water_base_total_unit: Optional[str] = machine_data.get("cooling_water_base_total_unit")
 
@@ -269,11 +269,11 @@ class ProductionStep:
 				for name in [
 						"ltr", "machines_required", "scaled_equip_cost",
 						"labor_required",
-						"electricity_consumed", "natural_gas_consumed", "process_water_consumed",
+						"electricity_consumed", "natural_gas_consumed", 
 						"cooling_water_consumed", "steam_consumed", "compressed_air_consumed",
-						"electricity_cost", "natural_gas_cost", "process_water_cost",
+						"electricity_cost", "natural_gas_cost", 
 						"cooling_water_cost", "steam_cost", "compressed_air_cost",
-						"tot_var_cost", "tot_fixed_cost", "tot_cost",
+						"tot_var_cost", "tot_fixed_cost", "tot_cost", "tot_opex", "tot_capex",
 						"machine_cost", "tool_cost", "building_cost", "aux_equip_cost",
 						"maint_cost", "fixed_over_cost",
 				]:
@@ -297,6 +297,24 @@ class ProductionStep:
 								self.propagate_chemistry()
 				elif target_name in self.secondary_outputs:
 						self.secondary_outputs[target_name]["constituents"] = constituents
+				else:
+						raise KeyError(f"Target {target_name} not found in step {self.step_id}.")
+
+		def set_reagents(self, target_name: str, details: dict, propagate: bool = True):
+				"""
+				Set the 
+				Default propagate downstream as reagents may remove constituents or step basis
+				"""
+				if target_name in self.secondary_inputs:
+						if all(key in details.keys() for key in ["name_long","targets","units","usage"]):
+								self.secondary_inputs[target_name] = details
+						else:
+								for key,value in details.items():
+										if key in ["name_long","targets","units","usage"]:
+												self.secondary_inputs[target_name][key] = value
+						if propagate:
+								self.apply_reagents()
+								self.propagate_chemistry()
 				else:
 						raise KeyError(f"Target {target_name} not found in step {self.step_id}.")
 
@@ -458,7 +476,6 @@ class ProductionStep:
 						else:
 								raise KeyError(f"Volume-defining input {self.volume_defining_basis} not found in step {self.step_id}.")
 
-				# print((target_volume, yield_rate), output_ratio, conversion_ratio)
 				self.step_pv = (target_volume / yield_rate) / output_ratio / conversion_ratio 
 
 				# CALCULATE USAGE / DEMAND FOR ALL INPUTS
@@ -505,6 +522,8 @@ class ProductionStep:
 						props["abs_usage"] = abs_usage
 						if reagent_name not in self.facility.material_data:
 								raise KeyError (f"Reagent {reagent_name} not found in facility {self.facility.fac_id}'s listed materials with data.")
+
+						# print(reagent_name,self.facility.material_data[reagent_name])
 						props["total_cost"] = abs_usage * self.facility.material_data[reagent_name]["cost"]
 
 		def calculate_environmental_impacts(self, impact_factors: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
@@ -546,7 +565,6 @@ class ProductionStep:
 				utility_map = [
 						("electricity_consumed",    "electricity"),
 						("natural_gas_consumed",    "natural_gas"),
-						("process_water_consumed",  "process_water"),
 						("cooling_water_consumed",  "cooling_water"),
 						("steam_consumed",          "steam"),
 						("compressed_air_consumed", "compressed_air"),
@@ -629,9 +647,12 @@ class ProductionStep:
 
 				# --- STEP 4: Totals ---
 				self.tot_var_cost = self.tot_mat_cost + self.labor_cost + self.utility_cost
-				self.tot_fixed_cost = (self.machine_cost + self.tool_cost +
-																self.building_cost + self.aux_equip_cost +
-																self.maint_cost + self.fixed_over_cost)
+				# "OPEX" here corresponds to annual operating expenditures (variable + fixed O&M).
+				self.tot_opex = self.tot_var_cost + self.maint_cost + self.fixed_over_cost
+
+				self.tot_capex = getattr(self, "tot_capex_annualized", (self.machine_cost + self.tool_cost + self.building_cost + self.aux_equip_cost))
+				self.tot_fixed_cost = self.tot_capex + self.maint_cost + self.fixed_over_cost
+				
 				self.tot_cost = self.tot_var_cost + self.tot_fixed_cost
 
 				# --- STEP 5: Externalites --- # Should this be here? 
@@ -662,7 +683,6 @@ class ProductionStep:
 				# Utility consumption (scale with line time)
 				self.electricity_consumed = self.electricity_base_total * self.ltr
 				self.natural_gas_consumed = self.natural_gas_base_total * self.ltr
-				self.process_water_consumed = self.process_water_base_total * self.ltr
 				self.cooling_water_consumed = self.cooling_water_base_total * self.ltr
 				self.steam_consumed = self.steam_base_total * self.ltr
 				self.compressed_air_consumed = self.compressed_air_base_total * self.ltr
@@ -681,7 +701,6 @@ class ProductionStep:
 				# Utility scaling
 				self.electricity_consumed = self.electricity_base_total * (volume_ratio ** self.scaling_exponent)
 				self.natural_gas_consumed = self.natural_gas_base_total * (volume_ratio ** self.scaling_exponent)
-				self.process_water_consumed = self.process_water_base_total * (volume_ratio ** self.scaling_exponent)
 				self.cooling_water_consumed = self.cooling_water_base_total * (volume_ratio ** self.scaling_exponent)
 				self.steam_consumed = self.steam_base_total * (volume_ratio ** self.scaling_exponent)
 				self.compressed_air_consumed = self.compressed_air_base_total * (volume_ratio ** self.scaling_exponent)
@@ -712,13 +731,11 @@ class ProductionStep:
 				"""Calculate cost of utilities based on facility prices"""
 				self.electricity_cost = self.electricity_consumed * self.facility.elec_price
 				self.natural_gas_cost = self.natural_gas_consumed * self.facility.gas_price
-				self.process_water_cost = self.process_water_consumed * self.facility.proc_water_price
 				self.cooling_water_cost = self.cooling_water_consumed * self.facility.cool_water_price
 				self.steam_cost = self.steam_consumed * self.facility.steam_price
 				self.compressed_air_cost = self.compressed_air_consumed * self.facility.comp_air_price
 
-				self.utility_cost = (self.electricity_cost + self.natural_gas_cost +
-															self.process_water_cost + self.cooling_water_cost +
+				self.utility_cost = (self.electricity_cost + self.natural_gas_cost + self.cooling_water_cost +
 															self.steam_cost + self.compressed_air_cost)
 
 		def _calc_capital_costs(self):
@@ -748,9 +765,9 @@ class ProductionStep:
 
 				# --- Building, aux, maintenance, overhead ---
 				if self.process_type == "batch":
-						footprint = self.footprint_base
+						footprint = self.footprint_base * self.machines_required
 				else:
-						volume_ratio = self.step_pv / self.base_volume if self.base_volume else 1.0
+						volume_ratio = self.step_pv / (self.base_volume * self.lta) if self.base_volume else 1.0
 						footprint = self.footprint_base * (volume_ratio ** self.footprint_scaling_exponent)
 
 				self.building_cost = self.facility.bcrf * self.facility.build_price * footprint

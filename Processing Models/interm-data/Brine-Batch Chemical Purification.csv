@@ -1,13 +1,13 @@
 variable_name,Description,Batch Treatment,Separation
 step_id,Step ID (unique),batch_treatment,sls_step
-step_name,Human-readable process step,Batch treatment of brine (Lime [CaCO3] + soda ash [Na2CO3]),Solid–liquid separation (settling + filtration lumped)
+step_name,Human-readable process step,Batch treatment of brine (Slaked Lime [Ca[OH2]] + soda ash [Na2CO3]),Solid–liquid separation (settling + filtration lumped)
 key_equation,"Key equation, chemical or physical, evaluated in this step.",Mg2+ + (OH)-2 --> Mg(OH)2(s); Ca2+ + CO3^2- -> CaCO3(s),
 notes,"Key information, notes","Batch reactor/tanks with agitation. Purpose is impurity precipitation (Mg, Ca) while keeping Li in solution.",Primary tunable is Li loss to solids.
 machine_options,,batch_treatment_generic,solid_liquid_separation
 machine_default,,batch_treatment_generic,solid_liquid_separation
-step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,concentrated_brine_throughput,treated_slurry_throughput
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,concentrated_brine_throughput,mixture_being_separated
 step_basis_unit,,m3/batch concentrated brine,m3/h treated slurry equivalent (pseudo-continuous)
-volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",concentrated_brine_throughput,treated_slurry_throughput
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",concentrated_brine_throughput,mixture_being_separated
 volume_defining_basis_unit,What unit is the process volume or constituent in?,L concentrated_lithium_brine,L brine_post_lime
 volume_defining_output,What is the output or output constituent that needs to be converted to,treated_slurry,brine_post_polishing
 volume_defining_output_unit,What unit is that output in?,L brine_post_lime,L brine_post_polish
@@ -20,22 +20,22 @@ primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; m
 primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE
 reagent_1_name,Reagent name,lime,filter_aid
 reagent_1_name_long,Long/descriptive reagent name,Slaked lime (Ca(OH)2) for Mg precipitation / pH adjustment,"precoat (e.g., diatomaceous earth)"
-reagent_1_target_constituents,,Mg,treated_slurry_throughput
-reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),3.700,0.020
+reagent_1_target_constituents,,Mg,mixture_being_separated
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),3.658,0.005
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,0.95,0.005
 reagent_1_units,,kg Ca(OH)2 per kg Mg,kg_filter_aid per m3 treated slurry
 reagent_2_name,Reagent name,soda_ash,
 reagent_2_name_long,Long/descriptive reagent name,Soda ash (Na2CO3) for Ca precipitation as CaCO3,
 reagent_2_target_constituents,,Ca,
-reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),3.200,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),3.173,
 reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,0.9,
-reagent_2_units,,kg Na2CO3 per kg Ca,
-reagent_3_name,Reagent name,,
-reagent_3_name_long,Long/descriptive reagent name,,
-reagent_3_target_constituents,,,
-reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,
-reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,
-reagent_3_units,,,
+reagent_2_units,,kg Na2CO3 per kg Mg,
+reagent_3_name,Reagent name,soda_ash,
+reagent_3_name_long,Long/descriptive reagent name,Soda ash (Na2CO3) for Ca precipitation as CaCO3,
+reagent_3_target_constituents,,Mg,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),6.279,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,0,
+reagent_3_units,,kg Na2CO3 per kg Ca,
 primary_output_1_name,Output stream/material,treated_slurry,brine_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,sls_step,Final
 primary_output_1_units,Convert from step basis units to output units (step basis * CF = output),L brine-post lime,L brine post de-boron

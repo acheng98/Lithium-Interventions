@@ -72,6 +72,8 @@ class Facility:
 			self.total_utilities = {}
 			self.tot_var_cost = 0
 			self.tot_fixed_cost = 0
+			self.tot_opex = 0
+			self.tot_capex = 0
 			self.tot_cost = 0
 			self.avg_var_cost = 0
 			self.avg_fixed_cost = 0
@@ -395,6 +397,20 @@ class Facility:
 				self.tot_cost = self.total_variable_cost() + self.total_fixed_cost()
 				return self.tot_cost
 
+		def total_opex(self):
+				tot_opex = 0
+				for step in self.steps.values():
+						tot_opex += getattr(step, "tot_opex", 0.0) or 0.0
+				self.tot_opex = tot_opex
+				return self.tot_opex
+
+		def total_capex(self):
+				tot_capex = 0
+				for step in self.steps.values():
+						tot_capex += getattr(step, "tot_capex", 0.0) or 0.0
+				self.tot_capex = tot_capex
+				return self.tot_capex
+
 		def average_variable_cost(self):
 				self.avg_var_cost = self.total_variable_cost()/self.apv
 				return self.avg_var_cost
@@ -441,15 +457,19 @@ class Facility:
 				# --- Aggregate facility totals ---
 				self.tot_var_cost = sum(step.tot_var_cost for step in self.steps.values())
 				self.tot_fixed_cost = sum(step.tot_fixed_cost for step in self.steps.values())
+				self.tot_opex = sum(step.tot_opex for step in self.steps.values())
+				self.tot_capex = sum(step.tot_capex for step in self.steps.values())
 				self.tot_cost = self.tot_var_cost + self.tot_fixed_cost
 
 				# --- Average costs per unit ---
 				self.avg_var_cost = self.tot_var_cost / self.apv
 				self.avg_fixed_cost = self.tot_fixed_cost / self.apv
+				self.avg_opex = self.tot_opex / self.apv
+				self.avg_capex = self.tot_capex / self.apv
 				self.avg_cost = self.tot_cost / self.apv
 
 				# --- Store results for scenario tracking ---
-				self.prod_map[self.apv] = [self.tot_var_cost, self.tot_fixed_cost, self.tot_cost]
+				self.prod_map[self.apv] = [self.tot_var_cost, self.tot_fixed_cost, self.tot_cost, self.tot_opex, self.tot_capex]
 
 				emissions_totals = self.get_total_environmental_impacts()
 
@@ -457,9 +477,13 @@ class Facility:
 						"apv": self.apv,
 						"tot_var_cost": self.tot_var_cost,
 						"tot_fixed_cost": self.tot_fixed_cost,
+						"tot_opex": self.tot_opex,
+						"tot_capex": self.tot_capex,
 						"tot_cost": self.tot_cost,
 						"avg_var_cost": self.avg_var_cost,
 						"avg_fixed_cost": self.avg_fixed_cost,
+						"avg_opex": self.avg_opex,
+						"avg_capex": self.avg_capex,
 						"avg_cost": self.avg_cost,
 						"emissions_totals": emissions_totals
 				}

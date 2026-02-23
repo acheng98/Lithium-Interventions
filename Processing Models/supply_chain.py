@@ -1,7 +1,6 @@
 from typing import Dict, Any, List, Optional
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import copy
-from collections import defaultdict
 
 from facility import Facility
 from production_step import ProductionStep
@@ -10,14 +9,22 @@ from helpers import plot_stacked_bars, plot_production_curve
 
 # Define a class for the supply chain
 class SupplyChain:
+	"""
+	Supply chain model composed of Facilities connected by optional TransportRoutes.
+
+	Design principle:
+	- Calculations happen in Facility / ProductionStep / TransportRoute.
+	- SupplyChain getters and reports are read-only projections over *already computed* state.
+	- A cached snapshot layer provides a stable schema for all projections.
+	"""
 	def __init__(self,transp_data,loc_data,machine_data,material_data):
-		self.facilities = {}   # facility_id : Facility
-		self.links = {}        # (from_fac,to_fac): {products: fraction_transferred}
-		self.prod_map = {} #apv: [self.tot_var_cost,self.tot_fixed_cost,self.tot_cost]
-		self.fwd = []
-		self.rev = []
-		self.fwd_transp = []
-		self.rev_transp = []
+		self.facilities: Dict[str, Facility] = {}  # facility_id : Facility
+		self.links: Dict[Tuple[Facility, Facility], List[Any]] = {}  # (from_fac,to_fac): [products_dict, Optional(transport_route)]
+		self.prod_map: Dict[float, List[float]] = {}  # apv: [tot_var_cost, tot_fixed_cost, tot_cost]
+		self.fwd: List[Facility] = []
+		self.rev: Iterable[Facility] = []
+		self.fwd_transp: List[Union[Facility, TransportRoute]] = []
+		self.rev_transp: List[Union[Facility, TransportRoute]] = []
 
 		# Default values for facilities to inherit
 		self.transp_data = transp_data
@@ -26,16 +33,33 @@ class SupplyChain:
 		self.material_data = material_data
 
 		# Summary statistics
-		self.apv = 0
-		self.total_utilities = {}
-		self.tot_var_cost = 0
-		self.tot_fixed_cost = 0
-		self.tot_cost = 0
-		self.avg_var_cost = 0
-		self.avg_fixed_cost = 0
-		self.avg_cost = 0
+		self.apv: float = 0.0
+		self.total_utilities: Dict[str, Any] = {}
+		self.tot_var_cost: float = 0.0
+		self.tot_fixed_cost: float = 0.0
+		self.tot_opex: float = 0.0
+		self.tot_capex: float = 0.0
+		self.tot_cost: float = 0.0
+		self.avg_var_cost: float = 0.0
+		self.avg_fixed_cost: float = 0.0
+		self.avg_opex: float = 0.0
+		self.avg_capex: float = 0.0
+		self.avg_cost: float = 0.0
+		self.env_impacts: Dict[str, float] = {}
 
-	def add_facility(self, fac, next_fac = None, products = None, transport_route = None):
+		# Getter/report cache (invalidated on APV recalculation)
+		self._getter_cache: Dict[Tuple[Any, ...], Any] = {}
+
+	def _invalidate_getter_cache(self) -> None:
+		self._getter_cache.clear()
+
+	def add_facility(
+		self,
+		fac: Facility,
+		next_fac: Optional[Facility] = None,
+		products: Optional[Dict[str, float]] = None,
+		transport_route: Optional[TransportRoute] = None,
+		):
 		self.facilities[fac.fac_id] = fac
 		fac.supply_chain = self
 		if next_fac is not None:
@@ -44,11 +68,20 @@ class SupplyChain:
 			else:
 				self.link_facilities(fac,next_fac,products,transport_route)
 
-	def link_facilities(self, from_fac, to_fac, products, transport_route):
+	def link_facilities(
+		self,
+		from_fac: Facility,
+		to_fac: Facility,
+		products: Dict[str, float],
+		transport_route: Optional[TransportRoute],
+		):
 		'''
+		Create a directed link between facilities.
+
 		from_fac (str): name of the source facility
 		to_fac (str): name of the target facility
 		products (dict): {product names: % of product to transfer to new facility}
+		transport_route: optional TransportRoute for associated shipping between facilities.
 		'''
 		if from_fac.fac_id not in self.facilities:
 			raise KeyError(f"Source facility '{from_fac.fac_id}' not found.")
@@ -122,9 +155,10 @@ class SupplyChain:
 
 		return self.fwd
 
-	def topo_order_transp(self):
+	def topo_order_transp(self) -> List[Union[Facility, TransportRoute]]:
+		"""Topo order including facility nodes and intermediate TransportRoutes."""
 		self.topo_order()
-		topo_order_transp = []
+		topo_order_transp: List[Union[Facility, TransportRoute]] = []
 		for fac in self.fwd:
 			topo_order_transp.append(fac)
 			
@@ -136,33 +170,61 @@ class SupplyChain:
 		self.rev_transp = list(reversed(topo_order_transp))
 		return topo_order_transp
 
-	def update_apv(self,apv,recalc=False):
+	def update_apv(self, apv: float, recalc: bool = False) -> Dict[str, Any]:
+		"""Evaluate the entire supply chain for a given annual production volume (APV)."""
 		if type(apv) not in [float,int]: 
-			print("APV input is not a float or int, try again.")
-			return
+			raise ValueError("APV input must be a float or int")
 
-		if not recalc and apv in self.prod_map: # Don't need to re-run if already recorded
-			print("Input production volume has already been calculated.")
-			return
+		if (not recalc) and (apv in self.prod_map): # Don't need to re-run if already recorded and not explicitly recalculating
+			self.apv = float(apv)
+			cached = self.prod_map[self.apv]
+			cached_var = cached[0] if len(cached) >= 1 else 0.0
+			cached_fixed = cached[1] if len(cached) >= 2 else 0.0
+			cached_total = cached[2] if len(cached) >= 3 else (cached_var + cached_fixed)
+			cached_opex = cached[3] if len(cached) >= 4 else cached_var
+			cached_capex = cached[4] if len(cached) >= 5 else cached_fixed
 
-		self.apv = apv
+			return {
+				"apv": self.apv,
+				"tot_var_cost": cached_var,
+				"tot_fixed_cost": cached_fixed,
+				"tot_opex": cached_opex,
+				"tot_capex": cached_capex,
+				"tot_cost": cached_total,
+				"avg_var_cost": cached_var / self.apv if self.apv else 0.0,
+				"avg_fixed_cost": cached_fixed / self.apv if self.apv else 0.0,
+				"avg_opex": cached_opex / self.apv if self.apv else 0.0,
+				"avg_capex": cached_capex / self.apv if self.apv else 0.0,
+				"avg_cost": cached_total / self.apv if self.apv else 0.0,
+ 				"total_co2": self.env_impacts.get("co2", 0.0),
+ 				"avg_co2": (self.env_impacts.get("co2", 0.0) / self.apv) if self.apv else 0.0,
+			}
+
+		self.apv = float(apv)
 		self.topo_order()
+		self._invalidate_getter_cache()
 
-		# Reset these values across apv runs 
+		# Reset rollups across runs
 		self.tot_var_cost   = 0.0
 		self.tot_fixed_cost = 0.0
+		self.tot_opex 		= 0.0
+		self.tot_capex 		= 0.0
 		self.tot_cost       = 0.0
 		self.avg_var_cost   = 0.0
 		self.avg_fixed_cost = 0.0
+		self.avg_opex 		= 0.0
+		self.avg_capex 		= 0.0
 		self.avg_cost       = 0.0
 		self.env_impacts = {}
 
-		cur_apv = apv
+		cur_apv = float(apv)
 		for fac in self.rev:
 			updated_apv = False
 			summary = fac.update_apv(cur_apv,recalc)
 			self.tot_var_cost += summary["tot_var_cost"]
 			self.tot_fixed_cost += summary["tot_fixed_cost"]
+			self.tot_opex += summary["tot_opex"]
+			self.tot_capex += summary["tot_capex"]
 			self.tot_cost += summary["tot_cost"]
 
 			for k, v in summary["emissions_totals"].items():
@@ -174,6 +236,8 @@ class SupplyChain:
 						res = transport_route.evaluate_total(total_volume=fac.get_initial_pv())
 						self.tot_var_cost += res["variable_cost"]
 						self.tot_fixed_cost += res["fixed_cost"]
+						# Transport is treated as operating cost (no capex attribution)
+						self.tot_opex += res["variable_cost"] + res["fixed_cost"]
 						self.tot_cost += res["total_cost"]
 				
 						for k, v in res["emissions_totals"].items():
@@ -184,108 +248,41 @@ class SupplyChain:
 						updated_apv = True
 						break
 			
-			if updated_apv is False: # No transportation link identified, just get the apv of this current facility
-				# TECHNICALLY SHOULD BE THE VALUE OF THE INPUT NEEDED FOR THE VOLUME-DEFINING INPUT
+			if not updated_apv: # No transportation link identified, just get the apv of this current facility
 				cur_apv = fac.get_initial_pv()
 
 
-		self.avg_var_cost = self.tot_var_cost / self.apv
-		self.avg_fixed_cost = self.tot_fixed_cost / self.apv
-		self.avg_cost = self.tot_cost / self.apv
-		self.prod_map[self.apv] = [self.tot_var_cost, self.tot_fixed_cost, self.tot_cost]
+		self.avg_var_cost = self.tot_var_cost / self.apv if self.apv else 0.0
+		self.avg_fixed_cost = self.tot_fixed_cost / self.apv if self.apv else 0.0
+		self.avg_opex = self.tot_opex / self.apv if self.apv else 0.0
+		self.avg_capex = self.tot_capex / self.apv if self.apv else 0.0
+		self.avg_cost = self.tot_cost / self.apv if self.apv else 0.0
+		self.prod_map[self.apv] = [self.tot_var_cost, self.tot_fixed_cost, self.tot_cost, self.tot_opex, self.tot_capex]
 
 		return {
 			"apv": self.apv,
 			"tot_var_cost": self.tot_var_cost,
 			"tot_fixed_cost": self.tot_fixed_cost,
+			"tot_opex": self.tot_opex,
+			"tot_capex": self.tot_capex,
 			"tot_cost": self.tot_cost,
 			"avg_var_cost": self.avg_var_cost,
 			"avg_fixed_cost": self.avg_fixed_cost,
+			"avg_opex": self.avg_opex,
+			"avg_capex": self.avg_capex,
 			"avg_cost": self.avg_cost,
-			"total_co2": self.env_impacts["co2"],
-			"avg_co2": self.env_impacts["co2"]/self.apv,
+			"total_co2": self.env_impacts.get("co2",0.0),
+			"avg_co2": (self.env_impacts.get("co2", 0.0) / self.apv) if self.apv else 0.0,
 		}
 
-	# OVERALL SUMMARY STASTISTICS
-	def get_total_reagents(self):
-		"""
-		Aggregates total absolute usage and total cost for each reagent across all steps.
-
-		Returns:
-			dict[str, dict[str, float]]
-			{
-				"Reagent A": {"abs_usage": x, "total_cost": y},
-				"Reagent B": {"abs_usage": x, "total_cost": y},
-				...
-			}
-		"""
-		totals = {}
-
-		for step in self.get_steps():
-			secondary_inputs = getattr(step, "secondary_inputs", {}) or {}
-
-			for reagent_name, props in secondary_inputs.items():
-				if reagent_name not in totals:
-					totals[reagent_name] = {"abs_usage": 0.0, "total_cost": 0.0}
-
-				totals[reagent_name]["abs_usage"] += props.get("abs_usage", 0.0)
-				totals[reagent_name]["total_cost"] += props.get("total_cost", 0.0)
-
-		for reagent_name, info in totals.items():
-			info["output_avg_cost"] = info["total_cost"] / self.apv
-
-		return totals
-
-	def get_total_utilities(self):
-		"""
-		Aggregates total consumption and cost for each utility across all steps.
-
-		Returns:
-			dict[str, dict[str, float]]
-			{
-				"electricity": {"consumed": x, "cost": y},
-				"natural_gas": {"consumed": x, "cost": y},
-				...
-			}
-		"""
-		utilities = {
-			"electricity": ("electricity_consumed", "electricity_cost"),
-			"natural_gas": ("natural_gas_consumed", "natural_gas_cost"),
-			"process_water": ("process_water_consumed", "process_water_cost"),
-			"cooling_water": ("cooling_water_consumed", "cooling_water_cost"),
-			"steam": ("steam_consumed", "steam_cost"),
-			"compressed_air": ("compressed_air_consumed", "compressed_air_cost"),
-		}
-
-		totals = {
-			name: {"consumed": 0.0, "cost": 0.0}
-			for name in utilities
-		}
-
-		for step in self.get_steps():
-			for utility, (consumed_attr, cost_attr) in utilities.items():
-				totals[utility]["consumed"] += getattr(step, consumed_attr, 0.0)
-				totals[utility]["cost"] += getattr(step, cost_attr, 0.0)
-
-		for utility, info in totals.items():
-			info["output_avg_cost"] = info["cost"] / self.apv
-
-		return totals
-
-	def get_total_labor(self):
-		labor_demand = 0
-		labor_cost = 0
-		for step in self.get_steps():
-			labor_demand += step.labor_required
-			labor_cost += step.labor_cost
-		return labor
-
-	# STEP-LEVEL SUMMARY STATISTICS
-	def get_steps(self,transp = False):
-		steps = []
+	# -------------------------
+	# Step list utilities
+	# -------------------------
+	def get_steps(self, transp: bool = False) -> List[Union[ProductionStep, Transportation]]:
+		"""Return ProductionSteps in topo order; optionally include Transportation legs."""
+		steps: List[Union[ProductionStep, Transportation]] = []
 		for node in self.topo_order_transp():
 			if isinstance(node, Facility):
-				# Ensure the facility step ordering has been computed
 				if not getattr(node, "fwd", None):
 					node.topo_order()
 				steps.extend(list(node.fwd))
@@ -293,169 +290,531 @@ class SupplyChain:
 				steps.extend(list(node.legs))
 		return steps
 
-	def get_step_constituents(self):
-		consts = []
-		for step in self.get_steps():
-			consts.append([step.step_name, step.constituents])
-		return consts
+	# -------------------------
+	# Canonical snapshot layer
+	# -------------------------
+	def _get_step_snapshots(self, transp: bool = False, use_cache: bool = True) -> List[OrderedDict]:
+		"""Return cached, topo-ordered step snapshots.
 
-	def get_constituent_amount_at_steps(self,constituent):
-		amts = []
-		for step in self.get_steps():
-			amts.append([step.step_name, step.constituents.get(constituent,0)*step.step_pv])
-		return amts
+		Snapshots are read-only views over already-computed step attributes.
+		They do *not* trigger recalculation.
+		"""
+		cache_key = ("step_snapshots", float(self.apv), transp)
+		if use_cache and cache_key in self._getter_cache:
+			return self._getter_cache[cache_key]
 
-	def get_step_reagent_usage(self):
-		reagent_usages = []
-		for step in self.get_steps():
-			for reagent_name, props in step.secondary_inputs.items():
-				reagent_usages.append([step.step_name, reagent_name, {"usage":props["abs_usage"], "cost":props["total_cost"]}])
-		return reagent_usages
+		def _safe_get(obj: Any, attr: str, default: Any = 0.0) -> Any:
+			v = getattr(obj, attr, default)
+			return default if v is None else v
 
-	def get_step_electric(self):
-		electric_usage = []
-		for step in self.get_steps():
-			electric_usage.append([step.step_name, "Electricity", step.electricity_consumed, step.electricity_cost])
-		return electric_usage
+		snaps: List[OrderedDict] = []
+		for node in self.get_steps(transp=transp):
+			if isinstance(node, ProductionStep):
+				step_units = getattr(node, "step_basis_unit", None)
 
-	def get_step_natural_gas(self):
-		natural_gas_usage = []
-		for step in self.get_steps():
-			natural_gas_usage.append([step.step_name, "Natural Gas", step.natural_gas_consumed, step.natural_gas_cost])
-		return natural_gas_usage
+				# Reagents
+				reagents = OrderedDict()
+				for r_name, props in (getattr(node, "secondary_inputs", None) or {}).items():
+					if props is None:
+						continue
+					reagents[r_name] = {
+						"abs_usage": float(props.get("abs_usage", 0.0) or 0.0),
+						"total_cost": float(props.get("total_cost", 0.0) or 0.0),
+					}
 
-	def get_step_process_water(self):
-		process_water_usage = []
-		for step in self.get_steps():
-			process_water_usage.append([step.step_name, "Process Water", step.process_water_consumed, step.process_water_cost])
-		return process_water_usage
+				# Utilities
+				fac = getattr(node, "facility", None)
+				utility_candidates = [
+					("electricity", "electricity_consumed", "electricity_cost", "elec_price"),
+					("natural_gas", "natural_gas_consumed", "natural_gas_cost", "gas_price"),
+					("process_water", "process_water_consumed", "process_water_cost", "proc_water_price"),
+					("cooling_water", "cooling_water_consumed", "cooling_water_cost", "cool_water_price"),
+					("steam", "steam_consumed", "steam_cost", "steam_price"),
+					("compressed_air", "compressed_air_consumed", "compressed_air_cost", "comp_air_price"),
+				]
+				utilities = OrderedDict()
+				for uname, c_attr, cost_attr, price_attr in utility_candidates:
+					consumed = float(_safe_get(node, c_attr, 0.0))
+					cost = float(_safe_get(node, cost_attr, 0.0))
+					unit_price = getattr(fac, price_attr, None) if fac is not None else None
+					if consumed != 0.0 or cost != 0.0 or hasattr(node, c_attr) or hasattr(node, cost_attr):
+						utilities[uname] = {"consumed": consumed, "cost": cost, "unit_price": unit_price}
 
-	def get_step_cooling_water(self):
-		cooling_water_usage = []
-		for step in self.get_steps():
-			cooling_water_usage.append([step.step_name, "Cooling Water", step.cooling_water_consumed, step.cooling_water_cost])
-		return cooling_water_usage
+				# Costs
+				costs = OrderedDict([
+					("tot_var_cost", float(_safe_get(node, "tot_var_cost", 0.0))),
+					("tot_fixed_cost", float(_safe_get(node, "tot_fixed_cost", 0.0))),
+					("tot_opex", float(_safe_get(node, "tot_opex", 0.0))),
+					("tot_capex", float(_safe_get(node, "tot_capex", 0.0))),
+					("tot_mat_cost", float(_safe_get(node, "tot_mat_cost", 0.0))),
+					("labor_cost", float(_safe_get(node, "labor_cost", 0.0))),
+					("utility_cost", float(_safe_get(node, "utility_cost", 0.0))),
+					("machine_cost", float(_safe_get(node, "machine_cost", 0.0))),
+					("tool_cost", float(_safe_get(node, "tool_cost", 0.0))),
+					("building_cost", float(_safe_get(node, "building_cost", 0.0))),
+					("aux_equip_cost", float(_safe_get(node, "aux_equip_cost", 0.0))),
+					("maint_cost", float(_safe_get(node, "maint_cost", 0.0))),
+					("fixed_over_cost", float(_safe_get(node, "fixed_over_cost", 0.0))),
+				])
 
-	def get_step_steam(self):
-		steam_usage = []
-		for step in self.get_steps():
-			steam_usage.append([step.step_name, "Steam", step.steam_consumed, step.steam_cost])
-		return steam_usage
+				# Impacts (if present)
+				impacts = None
+				if hasattr(node, "scope_one_impacts") or hasattr(node, "scope_two_impacts"):
+					impacts = {
+						"scope_one": dict(getattr(node, "scope_one_impacts", {}) or {}),
+						"scope_two": dict(getattr(node, "scope_two_impacts", {}) or {}),
+					}
 
-	def get_step_compressed_air(self):
-		compressed_air_usage = []
-		for step in self.get_steps():
-			compressed_air_usage.append([step.step_name, "Compressed Air", step.compressed_air_consumed, step.compressed_air_cost])
-		return compressed_air_usage
-
-	def get_step_utilities(self):
-		utility_usage = []
-		for step in self.get_steps():
-			utility_usage.append([step.step_name, "Total Utility Cost", step.utility_cost])
-		return utility_usage
-
-	def get_step_utilities_detailed(self):
-		results = []
-		for step in self.get_steps():
-			results.append(OrderedDict([
-				("step_name", step.step_name),
-				("total_utility_cost",step.utility_cost),
-				("electricity", {
-					"consumed": step.electricity_consumed,
-					"cost": step.electricity_cost,
-				}),
-				("natural_gas", {
-					"consumed": step.natural_gas_consumed,
-					"cost": step.natural_gas_cost,
-				}),
-				("process_water", {
-					"consumed": step.process_water_consumed,
-					"cost": step.process_water_cost,
-				}),
-				("cooling_water", {
-					"consumed": step.cooling_water_consumed,
-					"cost": step.cooling_water_cost,
-				}),
-				("steam", {
-					"consumed": step.steam_consumed,
-					"cost": step.steam_cost,
-				}),
-				("compressed_air", {
-					"consumed": step.compressed_air_consumed,
-					"cost": step.compressed_air_cost,
-				}),
+				snaps.append(OrderedDict([
+					("step_name", node.step_name),
+					("kind", "production"),
+					("pv", float(_safe_get(node, "step_pv", 0.0))),
+					("step_units",step_units),
+					("constituents", dict(getattr(node, "constituents", {}) or {})),
+					("primary_inputs", dict(getattr(node, "primary_inputs", {}) or {})),
+					("reagents", reagents),
+					("utilities", utilities),
+					("labor_required", float(_safe_get(node, "labor_required", 0.0))),
+					("costs", costs),
+					("impacts", impacts),
 				]))
+
+			elif isinstance(node, Transportation):
+				snaps.append(OrderedDict([
+					("step_name", node.name),
+					("kind", "transport"),
+					("pv", float(_safe_get(node, "volume", 0.0))),
+					("reagents", OrderedDict()),
+					("utilities", OrderedDict()),
+					("constituents", {}),
+					("primary_inputs", {}),
+					("labor_required", 0.0),
+					("costs", OrderedDict([
+						("variable_cost", float(_safe_get(node, "variable_cost", 0.0))),
+						("fixed_cost", float(_safe_get(node, "fixed_cost", 0.0))),
+						("total_cost", float(_safe_get(node, "total_cost", 0.0))),
+					])),
+					("impacts", {"emissions_totals": dict(getattr(node, "emissions_totals", {}) or {})}),
+				]))
+			else:
+				raise ValueError("Unidentified node returned from sc.get_steps().")
+
+		if use_cache:
+			self._getter_cache[cache_key] = snaps
+		return snaps
+
+	# -------------------------
+	# Overall summary getters
+	# -------------------------
+	def get_total_reagents(self) -> Dict[str, Dict[str, float]]:
+		"""Aggregate total absolute usage and total cost for each reagent across all steps."""
+		totals: Dict[str, Dict[str, float]] = {}
+		for s in self._get_step_snapshots(transp=False):
+			for reagent, props in (s.get("reagents") or {}).items():
+				if reagent not in totals:
+					totals[reagent] = {"abs_usage": 0.0, "total_cost": 0.0}
+				totals[reagent]["abs_usage"] += float(props.get("abs_usage", 0.0) or 0.0)
+				totals[reagent]["total_cost"] += float(props.get("total_cost", 0.0) or 0.0)
+
+		for r, info in totals.items():
+			info["output_avg_cost"] = (info["total_cost"] / self.apv) if self.apv else 0.0
+		return totals
+
+	def get_total_utilities(self) -> Dict[str, Dict[str, float]]:
+		"""Aggregate total consumption and cost for each utility across all steps."""
+		totals: Dict[str, Dict[str, float]] = defaultdict(lambda: {"consumed": 0.0, "cost": 0.0})
+		for s in self._get_step_snapshots(transp=False):
+			for uname, rec in (s.get("utilities") or {}).items():
+				totals[uname]["consumed"] += float(rec.get("consumed", 0.0) or 0.0)
+				totals[uname]["cost"] += float(rec.get("cost", 0.0) or 0.0)
+
+		out: Dict[str, Dict[str, float]] = {k: dict(v) for k, v in totals.items()}
+		for uname, info in out.items():
+			info["output_avg_cost"] = (info["cost"] / self.apv) if self.apv else 0.0
+		return out
+
+	def get_total_labor(self) -> Dict[str, float]:
+		"""Aggregate labor demand and labor cost across all steps."""
+		labor_required = 0.0
+		labor_cost = 0.0
+		for s in self._get_step_snapshots(transp=False):
+			labor_required += float(s.get("labor_required", 0.0) or 0.0)
+			labor_cost += float((s.get("costs") or {}).get("labor_cost", 0.0) or 0.0)
+		return {
+			"labor_required": labor_required,
+			"labor_cost": labor_cost,
+			"output_avg_labor_cost": (labor_cost / self.apv) if self.apv else 0.0,
+		}
+
+	# -------------------------
+	# Step-level projection getters
+	# -------------------------
+	def get_step_constituents(self) -> List[List[Any]]:
+		return [[s["step_name"], s.get("constituents", {})] for s in self._get_step_snapshots(transp=False)]
+
+	def get_constituent_amount_at_steps(self, constituent: str) -> List[List[Any]]:
+		out = []
+		for s in self._get_step_snapshots(transp=False):
+			pv = float(s.get("pv", 0.0) or 0.0)
+			val = float((s.get("constituents", {}) or {}).get(constituent, 0.0) or 0.0)
+			out.append([s["step_name"], val * pv])
+		return out
+
+	def get_step_reagent_usage(self) -> List[List[Any]]:
+		"""Backward-compatible shape: [step_name, reagent_name, {usage, cost}]."""
+		out: List[List[Any]] = []
+		for s in self._get_step_snapshots(transp=False):
+			for reagent, props in (s.get("reagents") or {}).items():
+				out.append([
+					s["step_name"],
+					reagent,
+					{"usage": props.get("abs_usage", 0.0), "cost": props.get("total_cost", 0.0)},
+				])
+		return out
+
+	def get_step_utility(self, utility_name: str) -> List[List[Any]]:
+		"""Generic utility getter. Backward-compatible shape for old specific getters."""
+		out: List[List[Any]] = []
+		for s in self._get_step_snapshots(transp=False):
+			rec = (s.get("utilities") or {}).get(utility_name, None)
+			cons = float((rec or {}).get("consumed", 0.0) or 0.0)
+			cost = float((rec or {}).get("cost", 0.0) or 0.0)
+			out.append([s["step_name"], utility_name, cons, cost])
+		return out
+
+	def get_step_electric(self) -> List[List[Any]]:
+		out = []
+		for step_name, _, cons, cost in self.get_step_utility("electricity"):
+			out.append([step_name, "Electricity", cons, cost])
+		return out
+
+	def get_step_natural_gas(self) -> List[List[Any]]:
+		out = []
+		for step_name, _, cons, cost in self.get_step_utility("natural_gas"):
+			out.append([step_name, "Natural Gas", cons, cost])
+		return out
+
+	def get_step_process_water(self) -> List[List[Any]]:
+		out = []
+		for step_name, _, cons, cost in self.get_step_utility("process_water"):
+			out.append([step_name, "Process Water", cons, cost])
+		return out
+
+	def get_step_cooling_water(self) -> List[List[Any]]:
+		out = []
+		for step_name, _, cons, cost in self.get_step_utility("cooling_water"):
+			out.append([step_name, "Cooling Water", cons, cost])
+		return out
+
+	def get_step_steam(self) -> List[List[Any]]:
+		out = []
+		for step_name, _, cons, cost in self.get_step_utility("steam"):
+			out.append([step_name, "Steam", cons, cost])
+		return out
+
+	def get_step_compressed_air(self) -> List[List[Any]]:
+		out = []
+		for step_name, _, cons, cost in self.get_step_utility("compressed_air"):
+			out.append([step_name, "Compressed Air", cons, cost])
+		return out
+
+	def get_step_utilities(self) -> List[List[Any]]:
+		"""Legacy: [step_name, 'Total Utility Cost', utility_cost]."""
+		out: List[List[Any]] = []
+		for s in self._get_step_snapshots(transp=False):
+			out.append([
+				s["step_name"],
+				"Total Utility Cost",
+				float((s.get("costs") or {}).get("utility_cost", 0.0) or 0.0),
+			])
+		return out
+
+	def get_step_utilities_detailed(self) -> List[OrderedDict]:
+		"""Detailed utility breakdown, now sourced from snapshots."""
+		results: List[OrderedDict] = []
+		for s in self._get_step_snapshots(transp=False):
+			utils = s.get("utilities") or OrderedDict()
+			rec = OrderedDict([
+				("step_name", s["step_name"]),
+				("total_utility_cost", float((s.get("costs") or {}).get("utility_cost", 0.0) or 0.0)),
+			])
+			for k in ["electricity", "natural_gas", "process_water", "cooling_water", "steam", "compressed_air"]:
+				rec[k] = {
+					"consumed": float((utils.get(k) or {}).get("consumed", 0.0) or 0.0),
+					"cost": float((utils.get(k) or {}).get("cost", 0.0) or 0.0),
+				}
+			rec["utilities"] = utils
+			results.append(rec)
 		return results
 
-	def get_step_labor(self):
-		labor = []
-		for step in self.get_steps():
-			labor.append([step.step_name, step.labor_required, step.labor_cost])
-		return labor
+	def get_step_labor(self) -> List[List[Any]]:
+		out: List[List[Any]] = []
+		for s in self._get_step_snapshots(transp=False):
+			out.append([
+				s["step_name"],
+				float(s.get("labor_required", 0.0) or 0.0),
+				float((s.get("costs") or {}).get("labor_cost", 0.0) or 0.0),
+			])
+		return out
 
-	def get_detailed_pvs(self):
-		pvs = []
+	def get_detailed_pvs(self) -> List[List[Any]]:
+		return [[s["step_name"], float(s.get("pv", 0.0) or 0.0), s.get("step_units")] for s in self._get_step_snapshots(transp=True)]
+
+	def get_detailed_inputs(self) -> List[List[Any]]:
+		inputs: List[List[Any]] = []
 		for node in self.topo_order_transp():
 			if isinstance(node, Facility):
 				for step in node.fwd:
-					pvs.append([step.step_name, step.step_pv])
-			elif isinstance(node, TransportRoute):
-				for leg in node.legs:
-					pvs.append([leg.name, leg.volume])
-		return pvs
-
-	def get_detailed_inputs(self):
-		inputs = []
-		for node in self.topo_order_transp():
-			if isinstance(node, Facility):
-				for step in node.fwd:
-					for primary_input,items in step.primary_inputs.items():
-						inputs.append([step.step_name, primary_input, items["input_needed"]])
+					for primary_input, items in (step.primary_inputs or {}).items():
+						inputs.append([step.step_name, primary_input, items.get("input_needed", 0.0)])
 		return inputs
 
-	def get_step_costs(self,transp=False,detail=1):
-		prints = []
-		if detail == 1:
-			for step in self.get_steps(transp=transp):
-				if isinstance(step, ProductionStep):
-					prints.append([step.step_name, step.tot_var_cost, step.tot_fixed_cost])
-				elif isinstance(step,Transportation):
-					prints.append([step.name, step.variable_cost, step.fixed_cost])
-				else:
-					raise ValueError(f"Unidentified node in the supply chain's topographic order")
-		elif detail == 2:
-			for step in self.get_steps(transp=transp):
-				if isinstance(step, ProductionStep):
-					prints.append(OrderedDict([
-						("step_name",step.step_name),
-						("variable_costs", step.tot_var_cost),
-						("material_costs", step.tot_mat_cost),
-						("labor_costs", step.labor_cost),
-						("utility_costs", step.utility_cost),
-						("fixed_costs", step.tot_fixed_cost),
-						("machine_cost", step.machine_cost),
-						("tool_cost", step.tool_cost),
-						("building_cost", step.building_cost),
-						("aux_equip_cost", step.aux_equip_cost),
-						("maint_cost", step.maint_cost),
-						("fixed_over_cost", step.fixed_over_cost)
-					]))
-				elif isinstance(step,Transportation):
-					prints.append(OrderedDict([
-						("step_name", step.name),
-						("variable_costs", step.variable_cost),
-						("fixed_costs", step.fixed_cost),
-					]))
-				else:
-					raise ValueError(f"Unidentified node in the supply chain's topographic order")
-		return prints
+	# -------------------------
+	# Cost reporting
+	# -------------------------
+	def get_step_cost_report(
+		self,
+		view: str = "total",
+		transp: bool = False,
+		detail: int = 2,
+		capex_fields=("machine_cost", "tool_cost", "building_cost", "aux_equip_cost"),
+		opex_variable_fields=("tot_mat_cost", "labor_cost", "utility_cost"),
+		opex_fixed_fields=("maint_cost", "fixed_over_cost"),
+	):
+		"""
+		view:
+			  - "total": variable + fixed (full)
+			  - "variable": variable only (materials + labor + utilities)
+			  - "fixed": fixed only (machine + tool + building + aux + maint + overhead)
+			  - "opex": materials + labor + utilities + maint + overhead
+			  - "capex": machine + tool + building + aux
+			  - "raw": canonical component dict
 
+			detail:
+			  1 -> [step_name, selected_total]
+			  2 -> category breakdown for view
+			  3 -> like 2 plus:
+			       - material_cost_items (per-reagent from secondary_inputs)
+			       - utility_cost_items (per-utility from *_consumed / *_cost)
+			       Itemization is ALWAYS included where applicable.
+		"""
+		if view not in {"total", "opex", "capex", "variable", "fixed", "raw"}:
+			raise ValueError("`view` must be one of: 'total', 'opex', 'capex', 'variable', 'fixed', 'raw'.")
+		if detail not in {1, 2, 3}:
+			raise ValueError("detail must be 1, 2, or 3")
+		if view == "raw" and detail == 1:
+			raise ValueError("view='raw' requires detail=2 or 3")
 
-	def plot_tot_fac_costs(self,apv=None,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None):
+		out = []
+		for s in self._get_step_snapshots(transp=transp):
+			name = s["step_name"]
+			kind = s.get("kind")
+
+			# Transportation
+			if kind == "transport":
+				c = s.get("costs") or {}
+				var_cost = float(c.get("variable_cost", 0.0) or 0.0)
+				fix_cost = float(c.get("fixed_cost", 0.0) or 0.0)
+				total_cost = float(c.get("total_cost", var_cost + fix_cost) or 0.0)
+
+				if view == "capex":
+					selected_total = 0.0
+					if detail == 1:
+						out.append([name, selected_total])
+					else:
+						out.append(OrderedDict([
+							("step_name", name),
+							("capex_total", 0.0),
+							("capex_breakdown", {k: 0.0 for k in capex_fields}),
+						]))
+					continue
+
+				# For transport legs, treat as operating (variable-ish) by default.
+				if view in {"total", "variable", "fixed", "opex"}:
+					selected_total = total_cost
+					if detail == 1:
+						out.append([name, selected_total])
+					else:
+						out.append(OrderedDict([
+							("step_name", name),
+							("total_cost", total_cost),
+							("variable_costs", var_cost),
+							("fixed_costs", fix_cost),
+						]))
+					continue
+
+				# raw
+				if view == "raw":
+					if detail == 1:
+						raise ValueError("view='raw' requires detail=2 or 3")
+					out.append(OrderedDict([
+						("step_name", name),
+						("variable_costs", var_cost),
+						("fixed_costs", fix_cost),
+						("total_cost", total_cost),
+					]))
+					continue
+
+				raise ValueError("Unhandled view for transport")
+
+			# Production
+			c = s.get("costs") or {}
+			comp = OrderedDict([
+				("step_name", name),
+				("variable_costs", float(c.get("tot_var_cost", 0.0) or 0.0)),
+				("fixed_costs", float(c.get("tot_fixed_cost", 0.0) or 0.0)),
+				("tot_mat_cost", float(c.get("tot_mat_cost", 0.0) or 0.0)),
+				("labor_cost", float(c.get("labor_cost", 0.0) or 0.0)),
+				("utility_cost", float(c.get("utility_cost", 0.0) or 0.0)),
+				("machine_cost", float(c.get("machine_cost", 0.0) or 0.0)),
+				("tool_cost", float(c.get("tool_cost", 0.0) or 0.0)),
+				("building_cost", float(c.get("building_cost", 0.0) or 0.0)),
+				("aux_equip_cost", float(c.get("aux_equip_cost", 0.0) or 0.0)),
+				("maint_cost", float(c.get("maint_cost", 0.0) or 0.0)),
+				("fixed_over_cost", float(c.get("fixed_over_cost", 0.0) or 0.0)),
+			])
+
+			material_cost_items = None
+			utility_cost_items = None
+			if detail == 3:
+				material_cost_items = s.get("reagents") or OrderedDict()
+				utility_cost_items = s.get("utilities") or OrderedDict()
+
+			if view == "raw":
+				if detail == 2:
+					out.append(comp)
+				else:
+					rec = OrderedDict(comp)
+					rec["material_cost_items"] = material_cost_items
+					rec["utility_cost_items"] = utility_cost_items
+					out.append(rec)
+				continue
+
+			if view == "total":
+				total_cost = comp["variable_costs"] + comp["fixed_costs"]
+				if detail == 1:
+					out.append([name, total_cost])
+					continue
+
+				rec = OrderedDict([
+					("step_name", name),
+					("total_cost", total_cost),
+					("variable_costs", comp["variable_costs"]),
+					("fixed_costs", comp["fixed_costs"]),
+					("material_costs", comp["tot_mat_cost"]),
+					("labor_costs", comp["labor_cost"]),
+					("utility_costs", comp["utility_cost"]),
+					("machine_cost", comp["machine_cost"]),
+					("tool_cost", comp["tool_cost"]),
+					("building_cost", comp["building_cost"]),
+					("aux_equip_cost", comp["aux_equip_cost"]),
+					("maint_cost", comp["maint_cost"]),
+					("fixed_over_cost", comp["fixed_over_cost"]),
+				])
+
+				if detail == 3:
+					rec["material_cost_items"] = material_cost_items
+					rec["utility_cost_items"] = utility_cost_items
+				out.append(rec)
+				continue
+
+			if view == "capex":
+				capex_total = sum(comp.get(k, 0.0) for k in capex_fields)
+				if detail == 1:
+					out.append([name, capex_total])
+					continue
+				out.append(OrderedDict([
+					("step_name", name),
+					("capex_total", capex_total),
+					("capex_breakdown", {k: comp.get(k, 0.0) for k in capex_fields}),
+				]))
+				continue
+
+			if view == "opex":
+				opex_var = sum(comp.get(k, 0.0) for k in opex_variable_fields)
+				opex_fix = sum(comp.get(k, 0.0) for k in opex_fixed_fields)
+				opex_total = opex_var + opex_fix
+				if detail == 1:
+					out.append([name, opex_total])
+					continue
+
+				rec = OrderedDict([
+					("step_name", name),
+					("opex_total", opex_total),
+					("opex_variable", opex_var),
+					("opex_fixed_like", opex_fix),
+					("opex_variable_breakdown", {k: comp.get(k, 0.0) for k in opex_variable_fields}),
+					("opex_fixed_like_breakdown", {k: comp.get(k, 0.0) for k in opex_fixed_fields}),
+					("material_costs", comp["tot_mat_cost"]),
+					("labor_costs", comp["labor_cost"]),
+					("utility_costs", comp["utility_cost"]),
+				])
+				if detail == 3:
+					rec["material_cost_items"] = material_cost_items
+					rec["utility_cost_items"] = utility_cost_items
+				out.append(rec)
+				continue
+
+			if view == "variable":
+				var_total = comp["variable_costs"]
+				if detail == 1:
+					out.append([name, var_total])
+					continue
+
+				rec = OrderedDict([
+					("step_name", name),
+					("variable_total", var_total),
+					("material_costs", comp["tot_mat_cost"]),
+					("labor_costs", comp["labor_cost"]),
+					("utility_costs", comp["utility_cost"]),
+				])
+				if detail == 3:
+					rec["material_cost_items"] = material_cost_items
+					rec["utility_cost_items"] = utility_cost_items
+				out.append(rec)
+				continue
+
+			if view == "fixed":
+				fix_total = comp["fixed_costs"]
+				if detail == 1:
+					out.append([name, fix_total])
+					continue
+
+				rec = OrderedDict([
+					("step_name", name),
+					("fixed_total", fix_total),
+					("machine_cost", comp["machine_cost"]),
+					("tool_cost", comp["tool_cost"]),
+					("building_cost", comp["building_cost"]),
+					("aux_equip_cost", comp["aux_equip_cost"]),
+					("maint_cost", comp["maint_cost"]),
+					("fixed_over_cost", comp["fixed_over_cost"]),
+				])
+				out.append(rec)
+				continue
+
+			raise ValueError("Invalid view")
+
+		return out
+
+	def get_step_opex_costs(self, transp: bool = False, detail: int = 2, **kwargs):
+		return self.get_step_cost_report(view="opex", transp=transp, detail=detail, **kwargs)
+
+	def get_step_capex_costs(self, transp: bool = False, detail: int = 2, **kwargs):
+		return self.get_step_cost_report(view="capex", transp=transp, detail=detail, **kwargs)
+
+	def get_step_costs(self, transp: bool = False, detail: int = 1):
+		return self.get_step_cost_report(view="total", transp=transp, detail=detail)
+
+	# -------------------------
+	# Plotting
+	# -------------------------
+	def plot_tot_fac_costs(self, apv=None, xscale=1, yscale=1, title='Cost of Steps', xlab='Step Names',
+						   ylab='Total Cost', xlims=None, ylims=None):
 		if apv is not None:
 			self.update_apv(apv)
 		elif len(self.prod_map.keys()) == 0:
-			raise ValueError(f"No APV values have been run; rerun with some target production volume.")
+			raise ValueError("No APV values have been run; rerun with some target production volume.")
 
 		labels = []
 		costs = defaultdict(list)
@@ -470,38 +829,260 @@ class SupplyChain:
 				costs["Variable Costs"].append(node.variable_cost)
 				costs["Fixed Costs"].append(node.fixed_cost)
 			else:
-				raise ValueError(f"Unidentified node in the supply chain's topographic order")
+				raise ValueError("Unidentified node in the supply chain's topographic order")
 
-		stack_order = ["Fixed Costs","Variable Costs"]
-		plot_stacked_bars(labels,costs,stack_order=stack_order,xscale=xscale,yscale=yscale,
-			title=title,xlab=xlab,ylab=ylab,xlims=xlims,ylims=ylims)
+		plot_stacked_bars(labels, costs, stack_order=["Fixed Costs", "Variable Costs"], xscale=xscale, yscale=yscale,
+						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims)
 
-	def plot_tot_steps_costs(self,apv=None,show_var=True,show_fixed=True,
-		xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None):
+	def plot_tot_steps_costs(
+		self,
+		apv=None,
+		xscale=1,
+		yscale=1,
+		title='Cost of Steps',
+		xlab='Step Names',
+		ylab='Total Cost',
+		xlims=None,
+		ylims=None,
+		*,
+		view: str = "total", # total|variable|fixed|opex|capex|combo
+		detail: int = 2, # 1|2|3
+		top_n = None, # int -> bucket to top_n + Other, None -> show all items; only used when detail=3
+		transp: bool = True,
+		wrap_width: int = 12,
+		):
+		"""
+		Plot step costs using get_step_cost_report().
+
+		view:
+		  - "total": all costs
+		  - "variable": variable-only (materials, labor, utilities)
+		  - "fixed": fixed-only (machine, tool, building, aux, maint, overhead)
+		  - "opex": materials, labor, utilities, maint, overhead (aux excluded)
+		  - "capex": machine, tool, building, aux
+		  - "combo": stacked CAPEX + OPEX totals (forces detail=1 behavior)
+
+		detail:
+		  1 -> single bar per step (total for the chosen view)
+		  2 -> category-level stack for chosen view
+		  3 -> category-level + automatic itemization of materials and utilities where applicable.
+		       (to keep plots readable, top_n buckets per step if needed)
+		"""
 		if apv is not None:
 			self.update_apv(apv)
 		elif len(self.prod_map.keys()) == 0:
-			raise ValueError(f"No APV values have been run; rerun with some target production volume.")
+			raise ValueError("No APV values have been run; rerun with some target production volume.")
 
-		labels = []
-		costs = defaultdict(list)
+		view = str(view).lower().strip()
+		if view not in {"total", "variable", "fixed", "opex", "capex", "combo"}:
+			raise ValueError("view must be one of: total|variable|fixed|opex|capex|combo")
+		if detail not in {1, 2, 3}:
+			raise ValueError("detail must be 1, 2, or 3")
+		if top_n is not None and not isinstance(top_n, int):
+			raise ValueError("top_n must be an int or None")
 
-		for node in self.get_step_costs(transp=True):
-			labels.append(node[0])
-			if show_var: costs["Variable Costs"].append(node[1])
-			if show_fixed: costs["Fixed Costs"].append(node[2])
+		labels: List[str] = []
+		series: Dict[str, List[float]] = defaultdict(list)
 
-		stack_order = []
-		if show_fixed: stack_order.append("Fixed Costs")
-		if show_var: stack_order.append("Variable Costs")
-		plot_stacked_bars(labels,costs,stack_order=stack_order,xscale=xscale,yscale=yscale,
-			title=title,xlab=xlab,ylab=ylab,xlims=xlims,ylims=ylims)
+		def _pad_all():
+			for k in list(series.keys()):
+				while len(series[k]) < len(labels):
+					series[k].append(0.0)
 
-	def plot_tot_steps_impacts(self,apv=None,xscale=1,yscale=1,title='GHGs at each Step',xlab='Step Names',ylab='Total GHGs',xlims=None,ylims=None):
+		def _append(name: str, val: float):
+			while len(series[name]) < len(labels) - 1:
+				series[name].append(0.0)
+			series[name].append(float(val or 0.0))
+
+		def _topn_bucket(items_dict: Dict[str, Dict[str, Any]], key_name: str, topn: int) -> Dict[str, float]:
+			"""
+			Return top_n items + 'Other' bucket if remainder > 0.
+			Assumes top_n is a positive integer.
+			"""
+			if not items_dict:
+				return {}
+			pairs = []
+			for item, rec in items_dict.items():
+				try:
+					v = float(rec.get(key_name, 0.0) or 0.0)
+				except Exception:
+					v = 0.0
+				pairs.append((item, v))
+			pairs.sort(key=lambda x: x[1], reverse=True)
+			top = pairs[:max(topn, 0)]
+			rest = pairs[max(topn, 0):]
+			out = {k: v for k, v in top}
+			other = sum(v for _, v in rest)
+			if other > 0:
+				out["Other"] = other
+			return out
+
+		def _items_as_values(items_dict, key_name: str):
+			"""Convert {item: {key_name: v}} -> {item: v} filtering zeros."""
+			out = {}
+			for k, rec in (items_dict or {}).items():
+				try:
+					v = float((rec or {}).get(key_name, 0.0) or 0.0)
+				except Exception:
+					v = 0.0
+				if v != 0.0:
+					out[k] = v
+			return out
+
+		def _get_itemized_maps(rec):
+			"""
+			Return (mat_items, util_items) as {name: value}.
+			- If top_n is None: all items.
+			- If top_n <= 0: empty dicts (meaning "don't itemize").
+			- If top_n > 0: bucket to top_n + Other.
+			"""
+			raw_mat = rec.get("material_cost_items", {}) or {}
+			raw_util = rec.get("utility_cost_items", {}) or {}
+
+			if top_n is None:
+				return _items_as_values(raw_mat, "total_cost"), _items_as_values(raw_util, "cost")
+			if top_n <= 0:
+				return {}, {}
+			return _topn_bucket(raw_mat, "total_cost", top_n), _topn_bucket(raw_util, "cost", top_n)
+
+		if view == "combo":
+			cap = self.get_step_cost_report(view="capex", transp=transp, detail=1)
+			opx = self.get_step_cost_report(view="opex", transp=transp, detail=1)
+			for (nm1, capex_total), (nm2, opex_total) in zip(cap, opx):
+				if nm1 != nm2:
+					raise ValueError("Step ordering mismatch between CAPEX and OPEX reports.")
+				labels.append(nm1)
+				_append("CAPEX", capex_total)
+				_append("OPEX", opex_total)
+			_pad_all()
+			plot_stacked_bars(labels, series, stack_order=["CAPEX","OPEX"], xscale=xscale, yscale=yscale,
+							  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims, wrap_width=wrap_width)
+			return
+
+		report = self.get_step_cost_report(view=view, transp=transp, detail=detail)
+
+		for rec in report:
+			if detail == 1:
+				labels.append(rec[0])
+				_append(view.upper(), rec[1])
+				continue
+
+			labels.append(rec.get("step_name"))
+
+			if view == "total":
+				if detail == 2:
+					_append("Fixed Costs", rec.get("fixed_costs", 0.0))
+					_append("Variable Costs", rec.get("variable_costs", 0.0))
+				else: # detail == 3
+					# fixed
+					_append("Machine Cost", rec.get("machine_cost", 0.0))
+					_append("Tool Cost", rec.get("tool_cost", 0.0))
+					_append("Building Cost", rec.get("building_cost", 0.0))
+					_append("Aux Equip Cost", rec.get("aux_equip_cost", 0.0))
+					_append("Maintenance", rec.get("maint_cost", 0.0))
+					_append("Fixed Overhead", rec.get("fixed_over_cost", 0.0))
+
+					# Variable: labor aggregate; materials/utilities itemized if available
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+
+					mat_items, util_items = _get_itemized_maps(rec)
+
+					if mat_items:
+						for k, v in mat_items.items():
+							_append(f"MAT: {k}", v)
+					else:
+						_append("Material Costs", rec.get("material_costs", 0.0))
+
+					if util_items:
+						for k, v in util_items.items():
+							_append(f"UTIL: {k}", v)
+					else:
+						_append("Utility Costs", rec.get("utility_costs", 0.0))
+
+			elif view == "variable":
+				if detail == 2:
+					_append("Material Costs", rec.get("material_costs", 0.0))
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+					_append("Utility Costs", rec.get("utility_costs", 0.0))
+				else:  # detail == 3
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+
+					mat_items, util_items = _get_itemized_maps(rec)
+
+					if mat_items:
+						for k, v in mat_items.items():
+							_append(f"MAT: {k}", v)
+					else:
+						_append("Material Costs", rec.get("material_costs", 0.0))
+
+					if util_items:
+						for k, v in util_items.items():
+							_append(f"UTIL: {k}", v)
+					else:
+						_append("Utility Costs", rec.get("utility_costs", 0.0))
+
+			elif view == "fixed":
+				_append("Machine Cost", rec.get("machine_cost", 0.0))
+				_append("Tool Cost", rec.get("tool_cost", 0.0))
+				_append("Building Cost", rec.get("building_cost", 0.0))
+				_append("Aux Equip Cost", rec.get("aux_equip_cost", 0.0))
+				_append("Maintenance", rec.get("maint_cost", 0.0))
+				_append("Fixed Overhead", rec.get("fixed_over_cost", 0.0))
+
+			elif view == "capex":
+				bd = rec.get("capex_breakdown", {}) or {}
+				_append("Machine Cost", bd.get("machine_cost", 0.0))
+				_append("Tool Cost", bd.get("tool_cost", 0.0))
+				_append("Building Cost", bd.get("building_cost", 0.0))
+				_append("Aux Equip Cost", bd.get("aux_equip_cost", 0.0))
+
+			elif view == "opex":
+				if detail == 2:
+					_append("OPEX Fixed-like", rec.get("opex_fixed_like", 0.0))
+					_append("OPEX Variable", rec.get("opex_variable", 0.0))
+				else:  # detail == 3
+					bd_fix = rec.get("opex_fixed_like_breakdown", {}) or {}
+					_append("Maintenance", bd_fix.get("maint_cost", 0.0))
+					_append("Fixed Overhead", bd_fix.get("fixed_over_cost", 0.0))
+
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+					mat_items, util_items = _get_itemized_maps(rec)
+
+					if mat_items:
+						for k, v in mat_items.items():
+							_append(f"MAT: {k}", v)
+					else:
+						_append("Material Costs", rec.get("material_costs", 0.0))
+
+					if util_items:
+						for k, v in util_items.items():
+							_append(f"UTIL: {k}", v)
+					else:
+						_append("Utility Costs", rec.get("utility_costs", 0.0))
+
+			else:
+				raise ValueError("Unhandled view")
+
+		_pad_all()
+
+		# Prefer “fixed first” when applicable
+		if view == "total" and detail == 2:
+			stack_order = ["Fixed Costs", "Variable Costs"]
+		elif view == "opex" and detail == 2:
+			stack_order = ["OPEX Fixed-like", "OPEX Variable"]
+		else:
+			stack_order = list(series.keys())
+
+		plot_stacked_bars(labels, series, stack_order=stack_order, xscale=xscale, yscale=yscale,
+						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims, wrap_width=wrap_width)
+
+	def plot_tot_steps_impacts(self, apv=None, xscale=1, yscale=1, title='GHGs at each Step',
+								xlab='Step Names', ylab='Total GHGs', xlims=None, ylims=None):
+		# Left as existing behavior; consider refactoring analogous to costs.
 		if apv is not None:
 			self.update_apv(apv)
 		elif len(self.prod_map.keys()) == 0:
-			raise ValueError(f"No APV values have been run; rerun with some target production volume.")
+			raise ValueError("No APV values have been run; rerun with some target production volume.")
 
 		labels = []
 		scopes = defaultdict(list)
@@ -510,36 +1091,32 @@ class SupplyChain:
 			if isinstance(node, Facility):
 				for step in node.fwd:
 					labels.append(step.step_name)
-					scopes["Scope One"].append(step.scope_one_impacts.get('co2',0))
-					scopes["Scope Two"].append(step.scope_two_impacts.get('co2',0))
+					scopes["Scope One"].append(step.scope_one_impacts.get('co2', 0))
+					scopes["Scope Two"].append(step.scope_two_impacts.get('co2', 0))
 			elif isinstance(node, TransportRoute):
 				for leg in node.legs:
 					labels.append(leg.name)
-					scopes["Scope One"].append(leg.emissions_totals.get('ghg',0))
+					scopes["Scope One"].append(leg.emissions_totals.get('ghg', 0))
 					scopes["Scope Two"].append(0)
 			else:
-				raise ValueError(f"Unidentified node in the supply chain's topographic order")
+				raise ValueError("Unidentified node in the supply chain's topographic order")
 
 		stack_order = ["Scope One", "Scope Two"]
-
-		# Optional colors to keep your house palette
 		colors = {"Scope One": "#f28e2b", "Scope Two": "#4e79a7"}
+		plot_stacked_bars(labels, scopes, stack_order=stack_order, colors=colors, xscale=xscale, yscale=yscale,
+						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims)
 
-		plot_stacked_bars(labels,scopes,stack_order=stack_order,colors=colors,xscale=xscale,yscale=yscale,
-			title=title,xlab=xlab,ylab=ylab,xlims=xlims,ylims=ylims)
-
-	def plot_unit_cc(self,xscale=1,yscale=1,title='APV vs Average Cost',xlab='Annual Production Volume (APV)',ylab='Unit Cost'):
-		# Extract APVs and costs from the prod_map
+	def plot_unit_cc(self, xscale=1, yscale=1, title='APV vs Average Cost',
+					 xlab='Annual Production Volume (APV)', ylab='Unit Cost'):
 		apvs = [apv * xscale for apv in self.prod_map.keys()]
-		avg_costs = [cost[2]/apv * yscale for apv,cost in self.prod_map.items()]
-		plot_production_curve(apvs,avg_costs,xscale,yscale,title,xlab,ylab)
+		avg_costs = [cost[2] / apv * yscale for apv, cost in self.prod_map.items()]
+		plot_production_curve(apvs, avg_costs, xscale, yscale, title, xlab, ylab)
 
-	def plot_total_cc(self,xscale=1,yscale=1,title='APV vs Total Cost',xlab='Annual Production Volume (APV)',ylab='Total Cost'):
-		# Extract APVs and costs from the prod_map
+	def plot_total_cc(self, xscale=1, yscale=1, title='APV vs Total Cost',
+					  xlab='Annual Production Volume (APV)', ylab='Total Cost'):
 		apvs = [apv * xscale for apv in self.prod_map.keys()]
 		tot_costs = [cost[2] * yscale for cost in self.prod_map.values()]
-
-		plot_production_curve(apvs,tot_costs,xscale,yscale,title,xlab,ylab)
+		plot_production_curve(apvs, tot_costs, xscale, yscale, title, xlab, ylab)
 
 
 

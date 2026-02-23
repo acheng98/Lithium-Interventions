@@ -1,64 +1,64 @@
-variable_name,Description,Pumping,Evaporation,Liming
-step_id,Step ID (unique),brine_pumping,evap_ponds,liming_step
-step_name,Human-readable (long) process step name,Brine pumping,Evaporation Ponds,Liming to remove magnesium and calcium
-key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A,Concentration of lithium brine via evaporation,
-notes,"Key information, notes","Includes cost of installation and other capex, estimated to be roughly $1M per input data. Electricity usage depends on depth of drilling, but not represented here either.",,
-machine_options,,"brine_pump.conservative, brine_pump.midpoint, brine_pump.optimistic",evaporation_pond,liming_system
-machine_default,,brine_pump.midpoint,evaporation_pond,liming_system
-step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_pump_throughput,brine_evaporation_throughput,brine_liming_throughput
-step_basis_unit,,L/h,n/a (cost is wholly a footprint cost),L/h
-volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",brine_pump_throughput,Li,brine_liming_throughput
-volume_defining_basis_unit,What unit is the process volume or constituent in?,L/h,mg/L,L/h
-volume_defining_output,What is the output or output constituent that needs to be converted to,pumped_brine,Li,concentrated_lithium_brine
-volume_defining_output_unit,What unit is that output in?,L/h,mg/L,L/h
-primary_input_1_name,,raw_brine_from_ground,pumped_brine,pre-limed_brine
-primary_input_1_units,Units after conversion is applied,,,
-primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,1,1
-primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Ca; Na; B; SO4,Li; K; Ca; Na; B; SO4
-primary_input_1_constituent_fractions,Values of input constituents,,,
-primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
-primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE,FALSE,TRUE
-reagent_1_name,Reagent name,,,lime
-reagent_1_name_long,Long/descriptive reagent name,,,Lime
-reagent_1_target_constituents,,,,Li
-reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,,7.9845
-reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,,0
-reagent_1_units,,,,
-reagent_2_name,Reagent name,,,wash_water
-reagent_2_name_long,Long/descriptive reagent name,,,Process water
-reagent_2_target_constituents,,,,Li
-reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,,0.00006786825
-reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,,0
-reagent_2_units,,,,L water/mg Li
-reagent_3_name,Reagent name,,,
-reagent_3_name_long,Long/descriptive reagent name,,,
-reagent_3_target_constituents,,,,
-reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,,
-reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,,
-reagent_3_units,,,,
-primary_output_1_name,Output stream/material,pumped_brine,pre-limed_brine,concentrated_lithium_brine
-primary_output_1_step,The step or waste material tracker that this output goes to,evap_ponds,liming_step,Final
-primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,1,1
-primary_output_1_units,Units after conversion is applied,L/h,L/h,L/h
-primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4,Li; K; Mg; Ca; Na; SO4
-primary_output_1_constituent_units,,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
-primary_output_1_constituent_fractions,,,,
-primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE,FALSE
-coproduct_1_name,,,,
-coproduct_1_sink,,,,
-coproduct_1_conversion_factor,,,,
-coproduct_1_units,,,,
-coproduct_1_constituents,,,,
-coproduct_1_constituent_fractions,,,,
-coproduct_2_name,,,,
-coproduct_2_sink,,,,
-coproduct_2_conversion_factor,,,,
-coproduct_2_units,,,,
-coproduct_2_constituents,,,,
-coproduct_2_constituent_fractions,,,,
-coproduct_3_name,,,,
-coproduct_3_sink,,,Air,
-coproduct_3_conversion_factor,,,,
-coproduct_3_units,,,,
-coproduct_3_constituents,,,,
-coproduct_3_constituent_fractions,,,,
+variable_name,Description,Pumping,Evaporation
+step_id,Step ID (unique),brine_pumping,evap_ponds
+step_name,Human-readable (long) process step name,Brine pumping,Evaporation Ponds
+key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A,Concentration of lithium brine via evaporation
+notes,"Key information, notes","Includes cost of installation and other capex, estimated to be roughly $1M per input data. Electricity usage depends on depth of drilling, but not represented here either.",
+machine_options,,brine_pump.conservative; brine_pump.midpoint; brine_pump.optimistic,evaporation_pond.conservative; evaporation_pond.midpoint; evaporation_pond.optimistic
+machine_default,,brine_pump.midpoint,evaporation_pond.midpoint
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_pump_throughput,brine_evaporation_throughput
+step_basis_unit,,L/h,n/a (cost is wholly a footprint cost)
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",brine_pump_throughput,Li
+volume_defining_basis_unit,What unit is the process volume or constituent in?,L/h,mg/L
+volume_defining_output,What is the output or output constituent that needs to be converted to,pumped_brine,Li
+volume_defining_output_unit,What unit is that output in?,L/h,mg/L
+primary_input_1_name,,raw_brine_from_ground,pumped_brine
+primary_input_1_units,Units after conversion is applied,,
+primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,1
+primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Ca; Na; B; SO4
+primary_input_1_constituent_fractions,Values of input constituents,,
+primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE,FALSE
+reagent_1_name,Reagent name,,
+reagent_1_name_long,Long/descriptive reagent name,,
+reagent_1_target_constituents,,,
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_1_units,,,
+reagent_2_name,Reagent name,,
+reagent_2_name_long,Long/descriptive reagent name,,
+reagent_2_target_constituents,,,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_2_units,,,
+reagent_3_name,Reagent name,,
+reagent_3_name_long,Long/descriptive reagent name,,
+reagent_3_target_constituents,,,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,
+reagent_3_units,,,
+primary_output_1_name,Output stream/material,pumped_brine,concentrated_lithium_brine
+primary_output_1_step,The step or waste material tracker that this output goes to,evap_ponds,Final
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,1
+primary_output_1_units,Units after conversion is applied,L/h,L/h
+primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4
+primary_output_1_constituent_units,,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
+primary_output_1_constituent_fractions,,,
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE
+coproduct_1_name,,,
+coproduct_1_sink,,,
+coproduct_1_conversion_factor,,,
+coproduct_1_units,,,
+coproduct_1_constituents,,,
+coproduct_1_constituent_fractions,,,
+coproduct_2_name,,,
+coproduct_2_sink,,,
+coproduct_2_conversion_factor,,,
+coproduct_2_units,,,
+coproduct_2_constituents,,,
+coproduct_2_constituent_fractions,,,
+coproduct_3_name,,,
+coproduct_3_sink,,,Air
+coproduct_3_conversion_factor,,,
+coproduct_3_units,,,
+coproduct_3_constituents,,,
+coproduct_3_constituent_fractions,,,

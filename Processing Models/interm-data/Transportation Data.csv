@@ -1,24 +1,27 @@
-variable_name,Description,Unit,liquid_tanker_truck_diesel,dry_bulk_truck,haul_truck,rail_freight_liquid,rail_freight_solid,dry_bulk_barges
-base_volume,,volume,30000,35000,120000,100000,110000,"1,500,000"
-base_volume_unit,,,L,L,L,L,L,L
-fixed_cost,Fixed costs,,0,0,0,0,0,0
-operating_cost.low,,per volume per km,$0.000084,$0.000126,$0.000380,$0.000024,$0.000036,$0.000011
-operating_cost.medium,Operating cost,per volume per km,$0.000162,$0.000243,$0.001615,$0.000048,$0.000072,$0.000016
-operating_cost.high,,per volume per km,$0.000240,$0.000360,$0.002850,$0.000072,$0.000108,$0.000022
-operating_cost_unit,,,$/L-km,$/L-km,$/L-km,$/L-km,$/L-km,$/L-km
-fuel_usage,,,0,0,0,0,0,0
-labor_fraction,,,0,0,0,0,0,0
-maintenance,,,0,0,0,0,0,0
-ghg_emissions.low,,kg CO2 / L·km,0.000096,0.000144,0.000152,0.0000144,0.0000216,0.000018
-ghg_emissions.medium,GHG per volume per distance,kg CO2 / L·km,0.000156,0.000234,0.000361,0.0000252,0.0000378,0.000036
-ghg_emissions.high,,kg CO2 / L·km,0.000216,0.000324,0.00057,0.000036,0.000054,0.000054
-so2_emissions.low,,g / L·km,0.00000012,0.00000018,0.00000019,0.00000012,0.00000018,0.00000036
-so2_emissions.medium,SO2 per volume per distance,g / L·km,0.0000012,0.0000018,0.0000019,0.0000012,0.0000018,0.0000027
-so2_emissions.high,,g / L·km,0.0000024,0.0000036,0.0000038,0.0000024,0.0000036,0.0000054
-nox_emissions.low,,g / L·km,0.000024,0.000036,0.00057,0.00012,0.00018,0.00027
-nox_emissions.medium,NOx per volume per distance,g / L·km,0.00024,0.00036,0.0019,0.00036,0.00054,0.00027
-nox_emissions.high,,g / L·km,0.00048,0.00072,0.0038,0.00072,0.00108,0.00054
-pm_emissions.low,,g / L·km,0.00000024,0.00000036,0.000019,0.000006,0.000009,0.0000054
-pm_emissions.medium,PM2.5 per volume per distance,g / L·km,0.000009,0.0000135,0.000095,0.000018,0.000027,0.000009
-pm_emissions.high,,g / L·km,0.000018,0.000027,0.00019,0.000036,0.000054,0.000018
-loss_fraction,,fraction,0,0,0,0,0,0
+variable_name,Description,Unit,liquid_tanker_truck_diesel,dry_bulk_truck,haul_truck,rail_freight_liquid,rail_freight_solid,dry_bulk_barges,ocean_transport,rail_transport,road_transport,transportation_costs_by_weight,baseline_diesel_long_haul_trucks
+source,,,,,,,,,McKinnon & Piecyk; European Chemical Industry Council (Cerif),McKinnon & Piecyk; European Chemical Industry Council (Cerif),McKinnon & Piecyk; European Chemical Industry Council (Cerif),https://www.kimnet.nl/site/binaries/site-content/collections/documents/2023/03/30/kostenkengetallen-voor-het-goederenvervoer/Cost+figures+for+freight+transport_def.pdf,GREET HDV_TS 2025 + EF 2.2
+notes,,,,,,,,,,,,"Doesn't really make sense given that transportation is generally volume limited, not weight limited. Reported for EU",
+base_volume,,volume,30000,35,120000,100000,110000,"1,500,000",1,1,1,,19
+base_volume_unit,,,L,m3,L,L,L,L,ton,ton,ton,,tons
+fixed_cost,Fixed costs,,0,0,0,0,0,0,,,,,
+operating_cost.conservative,,per volume per km,$0.000084,$0.126000,$0.000380,$0.000024,$0.000036,$0.000011,,,,,
+operating_cost.midpoint,Operating cost,per volume per km,$0.000162,$0.243000,$0.001615,$0.000048,$0.000072,$0.000016,,,,,
+operating_cost.optimistic,,per volume per km,$0.000240,$0.360000,$0.002850,$0.000072,$0.000108,$0.000022,,,,,
+operating_cost_unit,,,$/L-km,$/m3-km,$/L-km,$/L-km,$/L-km,$/L-km,,,,,
+fuel_usage,,,0,0,0,0,0,0,,,,,
+labor_fraction,,,0,0,0,0,0,0,,,,,
+maintenance,,,0,0,0,0,0,0,,,,,
+ghg_emissions.optimistic,,kg CO2 / L·km,0.000096,0.144,0.000152,0.0000144,0.0000216,0.000018,,,,,
+ghg_emissions.midpoint,GHG per volume per distance,kg CO2 / L·km,0.000156,0.234,0.000361,0.0000252,0.0000378,0.000036,,,,,0.4935778073
+ghg_emissions.conservative,,kg CO2 / L·km,0.000216,0.324,0.00057,0.000036,0.000054,0.000054,,,,,
+ghg_emissions_alt.midpoint,,kg CO2 / ton·km,,,,,,,0.0084,0.022,0.062,,
+so2_emissions.optimistic,,g / L·km,0.00000012,0.00018,0.00000019,0.00000012,0.00000018,0.00000036,,,,,
+so2_emissions.midpoint,SO2 per volume per distance,g / L·km,0.0000012,0.0018,0.0000019,0.0000012,0.0000018,0.0000027,,,,,
+so2_emissions.conservative,,g / L·km,0.0000024,0.0036,0.0000038,0.0000024,0.0000036,0.0000054,,,,,
+nox_emissions.optimistic,,g / L·km,0.000024,0.036,0.00057,0.00012,0.00018,0.00027,,,,,
+nox_emissions.midpoint,NOx per volume per distance,g / L·km,0.00024,0.36,0.0019,0.00036,0.00054,0.00027,,,,,
+nox_emissions.conservative,,g / L·km,0.00048,0.72,0.0038,0.00072,0.00108,0.00054,,,,,
+pm_emissions.optimistic,,g / L·km,0.00000024,0.00036,0.000019,0.000006,0.000009,0.0000054,,,,,
+pm_emissions.midpoint,PM2.5 per volume per distance,g / L·km,0.000009,0.0135,0.000095,0.000018,0.000027,0.000009,,,,,
+pm_emissions.conservative,,g / L·km,0.000018,0.027,0.00019,0.000036,0.000054,0.000018,,,,,
+loss_fraction,,fraction,0,0,0,0,0,0,,,,,

@@ -1,8 +1,10 @@
-material,Description,lime,boron_package,regen,organic_package,strip_acid,scrub_makeup,soda_ash,wash_water,explosives,limestone,flocculant,sulfuric_acid,dispersant,neutralizing_agent,filter_aid,generic_reagent_delivery,sulfur,methanol,raw_water
-notes / sources,,"From mg/L for brine concentration. Estimates from https://www.accio.com/plp/cost-of-bulk-hydrated-lime, https://www.made-in-china.com/products-search/hot-china-products/Lime_Chemical_Price.html",Rough guess,Rough guess,Rough guess,Rough guess,Dominated by price of weak salt (e.g. NaCl),"From mg/L for brine concentration. Prices have varied quite a bit, but estimate to be about ~$USD300/ton https://tradingeconomics.com/commodity/soda-ash",https://www.bluefieldresearch.com/ns/u-s-water-and-sewer-bill-has-increased-24-in-five-years-raising-affordability-concerns/,Rough guess,From TLC,From TLC,,"Heavily dependent on type of dispersant & specific formulation, run sensitivity analysis",,Based on diatomaceous earth,,,,
-raw_cost,,150,120000,3000,15,200,0.15,300,3,2,35,4960,0.12,1,0.1,0.5,,,,
-raw_unit,,$/mt,$/mt,$/mt,$/L,$/mt,$/L,$/mt,$/m^3,$/kg,$/mt,$/mt,$/kg,$/kg,$/kg,$/kg,,,,
-cost,,0.00000015,0.00012,0.000003,15,0.0000002,0.15,0.0000003,0.003,2,0.035,4.96,0.12,1,0.1,0.5,,,,
-unit,,$/mg,$/mg,$/mg,$/L,$/mg,$/L,$/mg,$/L,$/kg,$/kg,$/kg,$/kg,$/kg,$/kg,$/kg,,,,
-cost_TLC,,124,,,,,,270,,,35,4960,,,,,48,100,1154,0.5
-cost_TLC_unit,,$/mt,,,,,,$/mt,,,$/mt,$/mt,,,,,$/mt,$/mt,$/mt,$/m^3
+material,Description,lime,boron_package,regen,organic_package,strip_acid,scrub_makeup,soda_ash,wash_water,explosives,limestone,flocculant,sulfuric_acid,dispersant,neutralizing_agent,filter_aid,generic_reagent_delivery,sulfur,methanol,raw_water,sodium_sulfate,process_water
+notes / sources,,"From mg/L for brine concentration. Estimates from https://www.accio.com/plp/cost-of-bulk-hydrated-lime, https://www.made-in-china.com/products-search/hot-china-products/Lime_Chemical_Price.html",Rough guess,Rough guess,Rough guess,Rough guess,Dominated by price of weak salt (e.g. NaCl),"From mg/L for brine concentration. Prices have varied quite a bit, but estimate to be about ~$USD300/ton https://tradingeconomics.com/commodity/soda-ash",https://www.bluefieldresearch.com/ns/u-s-water-and-sewer-bill-has-increased-24-in-five-years-raising-affordability-concerns/,Rough guess,From TLC,From TLC,,"Heavily dependent on type of dispersant & specific formulation, run sensitivity analysis",,Based on diatomaceous earth,,,,,,
+raw_cost,,150,120000,3000,15,200,0.15,300,3,2,35,4960,0.12,1,0.1,0.5,,,,,73,
+raw_unit,,$/mt,$/mt,$/mt,$/L,$/mt,$/L,$/mt,$/m^3,$/kg,$/mt,$/mt,$/kg,$/kg,$/kg,$/kg,,,,,$/tonne,
+cost,,0.00000015,0.00012,0.000003,15,0.0000002,0.15,0.0000003,0.003,2,0.035,4.96,0.12,1,0.1,0.5,,,,,0.000073,0.5
+unit,,$/mg,$/mg,$/mg,$/L,$/mg,$/L,$/mg,$/L,$/kg,$/kg,$/kg,$/kg,$/kg,$/kg,$/kg,,,,,$/g,$/m^3
+cost_TLC,,124,,,,,,270,,,35,4960,,,,,48,100,1154,0.5,,
+cost_TLC_unit,,$/mt,,,,,,$/mt,,,$/mt,$/mt,,,,,$/mt,$/mt,$/mt,$/m^3,,
+co2,,,,,,,,,,,,,,,,,,,,,,
+water,,,,,,,,,,,,,,,,,,,,,,

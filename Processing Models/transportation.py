@@ -37,7 +37,7 @@ class Transportation:
 
 		self.input_volume = self.volume / (1.0 - self.loss_fraction)
 
-	def evaluate_total(self, new_volume = None, rank="medium"):
+	def evaluate_total(self, new_volume = None, rank="midpoint"):
 		"""
 		Evaluate this leg on a total volume.
 		Returns totals: delivered_units, cost_total, emissions_total dict.
@@ -76,7 +76,7 @@ class TransportRoute:
 	Can pass an override of the starting volume (total to send). If omitted,
 	we use the volume already stored on the last leg.
 	"""
-	def __init__(self, name, legs, rank = "medium"):
+	def __init__(self, name, legs, rank = "midpoint"):
 		self.name = name 
 		if type(legs) is not List and len(legs) == 0:
 			raise ValueError("TransportRoute requires a list of at least one Transportation legs.")
