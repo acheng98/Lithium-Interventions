@@ -23,7 +23,7 @@ reagent_1_name_long,Long/descriptive reagent name,,Slurry dispersant for clay/si
 reagent_1_target_constituents,,,scrubbed_slurry_throughput,,thickener_feed_throughput,leach_slurry_throughput,CCD_feed_throughput,pregnant_solution_throughput
 reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.001,,0.00026,552,0.0005,0.050
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,0,0,0,0
-reagent_1_units,,,kg/kg solids,,kg/kg solids,kg/m^3 acid,kg/kg solids,kg/kg solids <-- THESE ALL NEED TO BE per m^3 (!!)
+reagent_1_units,,,kg/kg solids,,kg/kg solids,kg acid/m^3,kg/kg solids,kg/kg solids <-- THESE ALL NEED TO BE per m^3 (!!)
 reagent_2_name,Reagent name,,process_water,,,,,neutralizing_agent
 reagent_2_name_long,Long/descriptive reagent name,,,,,,,Mg(OH)₂ for second of two-stage neutralization
 reagent_2_target_constituents,,,scrubbed_slurry_throughput,,,,,pregnant_solution_throughput
@@ -38,6 +38,7 @@ reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by t
 reagent_3_units,,,,,,,,kg/kg solution
 primary_output_1_name,Output stream/material,crushed_ore,scrubbed_slurry,classified_slurry,thick_leach_feed,leach_slurry,pregnant_leach_solution,brine_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,scrubbing,classifying,thickening,acid_leaching,ccd,impurity_removal,Final
+primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",0.99,0.995,0.92,0.995,0.9,0.99,0.95
 primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),0.625,1,0.67,0.27,1,0.7,1000
 primary_output_1_units,Units after conversion is applied,m^3,m^3,m^3,m^3,m^3,m^3,L
 primary_output_1_constituents,,,,,,,,

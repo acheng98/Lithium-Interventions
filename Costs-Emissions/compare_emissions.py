@@ -284,3 +284,14 @@ def plot_project_reported_emissions(
 
 # Example:
 plot_project_reported_emissions("reported_emissions.csv")
+# plot_project_reported_emissions("reported_emissions.csv", save_path="emissions_compare")
+
+
+
+
+
+
+
+
+
+

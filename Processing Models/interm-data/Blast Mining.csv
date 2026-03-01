@@ -6,7 +6,7 @@ notes,"Key information, notes",,Discrete numbers of excavators moving material t
 machine_options,,blasting_generic.conservative; blasting_generic.midpoint; blasting_generic.optimistic,excavation_loading_generic.conservative; excavation_loading_generic.midpoint; excavation_loading_generic.optimistic
 machine_default,,blasting_generic.midpoint,excavation_loading_generic.midpoint
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,rock_blast_throughput,loose_rock_throughput
-step_basis_unit,,metric tonnes,m^3 effective volume (90% fill factor)
+step_basis_unit,,metric tonnes,"m^3 effective volume (90% fill factor), including waste"
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",rock_blast_throughput,loose_rock_throughput
 volume_defining_basis_unit,What unit is the process volume or constituent in?,metric tonnes blasted rock,m^3 loose rock
 volume_defining_output,What is the output or output constituent that needs to be converted to,blasted_rock,rom_ore_feed

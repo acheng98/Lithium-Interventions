@@ -38,7 +38,8 @@ reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by t
 reagent_3_units,,,,,,,,,
 primary_output_1_name,Output stream/material,crushed_ore,classified_slurry,ground_slurry,roaster_feed,roasted_mix,pregnant_leach_solution,neutralized_pls,brine_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,classifying,grinding,dewatering,sulfate_roasting,water_leach,impurity_removal,stream_clarification,Final
-primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,0.35,1,1.205,1,0.869,1,980
+primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",0.99,0.92,0.995,1,0.95,0.95,0.95,0.995
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,0.65,1,1.205,1,0.869,1,980
 primary_output_1_units,Units after conversion is applied,tonnes,m^3,m^3,tonnes,tonnes,m^3,m^3,L
 primary_output_1_constituents,,,,,,,,,
 primary_output_1_constituent_units,,,,,,,,,
@@ -46,7 +47,7 @@ primary_output_1_constituent_fractions,,,,,,,,,
 primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,FALSE,FALSE,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE
 coproduct_1_name,,,reject/gangue,,wash_liquor,,leach_residue,,impurity_sludge
 coproduct_1_sink,,,tailings,,wastewater_treatment,,tailings,,tailings
-coproduct_1_conversion_factor,,,0.65,,0.4,,0.352,,0.02
+coproduct_1_conversion_factor,,,0.35,,0.4,,0.352,,0.02
 coproduct_1_units,,,m3/m3 classified slurry,,m3/m3,,t/m3,,m3/h
 coproduct_1_constituents,,,,,,,"Al, Fe, Si",,"precipitated_impurities (Mg/Ca/B), minor Li-bearing liquor"
 coproduct_1_constituent_fractions,,,,,,,,,

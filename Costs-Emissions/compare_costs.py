@@ -59,11 +59,11 @@ def plot_project_reported_costs(
 	df["ProjectLabel"] = df["Project"] + " (" + df["Material"] + ")"
 
 	offsets = {
-		"Our Study": 0.12,
-		"Disclosure": 0.05,
+		"Our Study": -0.12,
+		"Disclosure": -0.05,
 		"Fleming et al. 2024": 0.00,
-		"Wesselkamper et al. 2025": -0.05,
-		"Mousavinezhad et al. 2025": -0.10,
+		"Wesselkamper et al. 2025": 0.05,
+		"Mousavinezhad et al. 2025": 0.10,
 	}
 
 	colors = {
@@ -109,7 +109,7 @@ def plot_project_reported_costs(
 			x_ohi[mask_both],
 			yy,
 			colors["Our Study"],
-			"Our study (low–high) [TEMPORARY]",
+			"Our study (low–high)",
 			linewidth=3.5,
 			dotsize=45,
 		)
@@ -123,7 +123,7 @@ def plot_project_reported_costs(
 			color=colors["Our Study"],
 			s=70,
 			zorder=5,
-			label="Our study (midpoint) [TEMPORARY]",
+			label="Our study (midpoint)",
 		)
 
 	# =========================
@@ -188,7 +188,6 @@ def plot_project_reported_costs(
 	ax.set_yticks(y)
 	ax.set_ylim(len(projects) - 0.5, -0.5)
 	ax.set_yticklabels(projects)
-	ax.invert_yaxis()
 
 	ax.set_xlabel(value_label)
 	ax.set_xlim(left=0)
@@ -208,11 +207,16 @@ def plot_project_reported_costs(
 
 	ax.legend(uniq_h, uniq_l, loc="center left", bbox_to_anchor=(1.02, 0.5))
 	plt.tight_layout()
-	plt.show()
 
+	if save_path is not None:
+		plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+	plt.show()
+	
 	return fig
 
-plot_project_reported_costs("reported_costs.csv")
+# plot_project_reported_costs("reported_costs.csv")
+plot_project_reported_costs("reported_costs.csv", save_path="cost_compare")
 # plot_project_reported_costs("reported_costs.csv", add_separators=True, facet=False, save_path="reported_costs")
 # plot_project_reported_costs("reported_costs.csv", facet=True, facet_cols=3)
 

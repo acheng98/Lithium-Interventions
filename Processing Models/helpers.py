@@ -11,10 +11,10 @@ from collections import defaultdict
 def safe_float(x, default=0.0):
 	try:
 		if x is None or x == "":
-			return default
+			return float(default)
 		return float(x)
 	except (TypeError, ValueError):
-		return default
+		return float(default)
 
 def safe_bool(x, default=False):
 	if x is None:
@@ -195,6 +195,16 @@ def ensure_list(val, cast=str, delim=";"):
 	if cast is float and isinstance(val, (int, float)):
 		return [float(val)]
 	return [cast(val)]
+
+def format_currency(x):
+	# Formats numeric to "$#,###" (rounded to nearest dollar)
+	if x is None:
+		return ""
+	try:
+		v = float(x)
+	except Exception:
+		return ""
+	return f"${v:,.0f}"
 
 def build_constituent_dict(constituents, fractions=None):
 	"""

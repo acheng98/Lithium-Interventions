@@ -5,15 +5,15 @@ key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A,C
 notes,"Key information, notes","Includes cost of installation and other capex, estimated to be roughly $1M per input data. Electricity usage depends on depth of drilling, but not represented here either.",
 machine_options,,brine_pump.conservative; brine_pump.midpoint; brine_pump.optimistic,evaporation_pond.conservative; evaporation_pond.midpoint; evaporation_pond.optimistic
 machine_default,,brine_pump.midpoint,evaporation_pond.midpoint
-step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_pump_throughput,brine_evaporation_throughput
-step_basis_unit,,L/h,n/a (cost is wholly a footprint cost)
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_pump_throughput,brine_evaporation_pond_size
+step_basis_unit,,L brine pumped,m2
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",brine_pump_throughput,Li
 volume_defining_basis_unit,What unit is the process volume or constituent in?,L/h,mg/L
 volume_defining_output,What is the output or output constituent that needs to be converted to,pumped_brine,Li
 volume_defining_output_unit,What unit is that output in?,L/h,mg/L
 primary_input_1_name,,raw_brine_from_ground,pumped_brine
 primary_input_1_units,Units after conversion is applied,,
-primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,1
+primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,
 primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Ca; Na; B; SO4
 primary_input_1_constituent_fractions,Values of input constituents,,
 primary_input_1_constituent_units,Units for each input constituent,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
@@ -38,8 +38,9 @@ reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by t
 reagent_3_units,,,
 primary_output_1_name,Output stream/material,pumped_brine,concentrated_lithium_brine
 primary_output_1_step,The step or waste material tracker that this output goes to,evap_ponds,Final
-primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,1
-primary_output_1_units,Units after conversion is applied,L/h,L/h
+primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",1,
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,
+primary_output_1_units,Units after conversion is applied,L,L
 primary_output_1_constituents,,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg; Ca; Na; SO4
 primary_output_1_constituent_units,,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L,mg/L; mg/L; mg/L; mg/L; mg/L; mg/L; mg/L
 primary_output_1_constituent_fractions,,,

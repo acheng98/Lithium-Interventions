@@ -188,76 +188,77 @@ class ProductionStep:
 				# Core sizing / throughput
 				# -------------------------
 				self.process_type: str = machine_data.get("process_type", "batch")
-				self.base_volume: float = machine_data.get("base_volume")
+				self.base_volume: float = safe_float(machine_data.get("base_volume"), 0.0)
 				self.base_volume_unit: Optional[str] = machine_data.get("base_volume_unit")
-				self.scaling_exponent: float = machine_data.get("scaling_exponent_throughput",1.0)
-				self.oversizing_factor: float = machine_data.get("oversizing_factor", 1.0)
-				self.yield_rate: float = machine_data.get("yield_rate")
-				self.dedicated_line = machine_data.get("dedicated_line", True)
+				self.scaling_exponent: float = safe_float(machine_data.get("scaling_exponent_throughput"), 1.0)
+				self.oversizing_factor: float = safe_float(machine_data.get("oversizing_factor"), 1.0)
+				self.dedicated_line = safe_bool(machine_data.get("dedicated_line"), True)
 
 				# -------------------------
 				# Batch parameters (if any)
 				# -------------------------
-				self.batch_cycle_time: Optional[float] = machine_data.get("batch_cycle_time")
+				self.batch_cycle_time: Optional[float] = safe_float(machine_data.get("batch_cycle_time"), 0.0)
 				self.batch_cycle_time_unit: Optional[str] = machine_data.get("batch_cycle_time_unit")
-				self.batch_setup_time: Optional[float] = machine_data.get("batch_setup_time")
+				self.batch_setup_time: Optional[float] = safe_float(machine_data.get("batch_setup_time"), 0.0)
 				self.batch_setup_time_unit: Optional[str] = machine_data.get("batch_setup_time_unit")
 
 				# -------------------------
 				# Utilities (base totals)
 				# -------------------------
-				self.electricity_base_total: float = machine_data.get("electricity_base_total",0.0)
+				self.electricity_base_total: float = safe_float(machine_data.get("electricity_base_total"), 0.0)
 				self.electricity_base_total_unit: Optional[str] = machine_data.get("electricity_base_total_unit")
 
-				self.natural_gas_base_total: float = machine_data.get("natural_gas_base_total",0.0)
+				self.natural_gas_base_total: float = safe_float(machine_data.get("natural_gas_base_total"), 0.0)
 				self.natural_gas_base_total_unit: Optional[str] = machine_data.get("natural_gas_base_total_unit")
 
-				self.cooling_water_base_total: float = machine_data.get("cooling_water_base_total",0.0)
+				self.diesel_base_total: float = safe_float(machine_data.get("diesel_base_total"), 0.0)
+				self.diesel_base_total_unit: Optional[str] = machine_data.get("diesel_base_total_unit")
+
+				self.propane_base_total: float = safe_float(machine_data.get("propane_base_total"), 0.0)
+				self.propane_base_total_unit: Optional[str] = machine_data.get("propane_base_total_unit")
+
+				self.cooling_water_base_total: float = safe_float(machine_data.get("cooling_water_base_total"), 0.0)
 				self.cooling_water_base_total_unit: Optional[str] = machine_data.get("cooling_water_base_total_unit")
 
-				self.steam_base_total: float = machine_data.get("steam_base_total", 0.0)
+				self.steam_base_total: float = safe_float(machine_data.get("steam_base_total"), 0.0)
 				self.steam_base_total_unit: Optional[str] = machine_data.get("steam_base_total_unit")
 
-				self.compressed_air_base_total: float = machine_data.get("compressed_air_base_total", 0.0)
+				self.compressed_air_base_total: float = safe_float(machine_data.get("compressed_air_base_total"), 0.0)
 				self.compressed_air_base_total_unit: Optional[str] = machine_data.get("compressed_air_base_total_unit")
-
-				# Optional fuels not currently used elsewhere, but keep them for completeness
-				self.diesel_base_total: float = machine_data.get("diesel_base_total", 0.0)
-				self.diesel_base_total_unit: Optional[str] = machine_data.get("diesel_base_total_unit")
 
 				# -------------------------
 				# Equipment / CAPEX
 				# -------------------------
-				self.prim_equip_price_base: float = machine_data.get("prim_equip_price_base", 0.0)
+				self.prim_equip_price_base: float = safe_float(machine_data.get("prim_equip_price_base"), 0.0)
 				self.prim_equip_price_base_unit: Optional[str] = machine_data.get("prim_equip_price_base_unit")
 
-				self.prim_equip_scaling_exponent: float = machine_data.get("prim_equip_scaling_exponent", 1.0)
-				self.prim_equip_life: float = machine_data.get("prim_equip_life")
+				self.prim_equip_scaling_exponent: float = safe_float(machine_data.get("prim_equip_scaling_exponent"), 1.0)
+				self.prim_equip_life: float = safe_float(machine_data.get("prim_equip_life"), 0.0)
 				self.prim_equip_life_unit: Optional[str] = machine_data.get("prim_equip_life_unit")
 
-				self.tooling_cost_base: float = machine_data.get("tooling_cost_base", 0.0)
+				self.tooling_cost_base: float = safe_float(machine_data.get("tooling_cost_base"), 0.0)
 				self.tooling_cost_base_unit: Optional[str] = machine_data.get("tooling_cost_base_unit")
-				self.tooling_scaling_exponent: float = machine_data.get("tooling_scaling_exponent", 1.0)
+				self.tooling_scaling_exponent: float = safe_float(machine_data.get("tooling_scaling_exponent"), 1.0)
 
-				self.footprint_base: float = machine_data.get("footprint_base", 0.0)
+				self.footprint_base: float = safe_float(machine_data.get("footprint_base"), 0.0)
 				self.footprint_base_unit: Optional[str] = machine_data.get("footprint_base_unit")
-				self.footprint_scaling_exponent: float = machine_data.get("footprint_scaling_exponent", 1.0)
+				self.footprint_scaling_exponent: float = safe_float(machine_data.get("footprint_scaling_exponent"), 1.0)
 
 				# -------------------------
 				# Labor
 				# -------------------------
-				self.dedicated_labor = machine_data.get("dedicated_labor", False)
-				self.labor_base: float = machine_data.get("labor_base", 0.0)
+				self.dedicated_labor = safe_bool(machine_data.get("dedicated_labor"), False)
+				self.labor_base: float = safe_float(machine_data.get("labor_base"), 0.0)
 				self.labor_base_unit: Optional[str] = machine_data.get("labor_base_unit")
-				self.labor_scaling_exponent: float = machine_data.get("labor_scaling_exponent", 1.0)
+				self.labor_scaling_exponent: float = safe_float(machine_data.get("labor_scaling_exponent"), 1.0)
 
 				# -------------------------
 				# Opex / availability / downtime
 				# -------------------------
-				self.opex_fraction_of_capex: float = machine_data.get("opex_fraction_of_capex", 0.0)
-				self.unplanned_downtime: float = machine_data.get("unplanned_downtime", 0.0)
-				self.proc_avail_factor: float = machine_data.get("proc_avail_factor", 1.0)
-				self.scheduled_maintenance: float = machine_data.get("scheduled_maintenance", 0.0)
+				self.opex_fraction_of_capex: float = safe_float(machine_data.get("opex_fraction_of_capex"), 0.0)
+				self.unplanned_downtime: float = safe_float(machine_data.get("unplanned_downtime"), 0.0)
+				self.proc_avail_factor: float = safe_float(machine_data.get("proc_avail_factor"), 1.0)
+				self.scheduled_maintenance: float = safe_float(machine_data.get("scheduled_maintenance"), 0.0)
 
 				# Keep facility time assumptions consistent and recompute availability
 				self.plt = self.facility.plt
@@ -269,9 +270,9 @@ class ProductionStep:
 				for name in [
 						"ltr", "machines_required", "scaled_equip_cost",
 						"labor_required",
-						"electricity_consumed", "natural_gas_consumed", 
+						"electricity_consumed", "natural_gas_consumed", "diesel_consumed", "propane_consumed"
 						"cooling_water_consumed", "steam_consumed", "compressed_air_consumed",
-						"electricity_cost", "natural_gas_cost", 
+						"electricity_cost", "natural_gas_cost", "diesel_cost", "propane_cost"
 						"cooling_water_cost", "steam_cost", "compressed_air_cost",
 						"tot_var_cost", "tot_fixed_cost", "tot_cost", "tot_opex", "tot_capex",
 						"machine_cost", "tool_cost", "building_cost", "aux_equip_cost",
@@ -523,7 +524,7 @@ class ProductionStep:
 						if reagent_name not in self.facility.material_data:
 								raise KeyError (f"Reagent {reagent_name} not found in facility {self.facility.fac_id}'s listed materials with data.")
 
-						# print(reagent_name,self.facility.material_data[reagent_name])
+						# print(reagent_name,abs_usage,self.facility.material_data[reagent_name])
 						props["total_cost"] = abs_usage * self.facility.material_data[reagent_name]["cost"]
 
 		def calculate_environmental_impacts(self, impact_factors: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
@@ -565,6 +566,8 @@ class ProductionStep:
 				utility_map = [
 						("electricity_consumed",    "electricity"),
 						("natural_gas_consumed",    "natural_gas"),
+						("diesel_consumed",					"diesel"),
+						("propane_consumed",				"propane"),
 						("cooling_water_consumed",  "cooling_water"),
 						("steam_consumed",          "steam"),
 						("compressed_air_consumed", "compressed_air"),
@@ -683,6 +686,8 @@ class ProductionStep:
 				# Utility consumption (scale with line time)
 				self.electricity_consumed = self.electricity_base_total * self.ltr
 				self.natural_gas_consumed = self.natural_gas_base_total * self.ltr
+				self.diesel_consumed = self.diesel_base_total * self.ltr
+				self.propane_consumed = self.propane_base_total * self.ltr
 				self.cooling_water_consumed = self.cooling_water_base_total * self.ltr
 				self.steam_consumed = self.steam_base_total * self.ltr
 				self.compressed_air_consumed = self.compressed_air_base_total * self.ltr
@@ -691,6 +696,9 @@ class ProductionStep:
 				'''
 				Scale throughput, labor, and utilities for continuous process
 				'''
+				# Hours of operation assumed by design
+				self.ltr = self.lta
+
 				volume_ratio = self.step_pv / (self.base_volume * self.lta) if self.base_volume else 1.0 # Assume base volumes are always units per hour
 
 				# Equipment scaling
@@ -699,11 +707,13 @@ class ProductionStep:
 																		(volume_ratio ** self.prim_equip_scaling_exponent))
 
 				# Utility scaling
-				self.electricity_consumed = self.electricity_base_total * (volume_ratio ** self.scaling_exponent)
-				self.natural_gas_consumed = self.natural_gas_base_total * (volume_ratio ** self.scaling_exponent)
-				self.cooling_water_consumed = self.cooling_water_base_total * (volume_ratio ** self.scaling_exponent)
-				self.steam_consumed = self.steam_base_total * (volume_ratio ** self.scaling_exponent)
-				self.compressed_air_consumed = self.compressed_air_base_total * (volume_ratio ** self.scaling_exponent)
+				self.electricity_consumed = self.electricity_base_total * (volume_ratio ** self.scaling_exponent) * self.lta
+				self.natural_gas_consumed = self.natural_gas_base_total * (volume_ratio ** self.scaling_exponent) * self.lta
+				self.diesel_consumed = self.diesel_base_total * (volume_ratio ** self.scaling_exponent) * self.lta
+				self.propane_consumed = self.propane_base_total * (volume_ratio ** self.scaling_exponent) * self.lta
+				self.cooling_water_consumed = self.cooling_water_base_total * (volume_ratio ** self.scaling_exponent) * self.lta
+				self.steam_consumed = self.steam_base_total * (volume_ratio ** self.scaling_exponent) * self.lta
+				self.compressed_air_consumed = self.compressed_air_base_total * (volume_ratio ** self.scaling_exponent) * self.lta
 
 				# Labor scaling
 				if self.dedicated_labor:
@@ -731,12 +741,14 @@ class ProductionStep:
 				"""Calculate cost of utilities based on facility prices"""
 				self.electricity_cost = self.electricity_consumed * self.facility.elec_price
 				self.natural_gas_cost = self.natural_gas_consumed * self.facility.gas_price
+				self.diesel_cost = self.diesel_consumed * self.facility.diesel_price
+				self.propane_cost = self.propane_consumed * self.facility.propane_price
 				self.cooling_water_cost = self.cooling_water_consumed * self.facility.cool_water_price
 				self.steam_cost = self.steam_consumed * self.facility.steam_price
 				self.compressed_air_cost = self.compressed_air_consumed * self.facility.comp_air_price
 
-				self.utility_cost = (self.electricity_cost + self.natural_gas_cost + self.cooling_water_cost +
-															self.steam_cost + self.compressed_air_cost)
+				self.utility_cost = (self.electricity_cost + self.natural_gas_cost + self.diesel_cost + self.propane_cost +
+															self.cooling_water_cost + self.steam_cost + self.compressed_air_cost)
 
 		def _calc_capital_costs(self):
 				"""Calculate machine, tooling, building, and overhead costs"""
@@ -772,7 +784,7 @@ class ProductionStep:
 
 				self.building_cost = self.facility.bcrf * self.facility.build_price * footprint
 				self.aux_equip_cost = self.machine_cost * self.facility.aux_equip
-				self.maint_cost = self.machine_cost * self.facility.maint
+				self.maint_cost = self.machine_cost * self.facility.maint # Change to scaled machine cost? 
 				self.fixed_over_cost = (self.machine_cost + self.tool_cost +
 																self.building_cost + self.aux_equip_cost +
 																self.maint_cost) * self.facility.fixed_over

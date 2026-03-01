@@ -1,19 +1,19 @@
 Project,Company,Location,Material,Pieseler et al. 2024 (Best Guess),Kelly et al. 2021-Low,Kelly et al. 2021-High,Iyer and Kelly 2024-Low,Iyer and Kelly 2024-High,Mousavinezhad et al. 2024,Mousavinezhad et al. 2025,Sun et al. 2025,Khakmardan et al. 2024,Roy et al. 2024,Liu et al. 2025,Schenker and Pfister 2025,Manjong et al. 2021-Low,Manjong et al. 2021-High,Ambrose and Kendall 2020b-High Grade,Ambrose and Kendall 2020b-Low Grade,"Ambrose and Kendall 2020b-Low Grade, Unfavorable",Our Study-Low,Our Study-Midpoint,Our Study-High
 Lanxess,Standard Lithium,USA,Brine-DLE,,,,,,,,,,,,,,,,,,,,
 Clayton Valley DLE,Pure Energy Minerals,USA,Brine-DLE,,,,,,,,,,,,,,,,,,,,
-Salar de Atacama-Albemarle,Albemarle,Chile,Brine,4.45,,,,,6.17,,3.19,,,,4.10,2.00,6.20,3.06,3.97,5.28,,,
-Salar de Atacama-SQM,SQM,Chile,Brine,3.07,2.70,3.10,,,,,,,,,4.10,2.00,6.20,3.06,3.97,5.28,,,
-Sal de Vida,Arcadium Lithium,Argentina,Brine,,,,,,,,,,,,2.40,2.00,6.20,3.06,3.97,5.28,,,
-Silver Peak,Albemarle,USA,Brine,21.19,,,,,,4.34,8.08,,,,2.80,2.00,6.20,3.06,3.97,5.28,2.00,2.72,3.20
+Salar de Atacama-Albemarle,Albemarle,Chile,Brine,4.45,,,,,6.17,,3.19,,,,4.1,2.0,6.2,3.06,3.97,5.28,,,
+Salar de Atacama-SQM,SQM,Chile,Brine,3.07,2.7,3.1,,,,,,,,,4.1,2.0,6.2,3.06,3.97,5.28,,,
+Sal de Vida,Arcadium Lithium,Argentina,Brine,,,,,,,,,,,,2.4,2.0,6.2,3.06,3.97,5.28,,,
+Silver Peak,Albemarle,USA,Brine,21.19,,,,,,4.34,8.08,,,,2.8,2.0,6.2,3.06,3.97,5.28,3.285790474269872,3.9381239855970693,4.2686660124682545
 Sonora,Bacanora Minerals Limited,Mexico,Clay,,,,,,,,,20.38,,,,,,,,,,,
-Clayton Valley South,Century Lithium,USA,Clay,,,,8.90,16.60,,,,,,,,,,,,,,,
-Rhyolite Ridge,Ioneer,USA,Clay,,,,8.90,16.60,,,,,,,,,,,,,,,
-Thacker Pass,Lithium Americas,USA,Clay,,,,8.90,16.60,,10.00,,22.51,14.53,,,,,,,,5.00,5.76,6.50
-TLC (Tonopah Lithium Claims),American Lithium,USA,Clay,,,,8.90,16.60,,,,,,,,,,,,,,,
+Clayton Valley South,Century Lithium,USA,Clay,,,,8.9,16.6,,,,,,,,,,,,,,,
+Rhyolite Ridge,Ioneer,USA,Clay,,,,8.9,16.6,,,,,,,,,,,,,,,
+Thacker Pass,Lithium Americas,USA,Clay,,,,8.9,16.6,,10.0,,22.51,14.53,,,,,,,,1.2114159032058023,1.2609616118868963,1.327510088559649
+TLC (Tonopah Lithium Claims),American Lithium,USA,Clay,,,,8.9,16.6,,,,,,,,,,,,,,,
 Greenbushes,Talison Lithium,Australia,Spodumene,,,,,,,,,,,,,,,,,,,,
 Kings Mountain - Foote deposit,Albemarle,USA,Spodumene,,,,,,,,,,,,,,,,,,,,
 Grota do Cirilo–Barreiro,Sigma Lithium,Brazil,Spodumene,,,,,,,,,,,,,,,,,,,,
 Grota do Cirilo–Xuxa,Sigma Lithium,Brazil,Spodumene,,,,,,,,,,,,,,,,,,,,
 Georgia Lake Project,Rock Tech Lithium,Canada,Spodumene,,,,,,,,,,,,,,,,,,,,
 Mt Cattlin,Arcadium Lithium,Australia,Spodumene,,,,,,,,,,,,,,,,,,,,
-Jianxiawo,,,Lepidolite,,,,,,,,,,,22.00,,,,,,,9.00,9.86,10.50
+Jianxiawo,,,Lepidolite,,,,,,,,,,,22.0,,,,,,,0.9696584214630486,0.9707051583602527,0.9807036120382155

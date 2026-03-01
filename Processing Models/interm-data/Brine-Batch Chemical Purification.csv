@@ -39,6 +39,7 @@ reagent_3_units,,kg Na2CO3 per kg Ca,
 primary_output_1_name,Output stream/material,treated_slurry,brine_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,sls_step,Final
 primary_output_1_units,Convert from step basis units to output units (step basis * CF = output),L brine-post lime,L brine post de-boron
+primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",1,0.995
 primary_output_1_conversion_factor,Units after conversion is applied,1,1
 primary_output_1_constituents,,Li; K; Mg(OH)2; CaCO3; Na; B; SO4,Li; Na; K; Cl; SO4; H2O
 primary_output_1_constituent_units,,,

@@ -233,7 +233,7 @@ class SupplyChain:
 			for (u, v),(products,transport_route) in self.links.items(): # This is O(n^2) which is technically inefficient, but n should be small
 				if v == fac:
 					if transport_route is not None:
-						res = transport_route.evaluate_total(total_volume=fac.get_initial_pv())
+						res = transport_route.evaluate_total(total_volume=fac.get_initial_input_amount())
 						self.tot_var_cost += res["variable_cost"]
 						self.tot_fixed_cost += res["fixed_cost"]
 						# Transport is treated as operating cost (no capex attribution)
@@ -248,9 +248,8 @@ class SupplyChain:
 						updated_apv = True
 						break
 			
-			if not updated_apv: # No transportation link identified, just get the apv of this current facility
-				cur_apv = fac.get_initial_pv()
-
+			if not updated_apv: # No transportation link identified, just get the input value to this current facility
+				cur_apv = fac.get_initial_input_amount()
 
 		self.avg_var_cost = self.tot_var_cost / self.apv if self.apv else 0.0
 		self.avg_fixed_cost = self.tot_fixed_cost / self.apv if self.apv else 0.0
@@ -327,7 +326,8 @@ class SupplyChain:
 				utility_candidates = [
 					("electricity", "electricity_consumed", "electricity_cost", "elec_price"),
 					("natural_gas", "natural_gas_consumed", "natural_gas_cost", "gas_price"),
-					("process_water", "process_water_consumed", "process_water_cost", "proc_water_price"),
+					("diesel", "diesel_consumed", "diesel_cost", "diesel_price"),
+					("propane", "propane_consumed", "propane_cost", "propane_price"),
 					("cooling_water", "cooling_water_consumed", "cooling_water_cost", "cool_water_price"),
 					("steam", "steam_consumed", "steam_cost", "steam_price"),
 					("compressed_air", "compressed_air_consumed", "compressed_air_cost", "comp_air_price"),
@@ -374,6 +374,7 @@ class SupplyChain:
 					("primary_inputs", dict(getattr(node, "primary_inputs", {}) or {})),
 					("reagents", reagents),
 					("utilities", utilities),
+					("machines_required", float(_safe_get(node, "machines_required", 0.0))),
 					("labor_required", float(_safe_get(node, "labor_required", 0.0))),
 					("costs", costs),
 					("impacts", impacts),
@@ -494,10 +495,16 @@ class SupplyChain:
 			out.append([step_name, "Natural Gas", cons, cost])
 		return out
 
-	def get_step_process_water(self) -> List[List[Any]]:
+	def get_step_diesel(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("process_water"):
-			out.append([step_name, "Process Water", cons, cost])
+		for step_name, _, cons, cost in self.get_step_utility("diesel"):
+			out.append([step_name, "Diesel", cons, cost])
+		return out
+
+	def get_step_propane(self) -> List[List[Any]]:
+		out = []
+		for step_name, _, cons, cost in self.get_step_utility("propane"):
+			out.append([step_name, "Propane", cons, cost])
 		return out
 
 	def get_step_cooling_water(self) -> List[List[Any]]:
@@ -538,11 +545,6 @@ class SupplyChain:
 				("step_name", s["step_name"]),
 				("total_utility_cost", float((s.get("costs") or {}).get("utility_cost", 0.0) or 0.0)),
 			])
-			for k in ["electricity", "natural_gas", "process_water", "cooling_water", "steam", "compressed_air"]:
-				rec[k] = {
-					"consumed": float((utils.get(k) or {}).get("consumed", 0.0) or 0.0),
-					"cost": float((utils.get(k) or {}).get("cost", 0.0) or 0.0),
-				}
 			rec["utilities"] = utils
 			results.append(rec)
 		return results
@@ -554,6 +556,16 @@ class SupplyChain:
 				s["step_name"],
 				float(s.get("labor_required", 0.0) or 0.0),
 				float((s.get("costs") or {}).get("labor_cost", 0.0) or 0.0),
+			])
+		return out
+
+	def get_step_machines(self) -> List[List[Any]]:
+		out: List[List[Any]] = []
+		for s in self._get_step_snapshots(transp=False):
+			out.append([
+				s["step_name"],
+				float(s.get("machines_required", 0.0) or 0.0),
+				float((s.get("costs") or {}).get("machine_cost", 0.0) or 0.0),
 			])
 		return out
 

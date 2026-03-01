@@ -9,10 +9,7 @@ from helpers import plot_stacked_bars, plot_production_curve
 class Facility:
 
 		# Instance attribute
-		def __init__(self, fac_id, supply_chain, sinks, apv=0, steps=None, location=None, impact_factors=None,
-								dpy=330, upd=0.2, scm=0, spd=3, hps=8, ub=0.5, pb=0.5, dr=0.10,
-								wage=18, enpt=0.03, elec=0.08, gas=3.46, proc_water=3, cool_water=4, steam=0.0265, comp_air=0.04,
-								build=3000, crp=6, brp=20, aux_equip=0.10, maint=0.10, fixed_over = 0.35):
+		def __init__(self, fac_id, supply_chain, location, sinks, apv=0, steps=None, impact_factors=None):
 			
 			self.fac_id = fac_id
 			self.apv = apv
@@ -35,35 +32,29 @@ class Facility:
 					"air": {"CO2": 0.0, "NOx": 0.0, "SO2": 0.0} # probably more, to add later if needed
 			}
 
-			self.dpy = dpy # Working days/year
-			self.upd = upd # Facility-wide average Unplanned Downtime, as a percentage
-			self.scm = scm # Scheduled maintenance
-			self.spd = spd # Number of shifts/day
-			self.hps = hps # Hours per shift
-			self.ub = ub # Hours of unpaid breaks/shift
-			self.pb = pb # Hours of paid breaks/shift
-			self.dr = dr # Discount Rate
-			self.wage = wage # Direct Wage (w/benefits)
-			self.elec_price = elec # Electricity cost, $/kwh
-			self.gas_price = gas # Gas cost, $/MMBTU
-			self.diesel_price = gas # Gas cost, $/MMBTU
-			self.proc_water_price = proc_water # Cost of water used for processing, $/m^3
-			self.cool_water_price = cool_water # Cost of cooled water, $/m^3. Assume an increase over the process water cost.
-			self.steam_price = steam # Cost of steam, $/kg. Assume ~1.2 cents / pound, or 2.65 cents / kg
-			self.comp_air_price = comp_air # Cost of compressed air, in $/Nm^3 (normal m^3). Assume 4 cents for now.
-			self.build_price = build # Building space cost, $/m^2
-			self.crp = crp # Capital Recovery Period
-			self.brp = brp # Building Recovery Period
-			self.aux_equip = aux_equip # Annualized auxiliary Equipment cost, as a percentage of main machine cost
-			self.maint = maint # Annualized maintenance costs, as a percentage of main machine cost
-			self.fixed_over = fixed_over # Annualized fixed overhead costs, as a percentage of the total of {main machine, building, auxiliary equipment, and maintenance} costs
-
-			# Calculate default values from inputs
-			self.crf = self.calc_crf(self.dr,self.crp) # Capital recovery factor
-			self.bcrf = self.calc_crf(self.dr,self.brp) # Building capital recovery factor
-
-			self.plt = self.dpy*self.spd*(self.hps-self.ub) # Paid line time
-			self.wlt = self.dpy*self.spd*(self.hps-self.ub-self.pb) # Worked line time
+			self.dpy = 0 # Working days/year
+			self.upd = 0 # Facility-wide average Unplanned Downtime, as a percentage
+			self.scm = 0 # Scheduled maintenance
+			self.spd = 0 # Number of shifts/day
+			self.hps = 0 # Hours per shift
+			self.ub = 0 # Hours of unpaid breaks/shift
+			self.pb = 0 # Hours of paid breaks/shift
+			self.dr = 0 # Discount Rate
+			self.wage = 0 # Direct Wage (w/benefits)
+			self.elec_price = 0 # Electricity cost, $/kwh
+			self.gas_price = 0 # Gas cost, $/MMBTU
+			self.diesel_price = 0 # Diesel cost, $/L
+			self.propane_price = 0 # Propane cost, $/L
+			self.cool_water_price = 0 # Cost of cooled water, $/m^3. Assume an increase over the process water cost.
+			self.steam_price = 0 # Cost of steam, $/kg. Assume ~1.2 cents / pound, or 2.65 cents / kg
+			self.comp_air_price = 0 # Cost of compressed air, in $/Nm^3 (normal m^3). Assume 4 cents for now.
+			self.build_price = 0 # Building space cost, $/m^2
+			self.crp = 0 # Capital Recovery Period
+			self.brp = 0 # Building Recovery Period
+			self.aux_equip = 0 # Annualized auxiliary Equipment cost, as a percentage of main machine cost
+			self.maint = 0 # Annualized maintenance costs, as a percentage of main machine cost
+			self.fixed_over = 0 # Annualized fixed overhead costs, as a percentage of the total of {main machine, building, auxiliary equipment, and maintenance} costs
+			self.machine_cost_factor = 0 # A cost factor to be applied due to the relative local price of machines vs. benchmarked price for machines
 
 			self.prod_map = {} #apv: [self.tot_var_cost,self.tot_fixed_cost,self.tot_cost]
 			self.fwd = [] # Forward topographically ordered production steps (upstream → downstream)
@@ -79,26 +70,27 @@ class Facility:
 			self.avg_fixed_cost = 0
 			self.avg_cost = 0
 
+			# Need to specify location
+			if (location is None) or (location not in self.sc.loc_data):
+					raise ValueError(f"Location '{location}' not found in supply chain locations.")
+			else:
+					self.update_location(location)
+					
 			# If steps are specified, import them
 			if steps is not None and type(steps) == dict:
 					self.import_steps(steps)
-
-			# If location specified, override defaults
-			if location is not None:
-					if location not in self.sc.loc_data:
-							raise ValueError(f"Location '{location}' not found in supply chain locations.")
-					self.update_location(location)
 
 		@staticmethod
 		def calc_crf(dr: float, period: float) -> float:
 				"""
 				Return the capital recovery factor for a given rate and period.
+				Annualizing into year 0 payment
 				"""
 				if period == 1:
 						return 1.0
 				if dr == 0:
 						return 1 / period
-				return dr * (1 + dr) ** period / ((1 + dr) ** period - 1)
+				return dr * (1 + dr) ** (period-1) / ((1 + dr) ** period - 1)
 
 		# ============================================================
 		# STEP ACCESSORS / ORGANIZERS / REPORTING
@@ -159,6 +151,14 @@ class Facility:
 				'''
 				first_step = self.fwd[0]
 				return first_step.step_pv
+
+		def get_initial_input_amount(self):
+				'''Get the amount of primary input as calculated by conversion factors. Assumes only one primary input.'''
+				first_step = self.fwd[0]
+				return next(
+						(items.get("input_needed", 0.0) for items in first_step.primary_inputs.values()),
+						0.0
+				)
 
 		# ============================================================
 		# INPUTS & OUTPUTS
@@ -250,7 +250,7 @@ class Facility:
 										for category,val in cat_val.items():
 												self.material_data[material][category] = val
 						else:
-								print(f"Attribute {key} in the location data is not defined as a facility attributes.")
+								print(f"Attribute {key} in the location data is not defined as a facility attribute.")
  
 				# --- Recalculate dependent values ---
 				self.crf = self.calc_crf(self.dr, self.crp)   # Capital recovery factor

@@ -53,12 +53,14 @@ class Transportation:
 		self.trip_number = math.ceil(self.input_volume / self.ref_volume)
 
 		dist_trips = self.distance * self.trip_number
+		if self.mode not in ["dry_bulk_barges", "ocean_transport"]:
+			dist_trips = dist_trips * 2 # Need to account for round trip
 
 		self.emissions_totals = {
-			"ghg": self.ghg_emissions_pkm[rank] * dist_trips,
-			"so2": self.so2_emissions_pkm[rank] * dist_trips,
-			"nox": self.nox_emissions_pkm[rank] * dist_trips,
-			"pm":  self.pm_emissions_pkm[rank]  * dist_trips,
+			"co2": self.ghg_emissions_pkm[rank] * dist_trips * self.ref_volume,
+			"so2": self.so2_emissions_pkm[rank] * dist_trips * self.ref_volume,
+			"nox": self.nox_emissions_pkm[rank] * dist_trips * self.ref_volume,
+			"pm":  self.pm_emissions_pkm[rank]  * dist_trips * self.ref_volume,
 		}
 
 		return {
