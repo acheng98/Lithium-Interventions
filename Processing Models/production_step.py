@@ -33,6 +33,7 @@ class ProductionStep:
 
 				self.step_pv = None # Amount of production volume of step basis 
 				self.constituents = None # Chemical constituents of the step basis, aggregated from inputs
+				self.step_ccf = step_params.get("step_ccf")
 				
 				# ERROR CHECKING
 				missing = [name for name, value in {"step_id": self.step_id,
@@ -40,6 +41,7 @@ class ProductionStep:
 																						"step_basis": self.step_basis,
 																						"volume_defining_basis": self.volume_defining_basis,
 																						"volume_defining_output": self.volume_defining_output,
+																						"step_ccf": self.step_ccf
 																						}.items()
 									if value is None]
 
@@ -319,21 +321,60 @@ class ProductionStep:
 				else:
 						raise KeyError(f"Target {target_name} not found in step {self.step_id}.")
 
-		def set_conversion_factor(self,target_name,factor,change_yield=False):
+		def set_conversion_factor(self,target_name,factor,field="conversion_factor"):
 				"""
-				Set the conversion factor (or yield) of an input, output, or coproduct.
+				Set the conversion factor or yield of an input, output, coproduct, or input/basis/output constituent
+				target_name : str
+						Name of the flow to update, or "step_basis" to update the step-level CCF.
+				factor : float
+						The new value to assign.
+				field : str
+						The property to update. One of:
+						"conversion_factor"	— unit bridge between flow and step basis (default)
+						"yield_rate"				— fractional yield on a primary output
+						"ccf"								— kg constituent-bearing material per basis/output unit
+
+				CCF on the step basis is stored as self.step_ccf and is updated directly.
+				CCF on inputs and outputs is stored as flow_props["ccf"] and is used in
+						compute_step_pv() and propagate_chemistry().
 				"""
-				if target_name in self.primary_inputs:
-						self.primary_inputs[target_name]["conversion_factor"] = factor
+				valid_fields = {"conversion_factor", "yield_rate", "ccf"}
+						if field not in valid_fields:
+								raise ValueError(
+										f"Invalid field '{field}' for step {self.step_id}. "
+										f"Must be one of: {', '.join(sorted(valid_fields))}."
+								)
+				if target_name == "step_basis":
+						if field != "ccf":
+								raise ValueError(
+										f"'step_basis' only supports field='ccf', got '{field}' in step {self.step_id}."
+								)
+						self.step_ccf = factor
+
+				elif target_name in self.primary_inputs:
+						if field == "yield_rate":
+								raise ValueError(
+										f"'yield_rate' is only valid for primary outputs, not primary inputs "
+										f"(step {self.step_id}, target '{target_name}')."
+								)
+						self.primary_inputs[target_name][field] = factor
+
 				elif target_name in self.primary_outputs:
-						if change_yield:
-								self.primary_outputs[target_name]["yield_rate"] = factor
-						else:
-								self.primary_outputs[target_name]["conversion_factor"] = factor
+						self.primary_outputs[target_name][field] = factor
+
 				elif target_name in self.secondary_outputs:
-						self.secondary_outputs[target_name]["conversion_factor"] = factor
+						if field == "yield_rate":
+								raise ValueError(
+										f"'yield_rate' is only valid for primary outputs, not secondary outputs "
+										f"(step {self.step_id}, target '{target_name}')."
+								)
+						self.secondary_outputs[target_name][field] = factor
+
 				else:
-						raise KeyError(f"Target {target_name} not found in step {self.step_id}.")
+						raise KeyError(
+								f"Target '{target_name}' not found in step {self.step_id}. "
+								f"Use 'step_basis' to update the step-level CCF."
+						)
 
 		def aggregate_inputs(self):
 				# Gather initial amounts of constituents across all primary inputs
@@ -360,6 +401,9 @@ class ProductionStep:
 				"""
 				Apply reagent effects to the current step.
 				Updates constituent removal and records per-unit reagent usage.
+
+				Reagent dosing uses step_ccf to conver constituents (in PPM) to an absolute mass (per basis unit)
+				before multiplying by the reagent ratio (which should thus always be in kg reagent / kg constituent).
 				"""
 				total_consts = self.aggregate_inputs()
 
@@ -372,15 +416,17 @@ class ProductionStep:
 								elim  = tprops["elim"]
 
 								if target in total_consts:
-										base_amount = total_consts[target] # the base amount of the constituent targeted. Will be mutated later with removal.
+										# Convert constituent amounts (always in PPM, kg constituent per constituent basis) 
+										# to kg constituent per basis unit, via step_ccf, giving a dimensionally consistent base
+										base_amount = (total_consts[target] / 10**6) * self.step_ccf
 										remove_amount = elim * total_consts[target]
 
 										# Apply the removal to the running state (for downstream mass balance)
 										total_consts[target] = max(0.0, total_consts[target] - remove_amount)
-								elif target in self.step_basis:
+								elif target == self.step_basis:
 										# Effectively reverse yield; more step production volume is needed to balance this elimination
 										# This is still a ratio though, so effectively we are just multiplying by 1 (removing from the whole step production volume)
-										base_amount = 1 # CHECK IF WE WANT TO MAKE THIS SORT OF REVERSE YIELD ASSUMPTION
+										base_amount = 1 
 										remove_amount = elim
 										for const in total_consts:
 												total_consts[const] = max(0.0, total_consts[const] * (1-elim))
@@ -403,7 +449,7 @@ class ProductionStep:
 
 		def propagate_chemistry(self, propagate: bool = True):
 				"""
-				Push updated constituent compositions into next steps' inputs.
+				Push updated constituent compositions (and accompanying CCF) into next steps' inputs.
 				Only applies if next step has chemistry_dependence = True.
 				"""
 				if not self.primary_outputs:
@@ -413,10 +459,14 @@ class ProductionStep:
 				for output_name, output_data in self.primary_outputs.items():
 						if output_data["chemistry_dependence"]: # Only continue if output explicitly depends on input chemistry.
 								total_consts = output_data.get("constituents", {})
+								output_ccf = output_data.get("ccf")
 
 								for next_step in self.next_steps.values():
 										if output_name in next_step.primary_inputs:
 												next_step.primary_inputs[output_name]["constituents"] = copy.deepcopy(total_consts)
+
+												if output_ccf is not None:
+														next_step.primary_inputs[output_name]["ccf"] = output_ccf
 
 												if next_step.primary_inputs[output_name].get("chemistry_dependence") and propagate:
 														next_step.apply_reagents()
@@ -438,8 +488,8 @@ class ProductionStep:
 						if self.volume_defining_output in next_step.primary_inputs:
 								# Get the amount from next step's input needed
 								target_volume = next_step.primary_inputs[self.volume_defining_output]["input_needed"] 
-						else: # not a primary output, check the constituents of the primary outputs to get the primary output
-								volume_def_output = None # Needs a better name, probably 
+						else: # Volume defining output not a primary output, check the constituents of the primary outputs to get the actual primary output
+								volume_def_output = None 
 								for output,props in self.primary_outputs.items():
 										if self.volume_defining_output in props["constituents"]:
 												volume_def_output = output
@@ -459,24 +509,33 @@ class ProductionStep:
 				output_props = next(iter(self.primary_outputs.values()))  # Assuming only one primary output for now
 				yield_rate = output_props["yield_rate"]
 
+				vdb = self.volume_defining_basis
+				vdo = self.volume_defining_output
 
-				if self.volume_defining_output in self.primary_outputs:
-						output_ratio = output_props["conversion_factor"]
-				else: # not a primary output, check the constituents
-						output_consts = output_props.get("constituents", {})
-						if self.volume_defining_output in output_consts:
-								output_ratio = output_props["conversion_factor"] / output_consts[self.volume_defining_output]
-						else:
-								raise KeyError(f"Volume-defining output '{self.volume_defining_output}' not found in step {self.step_id}.")
+				output_ratio = output_props["conversion_factor"]
+				output_consts = output_props.get("constituents", {})
 
-				if self.volume_defining_basis == self.step_basis:
+				if vdb == self.step_basis and vdo in self.primary_outputs:
+						# Case 1: step basis --> primary output; no constituents involved. 
 						conversion_ratio = 1
-				else: # not a primary input, check the constituents
-						if self.volume_defining_basis in self.constituents:
-								conversion_ratio = self.constituents[self.volume_defining_basis] 
-						else:
-								raise KeyError(f"Volume-defining input {self.volume_defining_basis} not found in step {self.step_id}.")
-
+				elif: vdb in self.constituents and vdo in output_consts:
+						# Case 2: input constituent → output constituent. Constituent bearing material changes identity (e.g. brine to strong brine, 
+						# strong brine to carbonate). Constituent units possibly reference different materials, so convert to absolute amounts with CCFs;
+						# if they are the same, the CCFs should be the same and thus cancel. 
+						# 
+						# conc_in / 1e6 × basis_ccf → kg constituent / basis unit (input)
+						# conc_out / 1e6 × output_ccf → kg constituent / basis unit (output)
+						
+						basis_constituent_conc = (self.constituents[self.volume_defining_basis] / 1e6) * self.step_ccf	# kg constituent / basis unit
+						output_constituent_conc = (output_consts[vdo] / 1e6) * output_props["ccf"]											# kg constituent / output unit
+						constituent_ratio = basis_constituent_conc / output_constituent_conc
+				else:
+						raise KeyError(
+								f"Invalid combination of volume_defining_basis '{vdb}' and volume_defining_output '{vdo}' in step {self.step_id}. "
+								f"Both must either be flows (step basis / primary output) or constituents — not mixed."
+						)
+						
+				# Calculate production volume at step
 				self.step_pv = (target_volume / yield_rate) / output_ratio / conversion_ratio 
 
 				# CALCULATE USAGE / DEMAND FOR ALL INPUTS
