@@ -1,0 +1,71 @@
+variable_name,Description,Soda Ash Precipitation,Thickening + Dewatering,Washing & purification,Drying & Packaging
+step_id,Step ID (unique),precipitation_step,thicken_dewater,wash_purif_step,drying_packaging
+step_name,Human-readable process step,Soda ash precipitation (Li₂CO₃),Thickening and dewatering,Washing & purification,Drying & packaging
+key_equation,"Key equation, chemical or physical, evaluated in this step.",Li+ + (CO3)2- --> Li2CO3 via addition of Na2CO3. Assume output is 20% Li2CO3. Conversion factor of L_pls to L_slurry: calculated via determined by density_slurry mg/L * (mg Li2CO3 / mg slurry) * (mg Li / mg Li2CO3) where density_slurry = wt slurry/ L_slurry = 1.118 g/cm^3 = 1.118 mg/L (see step 5 notes). wt Li2CO3 / wt slurry = 20% from assumption. wt Li / wt Li2CO3 = 2*6.94/73.89 = 0.188 --> 1.118*0.20*0.188 mg Li / L slurry. Multiply by 10^3 to get mg Li / m3 slurry. This would be multiplied by the L_slurry and divided by Li concentration from input PLS concentration (* 1 / (mg Li / L PLS))) to get the L of PLS. ,"Thickening & dewatering for higher density. 20% Li2CO3 --> 70% Li2CO3, using equation defined in washing and purifying step (also at end of this note), takes 1.118 g/cm^3 slurry to 1.58 g/cm^3 cake. We go from ~223.6 kg Li2CO3 and 894.4 kg water in the slurry per m^3 to 223.6 kg Li2CO3 and 95.8 kg water in the 70/30 cake. 319.4 kg / 1.58 kg/m^3 ≈ 0.202 m^3 cake per 1 m^3 slurry. equation: density = 1 / (r_Li2CO3 / rho_Li2CO3 + (1 - r_Li2CO3) / (rho_water))",Removal of any remaining soluble Na/K/Mg from cake via water washing,"Based on density (function of constituent fractions); mass_Li2CO3 (V_cake) = V_cake / (r_Li2CO3 / rho_Li2CO3 + (1 - r_Li2CO3) / (rho_water)) * yield, where r_Li2CO3 is the ratio of Li2CO3 to total cake mass, in this case assumed to be 70%. With rho_Li2CO3 = 2.11 g/cm3 and assuming relatively pure water (rho_water ≈ 1 g/cm3), we need roughly 0.903 L of cake per kg Li2CO3. Since the conversion is from m3 of cake to tonnes Li2CO3, divide 1 (m3-->L but kg-->tonnes) by 0.903"
+notes,"Key information, notes",Li precipitation as carbonate at pH ~10.5; 5% Na2CO3 excess. ,Prepare filter cake via pressing,"Wash to remove residual Na, K, Mg","Drying to ~99% Li₂CO₃, bagging for sale"
+machine_options,,precipitator.conservative; precipitator.midpoint; precipitator.optimistic,presser,wash_purify_combo,drying_packaging_generic; drying_packaging_propane
+machine_default,,precipitator.midpoint,presser,wash_purify_combo,drying_packaging_generic
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from; also the unit that machine is sized to,polish_pls_throughput,slurry_press_throughput,cake_wash_throughput,cake_dry_throughput
+step_basis_unit,,L polished PLS,m3 lithium slurry (20% carbonate) being pressed,m3 Li2CO3 cake being washed (70% solids),tonnes Li2CO3 cake being dried & packed
+step_ccf,Constituent conversion factor from constituent units to step_basis units,2.288E-07,2.235E-04,1.108E-03,0.0007
+step_ccf_units,Units to convert constituents into step_basis units,kg ore / m3 20% slurry,kg Li2CO3 / m3,kg Li2CO3/t 70 wt% Li2CO3 cake• 1/PPM constituent,kg Li2CO3/t 70 wt% Li2CO3 cake• 1/PPM constituent
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",Li,slurry_press_throughput,cake_wash_throughput,cake_dry_throughput
+volume_defining_basis_unit,What unit is the process volume or constituent in?,mg Li,m3 lithium slurry (20% carbonate) being pressed,m3 Li2CO3 cake being washed (70% solids),tonnes lithium cake
+volume_defining_output,What is the output or output constituent that needs to be converted to,Li,unwashed_lithium_cake,lithium_cake,carbonate
+volume_defining_output_unit,What unit is that output in?,mg Li,m3 unwashed lithium cake (70% carbonate),m3 washed lithium cake (70% carbonate),tonnes Li2CO3
+primary_input_1_name,,pls_post_polishing,lithium_slurry,unwashed_lithium_cake,lithium_cake
+primary_input_1_units,Primary input units,L polished PLS,m3 lithium slurry (20% Li2CO3),m3 unwashed lithium cake (70% carbonate),m3 washed lithium cake (70% carbonate)
+primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,1,1,1,1.583
+primary_input_1_constituents,Names of input constituents,Li; Na; CO3,Li,Li,Li
+primary_input_1_constituent_fractions,Values of input constituents,,187871,187871,187871
+primary_input_1_constituent_units,Units for each input constituent,ppm (mg/kg PLS),ppm (mg/kg Li2CO3),ppm (mg/kg Li2CO3),ppm (mg/kg Li2CO3)
+primary_input_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,2.288E-07,2.235E-04,1.108E-03,1.108E-03
+primary_input_1_ccf_units,Units for constituent conversion factor,kg ore / m3 20% slurry,kg Li2CO3 / m3,kg Li2CO3/t 70 wt% Li2CO3 cake• 1/PPM constituent,kg Li2CO3/t 70 wt% Li2CO3 cake• 1/PPM constituent
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE,TRUE,TRUE
+reagent_1_name,Reagent name,soda_ash,flocculant,wash_water,
+reagent_1_name_long,Long/descriptive reagent name,Soda ash (Na2CO3),High-molecular-weight flocculant for CCD overflow/underflow separation,Wash water,
+reagent_1_target_constituents,,Li,slurry_press_throughput,cake_wash_throughput,
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),13.5,0.005,0.1,
+reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,0,0,0,
+reagent_1_units,,kg Soda ash / kg Li,kg/m^3 slurry,m3 water/m3 feed,
+reagent_2_name,Reagent name,,,,
+reagent_2_name_long,Long/descriptive reagent name,,,,
+reagent_2_target_constituents,,,,,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,,,
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,,,
+reagent_2_units,,,,,
+reagent_3_name,Reagent name,,,,
+reagent_3_name_long,Long/descriptive reagent name,,,,
+reagent_3_target_constituents,,,,,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,,,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,,,
+reagent_3_units,,,,,
+primary_output_1_name,Output stream/material,lithium_slurry,unwashed_lithium_cake,lithium_cake,carbonate
+primary_output_1_step,The step or waste material tracker that this output goes to,thicken_dewater,wash_purif_step,drying_packaging,Final
+primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",0.76,1,0.98,0.995
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),0.001,0.2017,1,0.7
+primary_output_1_units,Units after conversion is applied,m3 lithium slurry (20% Li2CO3),m3 unwashed lithium cake (70% carbonate),m3 washed lithium cake (70% carbonate),tonnes Li2CO3
+primary_output_1_constituents,,Li,Li,Li,Li
+primary_output_1_constituent_fractions,,187871,187871,187871,187871
+primary_output_1_constituent_units,,ppm (mg/kg Li2CO3),ppm (mg/kg Li2CO3),ppm (mg/kg Li2CO3),ppm (mg/kg Li2CO3)
+primary_output_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,2.235E-04,1.108E-03,1.108E-03,0.001
+primary_output_1_ccf_units,Units for constituent conversion factor,kg Li2CO3 / m3,kg Li2CO3 / m3,kg Li2CO3 / m3,kg Li2CO3 / tonne
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,FALSE,TRUE,TRUE,FALSE
+coproduct_1_name,,,pressed_water,wash_water,evaporated_water
+coproduct_1_sink,,,wastewater_treatment,wastewater_treatment,atmosphere
+coproduct_1_conversion_factor,,,0.8,0.1,0.4286
+coproduct_1_units,,,,,
+coproduct_1_constituents,,,Various ions but mostly water,Na; K; Mg,H2O
+coproduct_1_constituent_fractions,,,1,1,1
+coproduct_2_name,,,,,
+coproduct_2_sink,,,,,
+coproduct_2_conversion_factor,,,,,
+coproduct_2_units,,,,,
+coproduct_2_constituents,,,,,
+coproduct_2_constituent_fractions,,,,,
+coproduct_3_name,,,,,
+coproduct_3_sink,,,,,
+coproduct_3_conversion_factor,,,,,
+coproduct_3_units,,,,,
+coproduct_3_constituents,,,,,
+coproduct_3_constituent_fractions,,,,,

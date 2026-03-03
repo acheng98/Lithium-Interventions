@@ -1,31 +1,32 @@
-variable_name,Description,Unit,Chile_Atacama,Chile_Plant,Argentina,United States,China,Australia,Canada,Brazil
-dpy,Working days/year,Days per year,365,365,333,355,,,,
-upd,Facility-wide average Unplanned Downtime,% of total possible uptime,0,0,,0,,,,
-scm,Scheduled maintenance,% of total possible uptime,0,0,,0,,,,
-spd,Number of shifts/day,Number,3,3,2,3,,,,
-hps,Hours per shift,Hours,8,8,12,8,,,,
-ub,Hours of unpaid breaks/shift,Hours,0.5,0.5,,0.5,,,,
-pb,Hours of paid breaks/shift,Hours,0.5,0.5,,0.5,,,,
-dr,Discount Rate,%,10,10,10,10,10,10,10,10
-wage,Direct Wage (w/benefits),2025USD per hour,$7.00,$7.00,,$25.00,,,,
-elec_price,Electricity cost,$/KWh,$0.17,$0.17,,$0.09,,,,
-gas_price,Gas cost,$/MMBTU,$12.40,$12.40,,$5.04,,,,
-diesel_price,Diesel cost,$/L,$1.02,$1.02,,$4.20,,,,
-proc_water_price,Cost of water used for processing,$/m^3,$1.00,$1.00,,$1.00,,,,
-cool_water_price,Cost of cooled water. Assume for now an increase over the process water cost.,$/m^3,$1.20,$1.20,,$1.20,,,,
-steam_price,Cost of steam. ,$/kg,$0.03,$0.03,,$0.03,,,,
-comp_air_price,Cost of compressed air. ,$/Nm^3 (normal m^3),$0.04,$0.04,,$0.04,,,,
-build_price,Building space cost,$/m^2,$600.00,$600.00,,$600.00,,,,
-crp,Capital Recovery Period - may be site-specific,years,20,20,20,20,,,,
-brp,Building Recovery Period - may be site-specific,years,20,20,20,20,,,,
-aux_equip,Annualized auxiliary Equipment cost,% of main machine cost,10%,10%,10%,10%,,,,
-maint,Annualized maintenance costs,% of main machine cost,5%,5%,5%,5%,,,,
-fixed_over,Annualized fixed overhead costs,"% of the total of {main machine, building, auxiliary equipment, and maintenance} costs",10%,10%,10%,10%,,,,
+variable_name,Description,Unit,Chile_Atacama,Chile_Plant,Argentina,United States_Nevada,China_Jiangxi,Australia,Canada,Brazil
+dpy,Working days/year,Days per year,365,365,333,350,350,,,
+upd,Facility-wide average Unplanned Downtime,"% of total possible uptime, as a number",0%,0%,,5%,5%,,,
+scm,Scheduled maintenance,"% of total possible uptime, as a number",0%,0%,,8%,8%,,,
+spd,Number of shifts/day,Number,3,3,2,3,3,,,
+hps,Hours per shift,Hours,8,8,12,8,8,,,
+ub,Hours of unpaid breaks/shift,Hours,0.5,0.5,,0.5,0.5,,,
+pb,Hours of paid breaks/shift,Hours,0.5,0.5,,0.5,0.5,,,
+dr,Discount Rate,"%, as a number",10%,10%,10%,10%,10%,10%,10%,10%
+wage,Direct Wage (w/benefits),2025USD per hour,$7.00,$7.00,,$25.00,$12.00,,,
+elec_price,Electricity cost,$/KWh,$0.17,$0.17,,$0.09,$0.075,,,
+gas_price,Gas cost,$/MMBTU,$12.40,$12.40,,$5.04,$8.50,,,
+diesel_price,Diesel cost,$/L,$1.02,$1.02,,$4.20,$1.05,,,
+propane_price,Propane cost,$/L,,,,$0.26,$0.26,,,
+cool_water_price,Cost of cooled water. Assume for now an increase over the process water cost.,$/m^3,$1.20,$1.20,,$1.20,$0.80,,,
+steam_price,Cost of steam. ,$/kg,$0.03,$0.03,,$0.03,$0.03,,,
+comp_air_price,Cost of compressed air. ,$/Nm^3 (normal m^3),$0.04,$0.04,,$0.040,$0.025,,,
+build_price,Building space cost,$/m^2,$20.00,$20.00,$60.00,$60.00,$60.00,$60.00,,
+crp,Capital Recovery Period - may be site-specific,years,20,20,20,20,20,,,
+brp,Building Recovery Period - may be site-specific,years,25,25,25,25,25,,,
+machine_cost_factor,"Machine costs factor, relative to baseline reported costs",% of main machine cost,90%,90%,90%,100%,75%,,,
+aux_equip,Annualized auxiliary Equipment cost,% of main machine cost,0%,0%,0%,0%,0%,,,
+maint,Annualized maintenance costs,% of main machine cost,5%,5%,5%,5%,5%,,,
+fixed_over,Annualized fixed overhead costs,"% of the total of {main machine, building, auxiliary equipment, and maintenance} costs",10%,10%,10%,10%,3%,,,
 impact_factor.electricity.co2,Grid emissions intensity ,kgCO2e/kWh,0.27343,0.27343,0.32716,0.35507,0.66307,0.58023,0.11541,0.06398
 impact_factor.electricity.water,Water usage intensity of grid electricity,L/kWh,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 impact_factor.natural_gas.co2,Combustion emissions intensity of natural gas,kgCO2e/MMBTU,53.06,53.06,53.06,53.06,53.06,53.06,53.06,53.06
 impact_factor.cool_water.co2,Emissions intensity of chilled water,kgCO2e/m3,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08
-impact_factor.steam.co2,Emissions intensity of steam,kgCO2e/m3,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08
+impact_factor.steam.co2,Emissions intensity of steam,kgCO2e/kg steam,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15
 impact_factor.steam.water,Water usage of steam (pressure dependent),# Don't use for now,,,,,,,,
 impact_factor.compressed_air.co2,Emissions intensity of compressed air (pressure dependent),# Don't use for now,,,,,,,,
 impact_factor.landfill.co2,Emissions intensity of landfill,# Don't use for now,,,,,,,,

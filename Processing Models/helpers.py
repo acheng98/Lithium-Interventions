@@ -22,9 +22,9 @@ def safe_bool(x, default=False):
 	if isinstance(x, bool):
 		return x
 	s = str(x).strip().lower()
-	if s in {"true", "t", "yes", "y"}:
+	if s in {"true", "yes", "y"}:
 		return True
-	if s in {"false", "f", "no", "n"}:
+	if s in {"false", "no", "n"}:
 		return False
 	return default
 
@@ -156,7 +156,7 @@ def clean_input_str(cell_str, list_delim=";", key_delim=":"):
 		return num_val
 
 	# 2) Try boolean
-	if cell_str.lower() in {"true", "t", "yes", "y", "false", "f", "no", "n"}:
+	if cell_str.lower() in {"true", "yes", "y", "false", "no", "n"}:
 		return safe_bool(cell_str)
 
 	# 3) Try parsing as a list
@@ -412,6 +412,7 @@ def build_facility_dict(data_folder,file,skip_rows=["notes", "sources", "key_equ
 					"constituents": build_constituent_dict(block.get("constituents"), block.get("constituent_fractions")),
 					"units": block.get("constituent_units"),
 					"conversion_factor": safe_float(block.get("conversion_factor"), default=1.0),
+					"ccf": safe_float(block.get("ccf"), default=1.0),
 					"chemistry_dependence": safe_bool(block.get("chemistry_dependence", False)),
 					"input_needed": 0,
 				}
@@ -451,6 +452,7 @@ def build_facility_dict(data_folder,file,skip_rows=["notes", "sources", "key_equ
 					"next_step": block.get("step"),
 					"yield_rate": safe_float(block.get("yield_rate"), default=1.0),
 					"conversion_factor": safe_float(block.get("conversion_factor"), default=1.0),
+					"ccf": safe_float(block.get("ccf"), default=1.0),
 					"units": block.get("units"),
 					"constituents": build_constituent_dict(block.get("constituents"), block.get("constituent_fractions")),
 					"chemistry_dependence": safe_bool(block.get("chemistry_dependence", False)),

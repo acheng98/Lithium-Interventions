@@ -339,11 +339,12 @@ class ProductionStep:
 						compute_step_pv() and propagate_chemistry().
 				"""
 				valid_fields = {"conversion_factor", "yield_rate", "ccf"}
-						if field not in valid_fields:
-								raise ValueError(
-										f"Invalid field '{field}' for step {self.step_id}. "
-										f"Must be one of: {', '.join(sorted(valid_fields))}."
-								)
+				if field not in valid_fields:
+						raise ValueError(
+								f"Invalid field '{field}' for step {self.step_id}. "
+								f"Must be one of: {', '.join(sorted(valid_fields))}."
+						)
+
 				if target_name == "step_basis":
 						if field != "ccf":
 								raise ValueError(
@@ -416,9 +417,9 @@ class ProductionStep:
 								elim  = tprops["elim"]
 
 								if target in total_consts:
-										# Convert constituent amounts (always in PPM, kg constituent per constituent basis) 
+										# Convert constituent amounts (always in PPM) to kg constituent per step basis unit (always kg)
 										# to kg constituent per basis unit, via step_ccf, giving a dimensionally consistent base
-										base_amount = (total_consts[target] / 10**6) * self.step_ccf
+										base_amount = (total_consts[target]) * self.step_ccf
 										remove_amount = elim * total_consts[target]
 
 										# Apply the removal to the running state (for downstream mass balance)
@@ -518,17 +519,18 @@ class ProductionStep:
 				if vdb == self.step_basis and vdo in self.primary_outputs:
 						# Case 1: step basis --> primary output; no constituents involved. 
 						conversion_ratio = 1
-				elif: vdb in self.constituents and vdo in output_consts:
+				elif vdb in self.constituents and vdo in output_consts:
 						# Case 2: input constituent → output constituent. Constituent bearing material changes identity (e.g. brine to strong brine, 
 						# strong brine to carbonate). Constituent units possibly reference different materials, so convert to absolute amounts with CCFs;
 						# if they are the same, the CCFs should be the same and thus cancel. 
 						# 
-						# conc_in / 1e6 × basis_ccf → kg constituent / basis unit (input)
-						# conc_out / 1e6 × output_ccf → kg constituent / basis unit (output)
+						# conc_in × basis_ccf → constituent / basis unit (input) (e.g. kg/L)
+						# conc_out × output_ccf → constituent / basis unit (output) (should also equal kg/L)
 						
-						basis_constituent_conc = (self.constituents[self.volume_defining_basis] / 1e6) * self.step_ccf	# kg constituent / basis unit
-						output_constituent_conc = (output_consts[vdo] / 1e6) * output_props["ccf"]											# kg constituent / output unit
-						constituent_ratio = basis_constituent_conc / output_constituent_conc
+						basis_constituent_amt = (self.constituents[self.volume_defining_basis] ) * self.step_ccf	# kg constituent / basis unit
+						output_constituent_amt = (output_consts[vdo] ) * output_props["ccf"] 										# kg constituent / basis unit
+						conversion_ratio = basis_constituent_amt / output_constituent_amt / output_ratio
+						# print(basis_constituent_amt,output_constituent_amt,conversion_ratio)
 				else:
 						raise KeyError(
 								f"Invalid combination of volume_defining_basis '{vdb}' and volume_defining_output '{vdo}' in step {self.step_id}. "
