@@ -1,4 +1,4 @@
-variable_name,Description,Crushing,Classification,Grinding,Dewatering,Sulfate Roasting,Water Leaching,Impurity Removal and Neutralization,Clarification
+variable_name,Description,Crushing,Classification & Flotation,Grinding,Dewatering,Sulfate Roasting,Water Leaching,Impurity Removal and Neutralization,Clarification
 step_id,Step ID (unique),crushing,classifying,grinding,dewatering,sulfate_roasting,water_leach,impurity_removal,stream_clarification
 step_name,Human-readable process step,Crushing,Classification,Grinding via mill,Dewatering to allow for high-temp roasting,Roasting of lepidolate with sulfate salts,Water leaching,Impurity Removal,Lithium Stream Clarification
 key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A (mechanical),N/A (size separation),N/A (mechanical).,Mechanical dewatering from 60% to 80% slurry.,,,"Impurity precipitation / neutralization, e.g. Fe³⁺ + 3OH⁻ → Fe(OH)₃(s); Mg²⁺ + CO₃²⁻ → MgCO₃(s); Ca²⁺ + CO₃²⁻ → CaCO₃(s); Al³⁺ + 3OH⁻ → Al(OH)₃(s). Lithium remains mostly in solution.",
@@ -7,21 +7,21 @@ machine_options,,crushing_cycle.conservative; crushing_cycle.midpoint; crushing_
 machine_default,,crushing_cycle.midpoint,classifier_generic.midpoint,high_energy_grinding_mill,presser,sulfate_roasting_train_lepidolite,water_leach,staged_neutralization,solid_liquid_separation
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,crushed_ore_throughput,classified_slurry_throughput,slurry_being_ground,slurry_press_throughput,roasting_mix,leaching_slurry,pregnant_solution_throughput,mixture_being_separated
 step_basis_unit,,tonnes crushed ore,m^3 slurry (30wt%),m^3 slurry (60wt%),m^3 slurry being pressed into cake,"tonnes (80% solids cake being dried, roasted, and cooled)",m^3 20wt% solid slurry,m^3 raw pregnant leach solution,m^3 pregant leach solution being clarified
-step_ccf,Constituent conversion factor from constituent units to step_basis units,0.001,0.0003699,0.0009643,0.0009643,0.0005654,0.0002288,0.0002288,0.0002288
+step_ccf,Constituent conversion factor from constituent units to step_basis units,0.001,0.0003699,0.0009643,0.0009643,0.0005654,0.0001507,0.0002288,0.0002288
 step_ccf_units,Units to convert constituents into step_basis units,kg ore / tonne ore • 1/PPM ,kg ore / tonne ore • 1/PPM ,kg ore / m3 60% slurry,kg ore / m3 60% slurry,kg ore / tonne roasting mix,kg ore / m3 20% slurry,kg ore / m3 20% slurry,kg ore / m3 20% slurry
-volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",crushed_ore_throughput,Li,slurry_being_ground,slurry_press_throughput,roasting_mix,leaching_slurry,pregnant_solution_throughput,mixture_being_separated
-volume_defining_basis_unit,What unit is the process volume or constituent in?,tonnes,ppm Li / kg slurry (30wt%),m^3 slurry (60wt%),m^3 slurry being pressed into cake,"tonnes (80% solids cake being dried, roasted, and cooled)",m^3 20wt% solid slurry,m^3 raw pregnant leach solution,m^3 pregant leach solution being clarified
-volume_defining_output,What is the output or output constituent that needs to be converted to,crushed_ore,Li,ground_slurry,roaster_feed,roasted_mix,pregnant_leach_solution,neutralized_pls,pls_post_polishing
-volume_defining_output_unit,What unit is that output in?,tonnes crushed ore,ppm Li / kg slurry (60wt%),m^3 ground slurry (60wt%),"tonnes (80wt% solids cake to be dried, roasted, and cooled)",tonnes roasted sulfated ore mix,m^3 PLS to be neutralized,m^3 pregant leach solution to be clarified,L clarified PLS
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",crushed_ore_throughput,Li,slurry_being_ground,slurry_press_throughput,roasting_mix,Li,pregnant_solution_throughput,mixture_being_separated
+volume_defining_basis_unit,What unit is the process volume or constituent in?,tonnes,ppm Li / kg slurry (30wt%),m^3 slurry (60wt%),m^3 slurry being pressed into cake,"tonnes (80% solids cake being dried, roasted, and cooled)",ppm Li / kg slurry (30wt%),m^3 raw pregnant leach solution,m^3 pregant leach solution being clarified
+volume_defining_output,What is the output or output constituent that needs to be converted to,crushed_ore,Li,ground_slurry,roaster_feed,roasted_mix,Li,neutralized_pls,pls_post_polishing
+volume_defining_output_unit,What unit is that output in?,tonnes crushed ore,ppm Li / kg slurry (60wt%),m^3 ground slurry (60wt%),"tonnes (80wt% solids cake to be dried, roasted, and cooled)",tonnes roasted sulfated ore mix,ppm Li / kg slurry (60wt%),m^3 pregant leach solution to be clarified,L clarified PLS
 primary_input_1_name,,rom_ore_feed,crushed_ore,classified_slurry,ground_slurry,roaster_feed,roasted_mix,pregnant_leach_solution,neutralized_pls
 primary_input_1_units,Primary input units,m^3 ore,tonnes crushed ore,m^3 slurry (60wt%),m^3 ground slurry (60wt%),"tonnes (80wt% solids cake to be dried, roasted, and cooled)",tonnes roasted sulfated ore mix,m^3 PLS to be neutralized,m^3 pregant leach solution to be clarified
 primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,2.7,2.7037,1.000,1.000,1.415,4.37,1,1
 primary_input_1_constituents,Names of input constituents,Li,Li,Li,Li,Li,Li,Li,Li
 primary_input_1_constituent_fractions,Values of input constituents,,,,,,,,
 primary_input_1_constituent_units,Units for each input constituent,ppm (wt),ppm (mg Li / kg ore),ppm (wt),ppm (wt),ppm (wt),ppm (wt),ppm (wt),ppm (wt)
-primary_input_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,0.0027,0.001,0.0009643,0.0009643,0.0008,0.0005654,0.0002288,0.0002288
+primary_input_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,0.0027,0.001,0.0009643,0.0009643,0.0008,0.0006584,0.0002288,0.0002288
 primary_input_1_ccf_units,Units for constituent conversion factor,kg ore / tonne ore • 1/PPM ,kg ore / tonne ore • 1/PPM ,kg ore / m3 60% slurry,kg ore / m3 60% slurry,kg ore / tonne roaster feed,kg ore / tonne roasted mix,kg ore / m3 20% slurry,kg ore / m3 20% slurry
-primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE,TRUE,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE
+primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE
 reagent_1_name,Reagent name,,process_water,,,sodium_sulfate,process_water,neutralizing_agent,flocculant
 reagent_1_name_long,Long/descriptive reagent name,,Water to be added to allow for classification via hydrocyclone,,,Sodium sulfate (Na2SO4),Water to be for leaching,Lime / limestone / NaOH / similar reagents mix for impurity precipitation and pH control.,High-molecular-weight flocculant for CCD overflow/underflow separation
 reagent_1_target_constituents,,,classified_slurry_throughput,,,Li,leaching_slurry,pregnant_solution_throughput,mixture_being_separated
@@ -43,14 +43,14 @@ reagent_3_units,,,,,,,,kg/m^3 slurry,
 primary_output_1_name,Output stream/material,crushed_ore,classified_slurry,ground_slurry,roaster_feed,roasted_mix,pregnant_leach_solution,neutralized_pls,pls_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,classifying,grinding,dewatering,sulfate_roasting,water_leach,impurity_removal,stream_clarification,Final
 primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",0.99,0.92,0.995,1,0.95,0.95,0.95,0.995
-primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,0.3836,1,1.205,1,0.869,1,1000
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,0.3836,1,1.205,0.8587,0.869,1,1000
 primary_output_1_units,Units after conversion is applied,tonnes crushed ore,m^3 slurry (60wt%),m^3 ground slurry (60wt%),"tonnes (80wt% solids cake to be dried, roasted, and cooled)",tonnes roasted sulfated ore mix,m^3 PLS to be neutralized,m^3 pregant leach solution to be clarified,L clarified PLS
-primary_output_1_constituents,,,Li,,,,,,
-primary_output_1_constituent_units,,,,,,,,,
+primary_output_1_constituents,,,Li,,,,Li,,
 primary_output_1_constituent_fractions,,,,,,,,,
-primary_output_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,0.001,0.0009643,0.0009643,0.0008,0.0005654,0.0002632,0.0002288,2.288E-07
+primary_output_1_constituent_units,,,,,,,ppm (mg Li/kg PLS),,
+primary_output_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,0.001,0.0009643,0.0009643,0.0008,0.0006584,0.0002288,0.0002288,2.288E-07
 primary_output_1_ccf_units,Units for constituent conversion factor,kg ore / tonne ore • 1/PPM ,kg ore / m3 60% slurry,kg ore / m3 60% slurry,kg ore / tonne roaster feed,kg ore / tonne roasted mix,kg ore / m3 20% slurry,kg ore / m3 20% slurry,kg ore / m3 20% slurry
-primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE
+primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE,TRUE,TRUE,TRUE,FALSE,TRUE,TRUE
 coproduct_1_name,,,coarse_reject,,wash_liquor,fluorine_impurity,leach_residue,impurity_sludge,impurity_sludge
 coproduct_1_sink,,,tailings,,wastewater_treatment,tailings,tailings,tailings,tailings
 coproduct_1_conversion_factor,,,0.65,,0.4,,0.352,0.05,0.005

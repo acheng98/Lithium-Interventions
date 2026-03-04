@@ -530,7 +530,7 @@ class ProductionStep:
 						basis_constituent_amt = (self.constituents[self.volume_defining_basis] ) * self.step_ccf	# kg constituent / basis unit
 						output_constituent_amt = (output_consts[vdo] ) * output_props["ccf"] 										# kg constituent / basis unit
 						conversion_ratio = basis_constituent_amt / output_constituent_amt / output_ratio
-						# print(basis_constituent_amt,output_constituent_amt,conversion_ratio)
+						# print(self.step_id,basis_constituent_amt,output_constituent_amt,conversion_ratio)
 				else:
 						raise KeyError(
 								f"Invalid combination of volume_defining_basis '{vdb}' and volume_defining_output '{vdo}' in step {self.step_id}. "
@@ -538,6 +538,7 @@ class ProductionStep:
 						)
 						
 				# Calculate production volume at step
+				# print(self.step_id, target_volume, self.constituents)
 				self.step_pv = (target_volume / yield_rate) / output_ratio / conversion_ratio 
 
 				# CALCULATE USAGE / DEMAND FOR ALL INPUTS

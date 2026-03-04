@@ -133,22 +133,44 @@ def clay_lepidolite(sc,project_data,data_folder):
 	if project_data["Type"] == "Clays":
 		material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
 											target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
-		material_refining.add_target_comp(target = "pls_post_polishing", composition = project_data["Intermediate Concentration"], 
+		material_refining.add_target_comp(target = "thick_leach_feed", composition = project_data["Intermediate Concentration"], 
 											target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = False) 
-		lithium_extraction.add_target_comp(target = "pls_post_polishing", composition = project_data["Intermediate Concentration"],
+		material_refining.add_target_comp(target = "thick_leach_feed", composition = project_data["Intermediate Concentration"],
 											target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True)
+		# Set input lithium extraction constituents based on final constituents in material refining
+		pls_post_polishing = next(iter(material_refining.fwd[-1].primary_outputs.values()))
+		print(pls_post_polishing)
+		lithium_extraction.add_target_comp(target = "pls_post_polishing", composition = pls_post_polishing["constituents"],
+											target_step_id = "precipitation_step", propagate = True)
+
+		# Jank workaround to custom-set CCFs for solution processing because they are different between Clay & Lepidolite
+		precip_step = lithium_extraction.fwd[0]
+		ccf = 0.2/(0.2/2.7+0.8/1)/10**6 # Assume TDS is ~100 g/L
+		precip_step.set_conversion_factor("pls_post_polishing",ccf,field="ccf")
+		precip_step.set_conversion_factor("polish_pls_throughput",ccf,field="ccf")
+
 	elif project_data["Type"] == "Lepidolite":
 		material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
 											target_step_id = project_data["Initial Concentration Target Step"], propagate = True)
 		material_refining.add_target_comp(target = "classified_slurry", composition = project_data["Intermediate Concentration"], 
 											target_step_id = project_data["Intermediate Concentration Target Step-Before"], propagate = False) 
-		material_refining.add_target_comp(target = "classified_slurry", composition = project_data["Intermediate Concentration"],
-											target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True)
-		
-		# TEMPORARY HOLD 
-		lithium_extraction.add_target_comp(target = "pls_post_polishing", composition = project_data["Intermediate Concentration"],
+		material_refining.add_target_comp(target = "classified_slurry", composition = project_data["Intermediate Concentration"], 
+											target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True) 
+		# Some bug is causing the water leach step to not be working for some reason, so fixing it here
+		material_refining.add_target_comp(target = "roasted_mix", composition = project_data["Intermediate Concentration"], 
+											target_step_id = "water_leach", propagate = True) 
+		material_refining.add_target_comp(target = "pregnant_leach_solution", composition = project_data["Second Intermediate Concentration"],
+											target_step_id = "water_leach", propagate = True)
+		material_refining.add_target_comp(target = "pregnant_leach_solution", composition = project_data["Second Intermediate Concentration"],
+											target_step_id = project_data["Second Intermediate Concentration Target Step-After"], propagate = True)
+		# Temporary hold - need third constituent definition for some buggy reason
+		lithium_extraction.add_target_comp(target = "pls_post_polishing", composition = project_data["Second Intermediate Concentration"],
 											target_step_id = "precipitation_step", propagate = True)
-
+		# Jank workaround to custom-set CCFs for solution processing because they are different between Clay & Lepidolite
+		precip_step = lithium_extraction.fwd[0]
+		ccf = 0.2/(0.2/2.7+0.8/1)/10**6
+		precip_step.set_conversion_factor("pls_post_polishing",ccf,field="ccf")
+		precip_step.set_conversion_factor("polish_pls_throughput",ccf,field="ccf")
 	
 	products = {"rom_ore_feed": 1}
 	sc.add_facility(material_extraction, next_fac=material_refining, products=products, transport_route=ore_truck_route)	
@@ -177,25 +199,26 @@ def evaluate_project(sc,project_data,data_folder):
 	summary["midpoint"] = summary_midpoint
 	# pprint(summary_midpoint)
 	
+	print("\nProduction volume at each step:")
+	print("\nStep Production volumes:", sc.get_detailed_pvs())
+	print(sc.get_detailed_inputs())
+	pprint(sc.get_step_constituents())
+	# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
+	# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
+	
+	# print(sc.get_step_reagent_usage())
+	# pprint(sc.get_step_utilities_detailed())
+	print("\nNumber of Machines at each step:")
+	pprint(sc.get_step_machines())
 	print("\nReagents:")
 	pprint(sc.get_total_reagents())
 	print("\nUtilities:")
 	pprint(sc.get_total_utilities())
 	print("\nLabor:")
 	pprint(sc.get_step_labor())
-	# print("\nProduction volume at each step:")
-	# print("\nStep Production volumes:", sc.get_detailed_pvs())
-	# print("\nCosts at each step:")
+	print("\nCosts at each step:")
 	pprint(sc.get_step_costs(transp=True,detail=2))
-	# print(sc.get_detailed_inputs())
-
-	# pprint(sc.get_step_constituents())
-	# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
-	# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
-	# print(sc.get_step_reagent_usage())
-	# pprint(sc.get_step_utilities_detailed())
-	# pprint(sc.get_step_machines())
-
+	
 	wk_compare(sc,project_type)
 
 	# sc.plot_tot_steps_costs(view="opex",detail=3)
