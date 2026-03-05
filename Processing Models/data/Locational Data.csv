@@ -25,7 +25,7 @@ fixed_over,Annualized fixed overhead costs,"% of the total of {main machine, bui
 impact_factor.electricity.co2,Grid emissions intensity ,kgCO2e/kWh,0.27343,0.27343,0.32716,0.35507,0.66307,0.58023,0.11541,0.06398
 impact_factor.electricity.water,Water usage intensity of grid electricity,L/kWh,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 impact_factor.natural_gas.co2,Combustion emissions intensity of natural gas,kgCO2e/MMBTU,53.06,53.06,53.06,53.06,53.06,53.06,53.06,53.06
-impact_factor.cool_water.co2,Emissions intensity of chilled water,kgCO2e/m3,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08
+impact_factor.cooling_water.co2,Emissions intensity of chilled water,kgCO2e/m3,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08
 impact_factor.steam.co2,Emissions intensity of steam,kgCO2e/kg steam,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15
 impact_factor.steam.water,Water usage of steam (pressure dependent),# Don't use for now,,,,,,,,
 impact_factor.compressed_air.co2,Emissions intensity of compressed air (pressure dependent),# Don't use for now,,,,,,,,
@@ -33,3 +33,4 @@ impact_factor.landfill.co2,Emissions intensity of landfill,# Don't use for now,,
 impact_factor.landfill.landuse,Land use of landfilled items,m^2/m^3,,,,,,,,
 impact_factor.wastewater.water,,# Don't use for now,,,,,,,,
 impact_factor.wastewater.eutrophification,,# Don't use for now,,,,,,,,
+impact_factor.propane.co2,Emissions intensity of propane,kgCO2e/L,1.51,1.51,1.51,1.51,1.51,1.51,1.51,1.51

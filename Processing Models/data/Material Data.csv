@@ -1,10 +1,11 @@
 material,Description,lime,boron_package,regen,organic_package,strip_acid,scrub_makeup,soda_ash,wash_water,explosives,limestone,flocculant,sulfuric_acid,dispersant,neutralizing_agent,filter_aid,generic_reagent_delivery,sulfur,methanol,raw_water,sodium_sulfate,process_water
-notes / sources,,"From mg/L for brine concentration. Estimates from https://www.accio.com/plp/cost-of-bulk-hydrated-lime, https://www.made-in-china.com/products-search/hot-china-products/Lime_Chemical_Price.html",Rough guess,Rough guess,Rough guess,Rough guess,Dominated by price of weak salt (e.g. NaCl),"From mg/L for brine concentration. Prices have varied quite a bit, but estimate to be about ~$USD300/ton https://tradingeconomics.com/commodity/soda-ash",https://www.bluefieldresearch.com/ns/u-s-water-and-sewer-bill-has-increased-24-in-five-years-raising-affordability-concerns/,Rough guess,From TLC,From TLC,,"Heavily dependent on type of dispersant & specific formulation, run sensitivity analysis",,Based on diatomaceous earth,,,,,,
+notes / sources,,"From mg/L for brine concentration. Estimates from https://www.accio.com/plp/cost-of-bulk-hydrated-lime, https://www.made-in-china.com/products-search/hot-china-products/Lime_Chemical_Price.html",Rough guess,Rough guess,Rough guess,Rough guess,Dominated by price of weak salt (e.g. NaCl),"From mg/L for brine concentration. Prices have varied quite a bit, but estimate to be about ~$USD300/ton https://tradingeconomics.com/commodity/soda-ash",https://www.bluefieldresearch.com/ns/u-s-water-and-sewer-bill-has-increased-24-in-five-years-raising-affordability-concerns/,Rough guess,From TLC,From TLC,,"Heavily dependent on type of dispersant & specific formulation, run sensitivity analysis",Mix of NaOH and lime for impurity removal. Depends on pH balance / circuit ,Based on diatomaceous earth,,,,,,
 raw_cost,,150,120000,3000,15,200,0.15,300,3,2,35,4960,0.12,1,0.7,0.5,,,,,200,
 raw_unit,,$/mt,$/mt,$/mt,$/L,$/mt,$/L,$/mt,$/m^3,$/kg,$/mt,$/mt,$/kg,$/kg,$/kg,$/kg,,,,,$/tonne,
 cost,,0.15,120,3,15,0.2,0.15,0.3,0.003,2,0.035,4.96,0.12,1,0.7,0.5,,,,,0.2,0.5
 unit,,$/kg,$/kg,$/kg,$/L,$/kg,$/L,$/kg,$/L,$/kg,$/kg,$/kg,$/kg,$/kg,$/kg,$/kg,,,,,$/kg,$/m^3
 cost_TLC,,124,,,,,,270,,,35,4960,,,,,48,100,1154,0.5,,
 cost_TLC_unit,,$/mt,,,,,,$/mt,,,$/mt,$/mt,,,,,$/mt,$/mt,$/mt,$/m^3,,
-co2,,,,,,,,,,,,,,,,,,,,,,
+co2,From GREET or ecoInvent unless colored,0.83,,,,,,0.53,0,2.5,0.006,4,0.14,,1.5,0.4,,0.04,0.66,0,0.25,0
+co2_unit,,kg CO2e/kg,kg CO2e/kg,kg CO2e/kg,kg CO2e/m^3,kg CO2e/kg,kg CO2e/L,kg CO2e/kg,kg CO2e/m^3,kg CO2e/kg,kg CO2e/kg,kg CO2e/kg,kg CO2e/kg,kg CO2e/kg,kg CO2e/kg,kg CO2e/kg,kg CO2e/m^3,kg CO2e/m^3,kg CO2e/m^3,kg CO2e/m^3,kg CO2e/kg,kg CO2e/m^3
 water,,,,,,,,,,,,,,,,,,,,,,

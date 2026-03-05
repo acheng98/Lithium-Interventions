@@ -37,7 +37,7 @@ class Transportation:
 
 		self.input_volume = self.volume / (1.0 - self.loss_fraction)
 
-	def evaluate_total(self, new_volume = None, rank="midpoint"):
+	def evaluate_total(self, new_volume = None, rank=None):
 		"""
 		Evaluate this leg on a total volume.
 		Returns totals: delivered_units, cost_total, emissions_total dict.
@@ -95,6 +95,13 @@ class TransportRoute:
 		if rank is None:
 			rank = self.rank
 		delivered_at_sink = float(self.legs[-1].volume if total_volume is None else total_volume)
+
+		# Reset accumulators before each evaluation — without this, repeated calls
+		# (e.g. across conservative/midpoint/optimistic scenario passes) compound costs.
+		self.fixed_cost = 0
+		self.variable_cost = 0
+		self.total_cost = 0
+		self.route_emis = {"ghg": 0, "so2": 0, "nox": 0, "pm": 0}
 
 		leg_results = []
 

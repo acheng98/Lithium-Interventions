@@ -22,14 +22,14 @@ class Facility:
 			# Note the sinks input is a list. Possibly put this back into 'steps' later.
 			self.sinks = sinks_dict = {sink: {} for sink in sinks} # Landfill, air/environment, wastewater treatment, etc.
 			self.impact_factors = impact_factors or { # Should I even set 0 defaults?? 
-					"electricity": {"CO2": 0.0, "water": 0.0},   # defaults: no impact
-					"natural_gas": {"CO2": 0.0},
-					"cooling_water": {"CO2": 0.0},
-					"steam": {"CO2": 0.0, "water": 0.0},
-					"compressed_air": {"CO2": 0.0},
-					"landfill": {"CO2": 0.0, "land_use": 0.0},
+					"electricity": {"co2": 0.0, "water": 0.0},   # defaults: no impact
+					"natural_gas": {"co2": 0.0},
+					"cooling_water": {"co2": 0.0},
+					"steam": {"co2": 0.0, "water": 0.0},
+					"compressed_air": {"co2": 0.0},
+					"landfill": {"co2": 0.0, "land_use": 0.0},
 					"wastewater": {"water": 0.0, "eutrophication": 0.0},
-					"air": {"CO2": 0.0, "NOx": 0.0, "SO2": 0.0} # probably more, to add later if needed
+					"air": {"co2": 0.0, "nox": 0.0, "so2": 0.0} # probably more, to add later if needed
 			}
 
 			self.dpy = 0 # Working days/year
@@ -359,6 +359,10 @@ class Facility:
 								summary = {
 														"utility_impacts": step.utility_impacts,
 														"sink_impacts": step.sink_impacts,
+														"material_impacts":   getattr(step, "material_impacts",    {}),
+														"scope_one_impacts":  getattr(step, "scope_one_impacts",   {}),
+														"scope_two_impacts":  getattr(step, "scope_two_impacts",   {}),
+														"scope_three_impacts":getattr(step, "scope_three_impacts", {}),
 														"total_step_impacts": step.total_step_impacts,
 												}
 						results[step.step_name] = summary
@@ -444,6 +448,8 @@ class Facility:
 						s.apply_reagents()
 
 				# 2) Backward - volumes: set targets at sinks, walk upstream
+				for sink_coproducts in self.sinks.values(): # Reset sink volumes so repeated calcs don't accumulate
+						sink_coproducts.clear()
 				for end in (step for step in self.steps.values() if not step.next_steps):
 						end.output_volume = self.apv
 				for s in self.rev:

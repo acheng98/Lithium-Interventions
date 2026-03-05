@@ -272,7 +272,7 @@ class ProductionStep:
 				for name in [
 						"ltr", "machines_required", "scaled_equip_cost",
 						"labor_required",
-						"electricity_consumed", "natural_gas_consumed", "diesel_consumed", "propane_consumed"
+						"electricity_consumed", "natural_gas_consumed", "diesel_consumed", "propane_consumed",
 						"cooling_water_consumed", "steam_consumed", "compressed_air_consumed",
 						"electricity_cost", "natural_gas_cost", "diesel_cost", "propane_cost"
 						"cooling_water_cost", "steam_cost", "compressed_air_cost",
@@ -662,9 +662,30 @@ class ProductionStep:
 								cat: volume * fac for cat, fac in factors.items()
 						}
 
+				# ---------- Materials / reagents (Scope 3 upstream embodied emissions) ----------
+				# Requires: (1) _calc_material_costs() already run so abs_usage is populated,
+				#           (2) facility.material_data[reagent] contains impact category rows
+				#               (e.g. "co2": kg CO2e/kg, "water": L/kg) sourced from Material Data CSV.
+				material_impacts: Dict[str, Dict[str, float]] = {}
+				secondary_inputs = getattr(self, "secondary_inputs", {}) or {}
+				material_data = getattr(getattr(self, "facility", None), "material_data", {}) or {}
+				for reagent_name, props in secondary_inputs.items():
+						abs_usage = (props or {}).get("abs_usage")
+						if not abs_usage:
+								continue	# _calc_material_costs not yet run, or zero consumption
+						mat = material_data.get(reagent_name, {}) or {}
+						# Collect whichever impact categories are populated (co2, water, …)
+						# Skip cost/price rows — only numeric rows that are recognised impact categories
+						IMPACT_CATEGORIES = {"co2", "water"}	# extend as more columns are added to Material Data
+						factors = {cat: val for cat, val in mat.items()
+								if cat in IMPACT_CATEGORIES and isinstance(val, (int, float)) and val}
+						if factors:
+								material_impacts[reagent_name] = {cat: abs_usage * fac for cat, fac in factors.items()}
+
 				# ---------- Totals ----------
 				scope_one_impacts: Dict[str, float] = {}
 				scope_two_impacts: Dict[str, float] = {}
+				scope_three_impacts: Dict[str, float] = {}
 				total_step_impacts: Dict[str, float] = {}
 				for cats in utility_impacts.values():
 						for cat, val in cats.items():
@@ -675,18 +696,26 @@ class ProductionStep:
 								for cat, val in cats.items():
 										scope_one_impacts[cat] = scope_one_impacts.get(cat, 0.0) + val
 										total_step_impacts[cat] = total_step_impacts.get(cat, 0.0) + val
+				for cats in material_impacts.values():
+						for cat, val in cats.items():
+								scope_three_impacts[cat] = scope_three_impacts.get(cat, 0.0) + val
+								total_step_impacts[cat] = total_step_impacts.get(cat, 0.0) + val
 
 				self.utility_impacts = utility_impacts
 				self.sink_impacts = sink_impacts
+				self.material_impacts = material_impacts
 				self.scope_one_impacts = scope_one_impacts
 				self.scope_two_impacts = scope_two_impacts
+				self.scope_three_impacts = scope_three_impacts
 				self.total_step_impacts = total_step_impacts
 
 				return {
 						"utility_impacts": utility_impacts,
 						"sink_impacts": sink_impacts,
+						"material_impacts": material_impacts,
 						"scope_one_impacts": scope_one_impacts,
 						"scope_two_impacts": scope_two_impacts,
+						"scope_three_impacts": scope_three_impacts,
 						"total_step_impacts": total_step_impacts,
 				}
 
@@ -720,7 +749,7 @@ class ProductionStep:
 				
 				self.tot_cost = self.tot_var_cost + self.tot_fixed_cost
 
-				# --- STEP 5: Externalites --- # Should this be here? 
+				# --- STEP 5: Externalites ---
 				self.calculate_environmental_impacts(self.facility.impact_factors)
 
 		##############################

@@ -45,6 +45,7 @@ class SupplyChain:
 		self.avg_opex: float = 0.0
 		self.avg_capex: float = 0.0
 		self.avg_cost: float = 0.0
+		self.sink_costs: Dict[str, float] = {}
 		self.env_impacts: Dict[str, float] = {}
 
 		# Getter/report cache (invalidated on APV recalculation)
@@ -106,6 +107,10 @@ class SupplyChain:
 		if key not in self.links:
 			self.links[key] = {}
 		self.links[key] = [products,transport_route]
+
+	def register_sink_cost(self, sink_name: str, cost_per_unit: float) -> None:
+		"""Register a unit handling cost for a sink (e.g. $/tonne to landfill)."""
+		self.sink_costs[sink_name] = float(cost_per_unit)
 
 	def topo_order(self):
 		"""
@@ -205,17 +210,19 @@ class SupplyChain:
 		self._invalidate_getter_cache()
 
 		# Reset rollups across runs
-		self.tot_var_cost   = 0.0
-		self.tot_fixed_cost = 0.0
-		self.tot_opex 		= 0.0
-		self.tot_capex 		= 0.0
-		self.tot_cost       = 0.0
-		self.avg_var_cost   = 0.0
-		self.avg_fixed_cost = 0.0
-		self.avg_opex 		= 0.0
-		self.avg_capex 		= 0.0
-		self.avg_cost       = 0.0
-		self.env_impacts = {}
+		self.total_utilities: Dict[str, Any] = {}
+		self.tot_var_cost: float = 0.0
+		self.tot_fixed_cost: float = 0.0
+		self.tot_opex: float = 0.0
+		self.tot_capex: float = 0.0
+		self.tot_cost: float = 0.0
+		self.avg_var_cost: float = 0.0
+		self.avg_fixed_cost: float = 0.0
+		self.avg_opex: float = 0.0
+		self.avg_capex: float = 0.0
+		self.avg_cost: float = 0.0
+		self.sink_costs: Dict[str, float] = {}
+		self.env_impacts: Dict[str, float] = {}
 
 		cur_apv = float(apv)
 		for fac in self.rev:
@@ -247,10 +254,16 @@ class SupplyChain:
 						cur_apv = res["initial_volume"]
 						updated_apv = True
 						break
+
 			
 			if not updated_apv: # No transportation link identified, just get the input value to this current facility
 				cur_apv = fac.get_initial_input_amount()
 
+		for rec in self.get_sink_handling_costs():
+			self.tot_var_cost	+= rec["total_cost"]
+			self.tot_opex		+= rec["total_cost"]
+			self.tot_cost		+= rec["total_cost"]
+			
 		self.avg_var_cost = self.tot_var_cost / self.apv if self.apv else 0.0
 		self.avg_fixed_cost = self.tot_fixed_cost / self.apv if self.apv else 0.0
 		self.avg_opex = self.tot_opex / self.apv if self.apv else 0.0
@@ -357,6 +370,16 @@ class SupplyChain:
 					("fixed_over_cost", float(_safe_get(node, "fixed_over_cost", 0.0))),
 				])
 
+				# Coproducts
+				coproducts = OrderedDict()
+				for c_name, props in (getattr(node, "secondary_outputs", None) or {}).items():
+					if props is None:
+						continue
+					coproducts[c_name] = {
+						"volume": float(props.get("volume", 0.0) or 0.0),
+						"sink": props.get("sink"),
+					}
+
 				# Impacts (if present)
 				impacts = None
 				if hasattr(node, "scope_one_impacts") or hasattr(node, "scope_two_impacts"):
@@ -366,6 +389,7 @@ class SupplyChain:
 					}
 
 				snaps.append(OrderedDict([
+					("step_id", node.step_id),
 					("step_name", node.step_name),
 					("kind", "production"),
 					("pv", float(_safe_get(node, "step_pv", 0.0))),
@@ -373,6 +397,7 @@ class SupplyChain:
 					("constituents", dict(getattr(node, "constituents", {}) or {})),
 					("primary_inputs", dict(getattr(node, "primary_inputs", {}) or {})),
 					("reagents", reagents),
+					("coproducts", coproducts),
 					("utilities", utilities),
 					("machines_required", float(_safe_get(node, "machines_required", 0.0))),
 					("labor_required", float(_safe_get(node, "labor_required", 0.0))),
@@ -382,6 +407,7 @@ class SupplyChain:
 
 			elif isinstance(node, Transportation):
 				snaps.append(OrderedDict([
+					("step_id", node.name),
 					("step_name", node.name),
 					("kind", "transport"),
 					("pv", float(_safe_get(node, "volume", 0.0))),
@@ -399,6 +425,33 @@ class SupplyChain:
 				]))
 			else:
 				raise ValueError("Unidentified node returned from sc.get_steps().")
+
+		# Temporary adder for sinks
+		sink_totals: Dict[str, float] = {}
+		for snap in snaps:
+			if snap.get("kind") != "production":
+				continue
+			for c_name, props in (snap.get("coproducts") or {}).items():
+				sink = props.get("sink")
+				volume = float(props.get("volume", 0.0) or 0.0)
+				unit_cost = self.sink_costs.get(sink, 0.0)
+				sink_totals[sink] = sink_totals.get(sink, 0.0) + volume * unit_cost
+
+		for sink_name, total_cost in sink_totals.items():
+			if total_cost == 0.0:
+				continue
+			snaps.append(OrderedDict([
+				("step_name",	sink_name),
+				("step_id", 	sink_name),
+				("kind",		"sink"),
+				("pv",			0.0),
+				("costs",		OrderedDict([
+					("tot_var_cost",	total_cost),
+					("tot_fixed_cost",	0.0),
+					("tot_opex",		total_cost),
+					("tot_capex",		0.0),
+				])),
+			]))
 
 		if use_cache:
 			self._getter_cache[cache_key] = snaps
@@ -447,27 +500,49 @@ class SupplyChain:
 			"output_avg_labor_cost": (labor_cost / self.apv) if self.apv else 0.0,
 		}
 
+	def get_sink_handling_costs(self) -> List[Dict[str, Any]]:
+		"""
+		Compute handling costs for all coproducts using registered sink unit costs.
+		Returns one record per coproduct per step: step_name, coproduct, sink, volume, unit_cost, total_cost, avg_cost.
+		NOTE: reads from get_coproducts() (step.secondary_outputs) directly,
+		not from facility.sinks, which is redundant aggregation / technical debt.
+		"""
+		out: List[Dict[str, Any]] = []
+		for step_id, c_name, sink, volume in self.get_coproducts():
+			unit_cost = self.sink_costs.get(sink, 0.0)
+			out.append({
+				"step_id":		step_id,
+				"step_name": 	step_id,
+				"coproduct":	c_name,
+				"sink":			sink,
+				"volume":		volume,
+				"unit_cost":	unit_cost,
+				"total_cost":	volume * unit_cost,
+				"avg_cost":		(volume * unit_cost / self.apv) if self.apv else 0.0,
+			})
+		return out
+
 	# -------------------------
 	# Step-level projection getters
 	# -------------------------
 	def get_step_constituents(self) -> List[List[Any]]:
-		return [[s["step_name"], s.get("constituents", {})] for s in self._get_step_snapshots(transp=False)]
+		return [[s["step_id"], s.get("constituents", {})] for s in self._get_step_snapshots(transp=False)]
 
 	def get_constituent_amount_at_steps(self, constituent: str) -> List[List[Any]]:
 		out = []
 		for s in self._get_step_snapshots(transp=False):
 			pv = float(s.get("pv", 0.0) or 0.0)
 			val = float((s.get("constituents", {}) or {}).get(constituent, 0.0) or 0.0)
-			out.append([s["step_name"], val * pv])
+			out.append([s["step_id"], val * pv])
 		return out
 
 	def get_step_reagent_usage(self) -> List[List[Any]]:
-		"""Backward-compatible shape: [step_name, reagent_name, {usage, cost}]."""
+		"""Backward-compatible shape: [step_id, reagent_name, {usage, cost}]."""
 		out: List[List[Any]] = []
 		for s in self._get_step_snapshots(transp=False):
 			for reagent, props in (s.get("reagents") or {}).items():
 				out.append([
-					s["step_name"],
+					s["step_id"],
 					reagent,
 					{"usage": props.get("abs_usage", 0.0), "cost": props.get("total_cost", 0.0)},
 				])
@@ -480,57 +555,57 @@ class SupplyChain:
 			rec = (s.get("utilities") or {}).get(utility_name, None)
 			cons = float((rec or {}).get("consumed", 0.0) or 0.0)
 			cost = float((rec or {}).get("cost", 0.0) or 0.0)
-			out.append([s["step_name"], utility_name, cons, cost])
+			out.append([s["step_id"], utility_name, cons, cost])
 		return out
 
 	def get_step_electric(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("electricity"):
-			out.append([step_name, "Electricity", cons, cost])
+		for step_id, _, cons, cost in self.get_step_utility("electricity"):
+			out.append([step_id, "Electricity", cons, cost])
 		return out
 
 	def get_step_natural_gas(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("natural_gas"):
-			out.append([step_name, "Natural Gas", cons, cost])
+		for step_id, _, cons, cost in self.get_step_utility("natural_gas"):
+			out.append([step_id, "Natural Gas", cons, cost])
 		return out
 
 	def get_step_diesel(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("diesel"):
-			out.append([step_name, "Diesel", cons, cost])
+		for step_id, _, cons, cost in self.get_step_utility("diesel"):
+			out.append([step_id, "Diesel", cons, cost])
 		return out
 
 	def get_step_propane(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("propane"):
-			out.append([step_name, "Propane", cons, cost])
+		for step_id, _, cons, cost in self.get_step_utility("propane"):
+			out.append([step_id, "Propane", cons, cost])
 		return out
 
 	def get_step_cooling_water(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("cooling_water"):
-			out.append([step_name, "Cooling Water", cons, cost])
+		for step_id, _, cons, cost in self.get_step_utility("cooling_water"):
+			out.append([step_id, "Cooling Water", cons, cost])
 		return out
 
 	def get_step_steam(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("steam"):
-			out.append([step_name, "Steam", cons, cost])
+		for step_id, _, cons, cost in self.get_step_utility("steam"):
+			out.append([step_id, "Steam", cons, cost])
 		return out
 
 	def get_step_compressed_air(self) -> List[List[Any]]:
 		out = []
-		for step_name, _, cons, cost in self.get_step_utility("compressed_air"):
-			out.append([step_name, "Compressed Air", cons, cost])
+		for step_id, _, cons, cost in self.get_step_utility("compressed_air"):
+			out.append([step_id, "Compressed Air", cons, cost])
 		return out
 
 	def get_step_utilities(self) -> List[List[Any]]:
-		"""Legacy: [step_name, 'Total Utility Cost', utility_cost]."""
+		"""Legacy: [step_id, 'Total Utility Cost', utility_cost]."""
 		out: List[List[Any]] = []
 		for s in self._get_step_snapshots(transp=False):
 			out.append([
-				s["step_name"],
+				s["step_id"],
 				"Total Utility Cost",
 				float((s.get("costs") or {}).get("utility_cost", 0.0) or 0.0),
 			])
@@ -542,7 +617,7 @@ class SupplyChain:
 		for s in self._get_step_snapshots(transp=False):
 			utils = s.get("utilities") or OrderedDict()
 			rec = OrderedDict([
-				("step_name", s["step_name"]),
+				("step_id", s["step_id"]),
 				("total_utility_cost", float((s.get("costs") or {}).get("utility_cost", 0.0) or 0.0)),
 			])
 			rec["utilities"] = utils
@@ -553,7 +628,7 @@ class SupplyChain:
 		out: List[List[Any]] = []
 		for s in self._get_step_snapshots(transp=False):
 			out.append([
-				s["step_name"],
+				s["step_id"],
 				float(s.get("labor_required", 0.0) or 0.0),
 				float((s.get("costs") or {}).get("labor_cost", 0.0) or 0.0),
 			])
@@ -563,14 +638,27 @@ class SupplyChain:
 		out: List[List[Any]] = []
 		for s in self._get_step_snapshots(transp=False):
 			out.append([
-				s["step_name"],
+				s["step_id"],
 				float(s.get("machines_required", 0.0) or 0.0),
 				float((s.get("costs") or {}).get("machine_cost", 0.0) or 0.0),
 			])
 		return out
 
+	def get_coproducts(self) -> List[List[Any]]:
+		"""Return [step_name, coproduct_name, sink, volume] for every coproduct at each step."""
+		out: List[List[Any]] = []
+		for s in self._get_step_snapshots(transp=False):
+			for c_name, props in (s.get("coproducts") or {}).items():
+				out.append([
+					s["step_id"],
+					c_name,
+					props.get("sink"),
+					float(props.get("volume", 0.0) or 0.0),
+				])
+		return out
+
 	def get_detailed_pvs(self) -> List[List[Any]]:
-		return [[s["step_name"], float(s.get("pv", 0.0) or 0.0), s.get("step_units")] for s in self._get_step_snapshots(transp=True)]
+		return [[s["step_id"], float(s.get("pv", 0.0) or 0.0), s.get("step_units")] for s in self._get_step_snapshots(transp=True)]
 
 	def get_detailed_inputs(self) -> List[List[Any]]:
 		inputs: List[List[Any]] = []
@@ -619,7 +707,8 @@ class SupplyChain:
 
 		out = []
 		for s in self._get_step_snapshots(transp=transp):
-			name = s["step_name"]
+			step_id = s["step_id"]
+			step_name = s["step_name"]
 			kind = s.get("kind")
 
 			# Transportation
@@ -632,10 +721,11 @@ class SupplyChain:
 				if view == "capex":
 					selected_total = 0.0
 					if detail == 1:
-						out.append([name, selected_total])
+						out.append([step_id, selected_total])
 					else:
 						out.append(OrderedDict([
-							("step_name", name),
+							("step_id", step_id),
+							("step_name", step_name),
 							("capex_total", 0.0),
 							("capex_breakdown", {k: 0.0 for k in capex_fields}),
 						]))
@@ -645,10 +735,11 @@ class SupplyChain:
 				if view in {"total", "variable", "fixed", "opex"}:
 					selected_total = total_cost
 					if detail == 1:
-						out.append([name, selected_total])
+						out.append([step_id, selected_total])
 					else:
 						out.append(OrderedDict([
-							("step_name", name),
+							("step_name", step_name),
+							("step_id", step_id),
 							("total_cost", total_cost),
 							("variable_costs", var_cost),
 							("fixed_costs", fix_cost),
@@ -660,7 +751,8 @@ class SupplyChain:
 					if detail == 1:
 						raise ValueError("view='raw' requires detail=2 or 3")
 					out.append(OrderedDict([
-						("step_name", name),
+						("step_id", step_id),
+						("step_name", step_name),
 						("variable_costs", var_cost),
 						("fixed_costs", fix_cost),
 						("total_cost", total_cost),
@@ -669,10 +761,32 @@ class SupplyChain:
 
 				raise ValueError("Unhandled view for transport")
 
+			# Handle sink - temporary as sinks probably should be converted to production_steps later on
+			if kind == "sink":
+				total_cost = float((s.get("costs") or {}).get("tot_var_cost", 0.0) or 0.0)
+				if view == "capex":
+					out.append([step_id, 0.0] if detail == 1 else OrderedDict([
+						("step_id", step_id), ("step_name", step_name), ("capex_total", 0.0), ("capex_breakdown", {k: 0.0 for k in capex_fields}),
+					]))
+				elif view in {"total", "variable", "opex"}:
+					out.append([step_id, total_cost] if detail == 1 else OrderedDict([
+						("step_id", step_id), ("step_name", step_name), ("total_cost", total_cost), ("variable_costs", total_cost), ("fixed_costs", 0.0),
+					]))
+				elif view == "fixed":
+					out.append([step_id, 0.0] if detail == 1 else OrderedDict([
+						("step_id", step_id), ("step_name", step_name), ("fixed_costs", 0.0),
+					]))
+				elif view == "raw":
+					out.append(OrderedDict([
+						("step_id", step_id), ("step_name", step_name), ("variable_costs", total_cost), ("fixed_costs", 0.0), ("total_cost", total_cost),
+					]))
+				continue
+
 			# Production
 			c = s.get("costs") or {}
 			comp = OrderedDict([
-				("step_name", name),
+				("step_id", step_id),
+				("step_name", step_name),
 				("variable_costs", float(c.get("tot_var_cost", 0.0) or 0.0)),
 				("fixed_costs", float(c.get("tot_fixed_cost", 0.0) or 0.0)),
 				("tot_mat_cost", float(c.get("tot_mat_cost", 0.0) or 0.0)),
@@ -705,11 +819,12 @@ class SupplyChain:
 			if view == "total":
 				total_cost = comp["variable_costs"] + comp["fixed_costs"]
 				if detail == 1:
-					out.append([name, total_cost])
+					out.append([step_id, total_cost])
 					continue
 
 				rec = OrderedDict([
-					("step_name", name),
+					("step_id", step_id),
+					("step_name", step_name),
 					("total_cost", total_cost),
 					("variable_costs", comp["variable_costs"]),
 					("fixed_costs", comp["fixed_costs"]),
@@ -733,10 +848,10 @@ class SupplyChain:
 			if view == "capex":
 				capex_total = sum(comp.get(k, 0.0) for k in capex_fields)
 				if detail == 1:
-					out.append([name, capex_total])
+					out.append([step_id, capex_total])
 					continue
 				out.append(OrderedDict([
-					("step_name", name),
+					("step_id", step_id),
 					("capex_total", capex_total),
 					("capex_breakdown", {k: comp.get(k, 0.0) for k in capex_fields}),
 				]))
@@ -747,11 +862,11 @@ class SupplyChain:
 				opex_fix = sum(comp.get(k, 0.0) for k in opex_fixed_fields)
 				opex_total = opex_var + opex_fix
 				if detail == 1:
-					out.append([name, opex_total])
+					out.append([step_id, opex_total])
 					continue
 
 				rec = OrderedDict([
-					("step_name", name),
+					("step_id", step_id),
 					("opex_total", opex_total),
 					("opex_variable", opex_var),
 					("opex_fixed_like", opex_fix),
@@ -770,11 +885,11 @@ class SupplyChain:
 			if view == "variable":
 				var_total = comp["variable_costs"]
 				if detail == 1:
-					out.append([name, var_total])
+					out.append([step_id, var_total])
 					continue
 
 				rec = OrderedDict([
-					("step_name", name),
+					("step_id", step_id),
 					("variable_total", var_total),
 					("material_costs", comp["tot_mat_cost"]),
 					("labor_costs", comp["labor_cost"]),
@@ -789,11 +904,11 @@ class SupplyChain:
 			if view == "fixed":
 				fix_total = comp["fixed_costs"]
 				if detail == 1:
-					out.append([name, fix_total])
+					out.append([step_id, fix_total])
 					continue
 
 				rec = OrderedDict([
-					("step_name", name),
+					("step_id", step_id),
 					("fixed_total", fix_total),
 					("machine_cost", comp["machine_cost"]),
 					("tool_cost", comp["tool_cost"]),
@@ -1105,6 +1220,7 @@ class SupplyChain:
 					labels.append(step.step_name)
 					scopes["Scope One"].append(step.scope_one_impacts.get('co2', 0))
 					scopes["Scope Two"].append(step.scope_two_impacts.get('co2', 0))
+					scopes["Scope Three"].append(getattr(step, "scope_three_impacts", {}).get('co2', 0))
 			elif isinstance(node, TransportRoute):
 				for leg in node.legs:
 					labels.append(leg.name)

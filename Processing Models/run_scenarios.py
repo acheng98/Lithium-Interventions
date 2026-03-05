@@ -20,14 +20,14 @@ def lithium_evaporation(sc,project_data,data_folder):
 
 	# Concentrated Brine facility 	
 	conc_brine = Facility(fac_id="Concentrated Brine", supply_chain=sc,
-						sinks = ["landfill","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+						sinks = ["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
 						location = project_data["Location 2"],
 						steps = helpers.build_facility_dict(data_folder,project_data["Pathway 2"]))
 	sc.add_facility(conc_brine, next_fac=lithium_extraction, products={"pls_post_polishing": 1})
 
 	# Evaporation ponds 'facility' 
 	evap_ponds = Facility(fac_id="Evaporation Ponds", supply_chain=sc,
-						sinks = ["landfill","atmosphere"], # Potassium?
+						sinks = ["tailings","atmosphere"], # Potassium?
 						location = project_data["Location 1"],
 						steps = helpers.build_facility_dict(data_folder,project_data["Pathway 1"]))
 	# Set conversion factor for yield from ponds, and divide by evaporation rate to get size of ponds
@@ -87,7 +87,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 
 	# Mining 'facility' 
 	material_extraction = Facility(fac_id="Mining", supply_chain=sc,
-									sinks = ["landfill","atmosphere","waste_pile"],
+									sinks = ["tailings","atmosphere","waste_pile"],
 									location=project_data["Location 1"],
 									steps=helpers.build_facility_dict(data_folder,project_data["Pathway 1"]))
 
@@ -139,7 +139,6 @@ def clay_lepidolite(sc,project_data,data_folder):
 											target_step_id = project_data["Intermediate Concentration Target Step-After"], propagate = True)
 		# Set input lithium extraction constituents based on final constituents in material refining
 		pls_post_polishing = next(iter(material_refining.fwd[-1].primary_outputs.values()))
-		print(pls_post_polishing)
 		lithium_extraction.add_target_comp(target = "pls_post_polishing", composition = pls_post_polishing["constituents"],
 											target_step_id = "precipitation_step", propagate = True)
 
@@ -147,7 +146,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 		precip_step = lithium_extraction.fwd[0]
 		ccf = 0.2/(0.2/2.7+0.8/1)/10**6 # Assume TDS is ~100 g/L
 		precip_step.set_conversion_factor("pls_post_polishing",ccf,field="ccf")
-		precip_step.set_conversion_factor("polish_pls_throughput",ccf,field="ccf")
+		precip_step.set_conversion_factor("step_basis",ccf,field="ccf")
 
 	elif project_data["Type"] == "Lepidolite":
 		material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
@@ -170,25 +169,33 @@ def clay_lepidolite(sc,project_data,data_folder):
 		precip_step = lithium_extraction.fwd[0]
 		ccf = 0.2/(0.2/2.7+0.8/1)/10**6
 		precip_step.set_conversion_factor("pls_post_polishing",ccf,field="ccf")
-		precip_step.set_conversion_factor("polish_pls_throughput",ccf,field="ccf")
+		precip_step.set_conversion_factor("step_basis",ccf,field="ccf")
 	
 	products = {"rom_ore_feed": 1}
 	sc.add_facility(material_extraction, next_fac=material_refining, products=products, transport_route=ore_truck_route)	
 
 	return sc 
 
-def evaluate_project(sc,project_data,data_folder):
+def tailings_handling(sc):
+	sc.register_sink_cost("tailings", 3)   # $/m3, placeholder
+
+def brine_reinjection(sc):
+	pass
+
+def evaluate_project(sc,project_data,data_folder,detail=1):
 	summary = {}
 
 	project_type = project_data["Type"]
 	if project_type == "Brine-Evaporative":
 		sc = lithium_evaporation(sc,project_data,data_folder)
+		brine_reinjection(sc)
 	elif project_type == "Brine-DLE":
 		pass 
 	elif project_type == "Spodumene":
 		pass
 	elif project_type in ["Clays","Lepidolite"]:
 		sc = clay_lepidolite(sc,project_data,data_folder)
+		tailings_handling(sc)
 	else:
 		raise ValueError(f"Project type '{project_type}' not defined.")
 
@@ -199,27 +206,33 @@ def evaluate_project(sc,project_data,data_folder):
 	summary["midpoint"] = summary_midpoint
 	# pprint(summary_midpoint)
 	
-	print("\nProduction volume at each step:")
-	print("\nStep Production volumes:", sc.get_detailed_pvs())
-	print(sc.get_detailed_inputs())
-	pprint(sc.get_step_constituents())
-	# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
-	# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
+	if detail > 1:
+		print("\nProduction volume at each step:")
+		print("\nStep Production volumes:", sc.get_detailed_pvs())
+		print(sc.get_detailed_inputs())
+		pprint(sc.get_step_constituents())
+		# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
+		# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
 	
-	# print(sc.get_step_reagent_usage())
-	# pprint(sc.get_step_utilities_detailed())
-	print("\nNumber of Machines at each step:")
-	pprint(sc.get_step_machines())
-	print("\nReagents:")
-	pprint(sc.get_total_reagents())
-	print("\nUtilities:")
-	pprint(sc.get_total_utilities())
-	print("\nLabor:")
-	pprint(sc.get_step_labor())
-	print("\nCosts at each step:")
-	pprint(sc.get_step_costs(transp=True,detail=2))
-	
-	wk_compare(sc,project_type)
+	if detail <= 2:
+		pprint(sc.get_step_costs(transp=True,detail=1))
+
+	if detail > 2:
+		print(sc.get_step_reagent_usage())
+		pprint(sc.get_step_utilities_detailed())
+		print("\nNumber of Machines at each step:")
+		pprint(sc.get_step_machines())
+		print("\nReagents:")
+		pprint(sc.get_total_reagents())
+		print("\nUtilities:")
+		pprint(sc.get_total_utilities())
+		print("\nLabor:")
+		pprint(sc.get_step_labor())
+		print("\nCosts at each step:")
+		pprint(sc.get_step_costs(transp=True,detail=2))
+
+	if detail == 2.5:	
+		wk_compare(sc,project_type) # Output comparison metrics vs Wesselkamper et al. 2025
 
 	# sc.plot_tot_steps_costs(view="opex",detail=3)
 	# sc.plot_tot_steps_costs(view="opex",detail=2)
@@ -240,7 +253,7 @@ def evaluate_project(sc,project_data,data_folder):
 
 	return summary 
 
-def wk_compare(sc,proj):
+def wk_compare(sc,proj): # Outputs metrics for comparison against Wesselkamper et al. 2025
 	step_costs = sc.get_step_costs(transp=True,detail=3)
 	apv = sc.apv
 	mine_opex = 0
@@ -251,38 +264,46 @@ def wk_compare(sc,proj):
 	proc_capex = 0
 	if proj == "Brine-Evaporative":
 		for step in step_costs:
-			if step["step_name"] in ["Brine pumping", "Evaporation Ponds", ]:
+			if step["step_id"] in ["brine_pumping", "evap_ponds"]:
 				mine_opex += (step["material_costs"] + step["labor_costs"] + step["utility_costs"] + step["maint_cost"] + step["fixed_over_cost"])
 				mine_capex += (step["machine_cost"] + step["tool_cost"] + step["building_cost"] + step["aux_equip_cost"])
-			else:
+			elif step["step_id"] in ["batch_treatment", "sls_step","precipitation_step","thicken_dewater","wash_purif_step","drying_packaging"]:
 				proc_reag += step["material_costs"]
 				proc_pow += step["utility_cost_items"]["electricity"]["cost"]
 				proc_other += (step["labor_costs"] + step["utility_costs"] + step["maint_cost"] + step["fixed_over_cost"] - step["utility_cost_items"]["electricity"]["cost"])
 				proc_capex += (step["machine_cost"] + step["tool_cost"] + step["building_cost"] + step["aux_equip_cost"])
+			else: # wastewater, reinjection, etc.
+				proc_other += step["variable_costs"]
 	if proj == "Clays":
 		for step in step_costs:
-			if step["step_name"] in ["Loading with excavator"]:
+			if step["step_id"] in ["excav_load"]:
 				mine_opex += (step["material_costs"] + step["labor_costs"] + step["utility_costs"] + step["maint_cost"] + step["fixed_over_cost"])
 				mine_capex += (step["machine_cost"] + step["tool_cost"] + step["building_cost"] + step["aux_equip_cost"])
-			elif step["step_name"] in ["Ore transport via truck"]:
+			elif step["step_id"] in ["Ore transport via truck"]:
 				mine_opex += (step["variable_costs"])
-			else:
+			elif step["step_id"] in ["crushing","scrubbing","classifying","thickening","acid_leaching","neutralization","ccd","impurity_removal",
+										"precipitation_step","thicken_dewater","wash_purif_step","drying_packaging"]:
 				proc_reag += step["material_costs"]
 				proc_pow += step["utility_cost_items"]["electricity"]["cost"]
 				proc_other += (step["labor_costs"] + step["utility_costs"] + step["maint_cost"] + step["fixed_over_cost"] - step["utility_cost_items"]["electricity"]["cost"])
 				proc_capex += (step["machine_cost"] + step["tool_cost"] + step["building_cost"] + step["aux_equip_cost"])
+			else: # Tailings, wastewater, etc. 
+				proc_other += step["variable_costs"]
 	if proj == "Lepidolite":
 		for step in step_costs:
-			if step["step_name"] in ["Blasting with drilling and explosives","Loading with excavator"]:
+			if step["step_id"] in ["blasting","excav_load"]:
 				mine_opex += (step["material_costs"] + step["labor_costs"] + step["utility_costs"] + step["maint_cost"] + step["fixed_over_cost"])
 				mine_capex += (step["machine_cost"] + step["tool_cost"] + step["building_cost"] + step["aux_equip_cost"])
-			elif step["step_name"] in ["Ore transport via truck"]:
+			elif step["step_id"] in ["Ore transport via truck"]:
 				mine_opex += (step["variable_costs"])
-			else:
+			elif step["step_id"] in ["crushing","classifying","grinding","dewatering","sulfate_roasting","water_leach","impurity_removal","stream_clarification",
+										"precipitation_step","thicken_dewater","wash_purif_step","drying_packaging"]:
 				proc_reag += step["material_costs"]
 				proc_pow += step["utility_cost_items"]["electricity"]["cost"]
 				proc_other += (step["labor_costs"] + step["utility_costs"] + step["maint_cost"] + step["fixed_over_cost"] - step["utility_cost_items"]["electricity"]["cost"])
 				proc_capex += (step["machine_cost"] + step["tool_cost"] + step["building_cost"] + step["aux_equip_cost"])
+			else: # Tailings, wastewater, etc. 
+				proc_other += step["variable_costs"]
 	
 	print("Annual Production Volume:",apv,
 		"\nAvg. Mine Opex:", mine_opex/apv,
@@ -292,14 +313,13 @@ def wk_compare(sc,proj):
 		"\nAvg. Other Process costs:", proc_other/apv,
 		"\nAvg. Process Capex costs:", proc_capex/apv)
 
-
-def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write):
+def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write,detail=1):
 	project_summaries = {}
 
 	for project in projects:
 		project_data = projects_data[project]
 		sc = SupplyChain(transp_data,loc_data,machine_data,material_data)
-		summary = evaluate_project(sc,project_data,data_folder)
+		summary = evaluate_project(sc,project_data,data_folder,detail)
 		project_summaries[project] = summary 
 		# pprint(summary)
 
@@ -315,7 +335,7 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 				'avg_var_cost': sub_value['avg_var_cost'],
 				'avg_co2': sub_value['avg_co2']/1000 # Divide by 1000 to get tonnes
 			}
-	# pprint(extracted_data)
+	pprint(extracted_data)
 
 	# helpers.plot_project_summaries(project_summaries)
 
@@ -328,14 +348,15 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 		base_dir = os.path.dirname(os.path.abspath(__file__))
 		cost_emissions_dir = os.path.normpath(os.path.join(base_dir,"..","Costs-Emissions"))
 
-		cost_csv_path = os.path.join(cost_emissions_dir,"reported_costs.csv")
-		emissions_csv_path = os.path.join(cost_emissions_dir,"reported_emissions.csv")
+		# cost_csv_path = os.path.join(cost_emissions_dir,"reported_costs.csv")
+		# emissions_csv_path = os.path.join(cost_emissions_dir,"reported_emissions.csv")
+		both_csv_path = os.path.join(cost_emissions_dir,"reported_both.csv")
 
-		write_project_outputs_to_csv(extracted_data,cost_csv_path,emissions_csv_path)
+		write_project_outputs_to_csv(extracted_data,both_csv_path)
 
 	return extracted_data
 
-def write_project_outputs_to_csv(extracted_data,cost_csv_path,emissions_csv_path):
+def write_project_outputs_to_csv(extracted_data,both_csv_path):
 	# Map scenario names -> "Our Study" columns
 	scen_to_col = {
 		"optimistic": "Our Study-Low",
@@ -343,31 +364,28 @@ def write_project_outputs_to_csv(extracted_data,cost_csv_path,emissions_csv_path
 		"conservative": "Our Study-High",
 	}
 
-	# -------------------------
-	# COSTS: write avg_opex
-	# -------------------------
-	df_cost = pd.read_csv(cost_csv_path)
-	for project,scens in extracted_data.items():
-		mask = df_cost["Project"].astype(str) == str(project)
-		if not mask.any():
-			continue
-		for scen,col in scen_to_col.items():
-			val = (scens.get(scen) or {}).get("avg_opex",None)
-			df_cost.loc[mask,col] = helpers.format_currency(val)
-	df_cost.to_csv(cost_csv_path,index=False)
+	df = pd.read_csv(both_csv_path)
 
-	# -------------------------
-	# EMISSIONS: write avg_co2
-	# -------------------------
-	df_em = pd.read_csv(emissions_csv_path)
 	for project,scens in extracted_data.items():
-		mask = df_em["Project"].astype(str) == str(project)
-		if not mask.any():
+		project_mask = df["Project"].astype(str) == str(project)
+		if not project_mask.any():
 			continue
-		for scen,col in scen_to_col.items():
-			val = (scens.get(scen) or {}).get("avg_co2",None)
-			df_em.loc[mask,col] = val
-	df_em.to_csv(emissions_csv_path,index=False)
+
+		cost_mask  = project_mask & (df["Dimension"] == "Cost")
+		emiss_mask = project_mask & (df["Dimension"] == "Emissions")
+
+		for scen, col in scen_to_col.items():
+			# Write avg_opex into Cost row
+			cost_val = (scens.get(scen) or {}).get("avg_opex", None)
+			if cost_mask.any():
+				df.loc[cost_mask, col] = helpers.format_currency(cost_val)
+
+			# Write avg_co2 into Emissions row
+			emiss_val = (scens.get(scen) or {}).get("avg_co2", None)
+			if emiss_mask.any():
+				df.loc[emiss_mask, col] = emiss_val
+
+	df.to_csv(both_csv_path,index=False)
 
 if __name__ == '__main__':
 	data_folder = "./data/"
@@ -387,7 +405,7 @@ if __name__ == '__main__':
 	projects = ["Jianxiawo"]
 	# projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
-	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=False)
+	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=True,detail=3)
 
 
 

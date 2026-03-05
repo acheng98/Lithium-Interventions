@@ -7,11 +7,11 @@ machine_options,,batch_treatment_generic,solid_liquid_separation
 machine_default,,batch_treatment_generic,solid_liquid_separation
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,concentrated_brine_throughput,mixture_being_separated
 step_basis_unit,,L/batch concentrated brine,m3/h treated slurry equivalent (pseudo-continuous)
-step_ccf,Constituent conversion factor from constituent units to step_basis units,,
+step_ccf,Constituent conversion factor from constituent units to step_basis units,0.00000125,0.00000125
 step_ccf_units,Units to convert constituents into step_basis units,kg/L (conc. brine density),kg/L (conc. brine density)
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",concentrated_brine_throughput,mixture_being_separated
 volume_defining_basis_unit,What unit is the process volume or constituent in?,L concentrated_lithium_brine,L brine_post_lime
-volume_defining_output,What is the output or output constituent that needs to be converted to,treated_slurry,brine_post_polishing
+volume_defining_output,What is the output or output constituent that needs to be converted to,treated_slurry,pls_post_polishing
 volume_defining_output_unit,What unit is that output in?,L brine_post_lime,L brine_post_polish
 primary_input_1_name,,concentrated_lithium_brine,treated_slurry
 primary_input_1_units,Primary input units,L concentrated_lithium_brine,L treated slurry
@@ -19,7 +19,7 @@ primary_input_1_conversion_factor,Conversion factor of input into step basis. (I
 primary_input_1_constituents,Names of input constituents,Li; K; Mg; Ca; Na; B; SO4,Li; K; Mg(OH)2; CaCO3; Na; B; SO4
 primary_input_1_constituent_fractions,Values of input constituents,,
 primary_input_1_constituent_units,Units for each input constituent,ppm; ppm; ppm; ppm; ppm; ppm; ppm,ppm; ppm; ppm; ppm; ppm; ppm; ppm
-primary_input_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,,
+primary_input_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,0.00000125,0.00000125
 primary_input_1_ccf_units,Units for constituent conversion factor,kg/L (conc. brine density),kg/L (conc. brine density ≈ treated slurry density)
 primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE
 reagent_1_name,Reagent name,lime,filter_aid
@@ -40,19 +40,19 @@ reagent_3_target_constituents,,Mg,
 reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),6.279,
 reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,0,
 reagent_3_units,,kg Na2CO3 per kg Ca,
-primary_output_1_name,Output stream/material,treated_slurry,brine_post_polishing
+primary_output_1_name,Output stream/material,treated_slurry,pls_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,sls_step,Final
 primary_output_1_units,Convert from step basis units to output units (step basis * CF = output),L brine-post lime,L brine post de-boron
 primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",1,0.995
 primary_output_1_conversion_factor,Units after conversion is applied,1,1
 primary_output_1_constituents,,Li; K; Mg(OH)2; CaCO3; Na; B; SO4,Li; Na; K; Cl; SO4; H2O
-primary_output_1_constituent_units,,,
 primary_output_1_constituent_fractions,,,
-primary_output_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,,
+primary_output_1_constituent_units,,,
+primary_output_1_ccf,Constituent conversion factor of constituent units to step basis. (Constituent * CCF = Basis Units) ,0.00000125,0.00000125
 primary_output_1_ccf_units,Units for constituent conversion factor,kg/L (conc. brine density ≈ treated slurry density),kg/L (conc. brine density ≈ clarified brine density)
 primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,TRUE
 coproduct_1_name,,,residue
-coproduct_1_sink,,,landfill
+coproduct_1_sink,,,tailings
 coproduct_1_conversion_factor,,,0.005
 coproduct_1_units,,,m3_wet_solids per m3 treated slurry
 coproduct_1_constituents,,,Mg(OH)2; CaCO3; brine
