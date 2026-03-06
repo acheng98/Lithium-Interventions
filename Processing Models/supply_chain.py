@@ -221,7 +221,6 @@ class SupplyChain:
 		self.avg_opex: float = 0.0
 		self.avg_capex: float = 0.0
 		self.avg_cost: float = 0.0
-		self.sink_costs: Dict[str, float] = {}
 		self.env_impacts: Dict[str, float] = {}
 
 		cur_apv = float(apv)
@@ -427,31 +426,37 @@ class SupplyChain:
 				raise ValueError("Unidentified node returned from sc.get_steps().")
 
 		# Temporary adder for sinks
-		sink_totals: Dict[str, float] = {}
+		# Build one sink snapshot per coproduct per step (preserves step-level detail for detail=2).
+		# Aggregation to a single "Sink Costs" row is deferred to get_step_cost_report (detail=1).
 		for snap in snaps:
 			if snap.get("kind") != "production":
 				continue
 			for c_name, props in (snap.get("coproducts") or {}).items():
 				sink = props.get("sink")
-				volume = float(props.get("volume", 0.0) or 0.0)
-				unit_cost = self.sink_costs.get(sink, 0.0)
-				sink_totals[sink] = sink_totals.get(sink, 0.0) + volume * unit_cost
-
-		for sink_name, total_cost in sink_totals.items():
-			if total_cost == 0.0:
-				continue
-			snaps.append(OrderedDict([
-				("step_name",	sink_name),
-				("step_id", 	sink_name),
-				("kind",		"sink"),
-				("pv",			0.0),
-				("costs",		OrderedDict([
-					("tot_var_cost",	total_cost),
-					("tot_fixed_cost",	0.0),
-					("tot_opex",		total_cost),
-					("tot_capex",		0.0),
-				])),
-			]))
+				if not sink:
+					continue
+				volume		= float(props.get("volume", 0.0) or 0.0)
+				unit_cost	= self.sink_costs.get(sink, 0.0)
+				total_cost	= volume * unit_cost
+				# Use a compound key so two coproducts from the same step going to the same sink stay distinct
+				snap_id = f"{snap['step_id']}::{c_name}"
+				snaps.append(OrderedDict([
+					("step_name",	f"{sink} ({c_name})"),
+					("step_id",		snap_id),
+					("kind",		"sink"),
+					("sink_name",	sink),
+					("coproduct",	c_name),
+					("source_step",	snap["step_id"]),
+					("volume",		volume),
+					("unit_cost",	unit_cost),
+					("pv",			0.0),
+					("costs",		OrderedDict([
+						("tot_var_cost",	total_cost),
+						("tot_fixed_cost",	0.0),
+						("tot_opex",		total_cost),
+						("tot_capex",		0.0),
+					])),
+				]))
 
 		if use_cache:
 			self._getter_cache[cache_key] = snaps
@@ -706,6 +711,8 @@ class SupplyChain:
 			raise ValueError("view='raw' requires detail=2 or 3")
 
 		out = []
+		sink_records: List[tuple] = []  # (step_id, step_name, total_cost) buffered for end-of-report flush
+
 		for s in self._get_step_snapshots(transp=transp):
 			step_id = s["step_id"]
 			step_name = s["step_name"]
@@ -764,22 +771,7 @@ class SupplyChain:
 			# Handle sink - temporary as sinks probably should be converted to production_steps later on
 			if kind == "sink":
 				total_cost = float((s.get("costs") or {}).get("tot_var_cost", 0.0) or 0.0)
-				if view == "capex":
-					out.append([step_id, 0.0] if detail == 1 else OrderedDict([
-						("step_id", step_id), ("step_name", step_name), ("capex_total", 0.0), ("capex_breakdown", {k: 0.0 for k in capex_fields}),
-					]))
-				elif view in {"total", "variable", "opex"}:
-					out.append([step_id, total_cost] if detail == 1 else OrderedDict([
-						("step_id", step_id), ("step_name", step_name), ("total_cost", total_cost), ("variable_costs", total_cost), ("fixed_costs", 0.0),
-					]))
-				elif view == "fixed":
-					out.append([step_id, 0.0] if detail == 1 else OrderedDict([
-						("step_id", step_id), ("step_name", step_name), ("fixed_costs", 0.0),
-					]))
-				elif view == "raw":
-					out.append(OrderedDict([
-						("step_id", step_id), ("step_name", step_name), ("variable_costs", total_cost), ("fixed_costs", 0.0), ("total_cost", total_cost),
-					]))
+				sink_records.append((step_id, step_name, total_cost))
 				continue
 
 			# Production
@@ -921,6 +913,42 @@ class SupplyChain:
 				continue
 
 			raise ValueError("Invalid view")
+
+		# Flush buffered sinks costs: aggregate into one entry at detail=1, individual entries at detail>=2
+		if sink_records:
+			if view == "capex":
+				if detail == 1:
+					out.append(["Sink Costs", 0.0])
+				else:
+					for sid, sname, _ in sink_records:
+						out.append(OrderedDict([
+							("step_id", sid), ("step_name", sname),
+							("capex_total", 0.0), ("capex_breakdown", {k: 0.0 for k in capex_fields}),
+						]))
+
+			elif view == "fixed":
+				if detail == 1:
+					out.append(["Sink Costs", 0.0])
+				else:
+					for sid, sname, _ in sink_records:
+						out.append(OrderedDict([("step_id", sid), ("step_name", sname), ("fixed_costs", 0.0)]))
+
+			elif view in {"total", "variable", "opex"}:
+				if detail == 1:
+					out.append(["Sink Costs", sum(tc for _, _, tc in sink_records)])
+				else:
+					for sid, sname, tc in sink_records:
+						out.append(OrderedDict([
+							("step_id", sid), ("step_name", sname),
+							("total_cost", tc), ("variable_costs", tc), ("fixed_costs", 0.0),
+						]))
+
+			elif view == "raw":
+				for sid, sname, tc in sink_records:
+					out.append(OrderedDict([
+						("step_id", sid), ("step_name", sname),
+						("variable_costs", tc), ("fixed_costs", 0.0), ("total_cost", tc),
+					]))
 
 		return out
 

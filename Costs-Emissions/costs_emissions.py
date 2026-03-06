@@ -295,5 +295,5 @@ def plot_cost_vs_emissions(
 if __name__ == "__main__":
     plot_cost_vs_emissions(
         "reported_both.csv",
-        # save_path="cost_vs_emissions.png",
+        save_path="cost_vs_emissions.png",
     )

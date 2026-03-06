@@ -178,9 +178,10 @@ def clay_lepidolite(sc,project_data,data_folder):
 
 def tailings_handling(sc):
 	sc.register_sink_cost("tailings", 3)   # $/m3, placeholder
+	sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
 
 def brine_reinjection(sc):
-	pass
+	sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
 
 def evaluate_project(sc,project_data,data_folder,detail=1):
 	summary = {}
@@ -188,6 +189,7 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 	project_type = project_data["Type"]
 	if project_type == "Brine-Evaporative":
 		sc = lithium_evaporation(sc,project_data,data_folder)
+		tailings_handling(sc)
 		brine_reinjection(sc)
 	elif project_type == "Brine-DLE":
 		pass 
@@ -218,8 +220,6 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 		pprint(sc.get_step_costs(transp=True,detail=1))
 
 	if detail > 2:
-		print(sc.get_step_reagent_usage())
-		pprint(sc.get_step_utilities_detailed())
 		print("\nNumber of Machines at each step:")
 		pprint(sc.get_step_machines())
 		print("\nReagents:")
@@ -233,6 +233,11 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 
 	if detail == 2.5:	
 		wk_compare(sc,project_type) # Output comparison metrics vs Wesselkamper et al. 2025
+
+	if detail > 3:
+		print(sc.get_step_reagent_usage())
+		pprint(sc.get_step_utilities_detailed())
+		
 
 	# sc.plot_tot_steps_costs(view="opex",detail=3)
 	# sc.plot_tot_steps_costs(view="opex",detail=2)
@@ -402,10 +407,18 @@ if __name__ == '__main__':
 	################
 	# projects = ["Silver Peak"]
 	# projects = ["Thacker Pass"]
-	projects = ["Jianxiawo"]
-	# projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
+	# projects = ["Jianxiawo"]
+	projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
-	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=True,detail=3)
+	# write=False
+	write=True
+	detail=0
+	# detail=1
+	# detail=2
+	# detail=2.5
+	# detail=3
+
+	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail)
 
 
 
