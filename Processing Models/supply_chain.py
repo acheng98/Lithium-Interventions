@@ -110,7 +110,11 @@ class SupplyChain:
 
 	def register_sink_cost(self, sink_name: str, cost_per_unit: float) -> None:
 		"""Register a unit handling cost for a sink (e.g. $/tonne to landfill)."""
+		all_sinks = {sink for fac in self.facilities.values() for sink in fac.sinks}
+		if sink_name not in all_sinks:
+			return
 		self.sink_costs[sink_name] = float(cost_per_unit)
+		self._invalidate_getter_cache()
 
 	def topo_order(self):
 		"""
@@ -156,7 +160,7 @@ class SupplyChain:
 			)
 
 		self.fwd = [self.facilities[fid] for fid in order]
-		self.rev = reversed(self.fwd)
+		self.rev = list(reversed(self.fwd))
 
 		return self.fwd
 
@@ -663,7 +667,16 @@ class SupplyChain:
 		return out
 
 	def get_detailed_pvs(self) -> List[List[Any]]:
-		return [[s["step_id"], float(s.get("pv", 0.0) or 0.0), s.get("step_units")] for s in self._get_step_snapshots(transp=True)]
+		out: List[List[Any]] = []
+		sink_totals: Dict[str, float] = {}
+		for s in self._get_step_snapshots(transp=True):
+			if s.get("kind") == "sink":
+				sink_totals[s["sink_name"]] = sink_totals.get(s["sink_name"], 0.0) + float(s.get("volume", 0.0) or 0.0)
+			else:
+				out.append([s["step_id"], float(s.get("pv", 0.0) or 0.0), s.get("step_units")])
+		for sink_name, volume in sink_totals.items():
+			out.append([sink_name, volume, None])
+		return out
 
 	def get_detailed_inputs(self) -> List[List[Any]]:
 		inputs: List[List[Any]] = []

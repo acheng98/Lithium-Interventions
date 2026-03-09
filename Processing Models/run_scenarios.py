@@ -1,6 +1,6 @@
 import helpers
 from supply_chain import SupplyChain
-from facility import Facility
+from facility import Facility, tailings_handling, brine_reinjection
 from production_step import ProductionStep
 from transportation import Transportation, TransportRoute
 
@@ -13,21 +13,21 @@ from pprint import pprint
 def lithium_evaporation(sc,project_data,data_folder):
 	# Pregnant Solution Processing facility
 	lithium_extraction = Facility(fac_id="Lithium Extraction", supply_chain=sc,
-							sinks = ["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+							sinks = ["tailings_35","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
 							location = project_data["Location 2"], # Assume lithium extraction plant is adjacent to concentrated brine facility
 							steps = helpers.build_facility_dict(data_folder,project_data["Pathway 3"]))
 	sc.add_facility(lithium_extraction)
 
 	# Concentrated Brine facility 	
 	conc_brine = Facility(fac_id="Concentrated Brine", supply_chain=sc,
-						sinks = ["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+						sinks = ["tailings_35","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
 						location = project_data["Location 2"],
 						steps = helpers.build_facility_dict(data_folder,project_data["Pathway 2"]))
 	sc.add_facility(conc_brine, next_fac=lithium_extraction, products={"pls_post_polishing": 1})
 
 	# Evaporation ponds 'facility' 
 	evap_ponds = Facility(fac_id="Evaporation Ponds", supply_chain=sc,
-						sinks = ["tailings","atmosphere"], # Potassium?
+						sinks = ["tailings_35","atmosphere"], # Potassium?
 						location = project_data["Location 1"],
 						steps = helpers.build_facility_dict(data_folder,project_data["Pathway 1"]))
 	# Set conversion factor for yield from ponds, and divide by evaporation rate to get size of ponds
@@ -67,14 +67,16 @@ def lithium_evaporation(sc,project_data,data_folder):
 def clay_lepidolite(sc,project_data,data_folder):
 	# Pregnant Solution Processing facility
 	lithium_extraction = Facility(fac_id="Lithium Extraction", supply_chain=sc,
-								sinks=["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+								sinks=["tailings_20","tailings_25","tailings_35","tailings_65","tailings_solid",
+								"wastewater_treatment","atmosphere"],
 								location=project_data["Location 2"], # Assume lithium extraction is adjacent to leaching plant 
 								steps=helpers.build_facility_dict(data_folder,project_data["Pathway 3"]))
 	sc.add_facility(lithium_extraction)
 
 	# Communition and Leaching facility 
 	material_refining = Facility(fac_id="Material Refining", supply_chain=sc,
-								sinks = ["tailings","resin_regeneration","solvent_recovery","wastewater_treatment","atmosphere"],
+								sinks = ["tailings_20","tailings_25","tailings_35","tailings_65","tailings_solid",
+								"offgas_handling","wastewater_treatment","atmosphere"],
 								location=project_data["Location 2"],
 								steps=helpers.build_facility_dict(data_folder,project_data["Pathway 2"]))
 	sc.add_facility(material_refining, next_fac = lithium_extraction, products = {"pls_post_polishing": 1})
@@ -87,7 +89,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 
 	# Mining 'facility' 
 	material_extraction = Facility(fac_id="Mining", supply_chain=sc,
-									sinks = ["tailings","atmosphere","waste_pile"],
+									sinks = ["waste_pile","atmosphere"],
 									location=project_data["Location 1"],
 									steps=helpers.build_facility_dict(data_folder,project_data["Pathway 1"]))
 
@@ -176,13 +178,6 @@ def clay_lepidolite(sc,project_data,data_folder):
 
 	return sc 
 
-def tailings_handling(sc):
-	sc.register_sink_cost("tailings", 3)   # $/m3, placeholder
-	sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
-
-def brine_reinjection(sc):
-	sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
-
 def evaluate_project(sc,project_data,data_folder,detail=1):
 	summary = {}
 
@@ -211,13 +206,15 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 	if detail > 1:
 		print("\nProduction volume at each step:")
 		print("\nStep Production volumes:", sc.get_detailed_pvs())
-		print(sc.get_detailed_inputs())
-		pprint(sc.get_step_constituents())
 		# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
 		# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
 	
 	if detail <= 2:
 		pprint(sc.get_step_costs(transp=True,detail=1))
+
+	if (detail > 1) and (detail <=2):
+		print(sc.get_detailed_inputs())
+		pprint(sc.get_step_constituents())
 
 	if detail > 2:
 		print("\nNumber of Machines at each step:")
@@ -238,7 +235,6 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 		print(sc.get_step_reagent_usage())
 		pprint(sc.get_step_utilities_detailed())
 		
-
 	# sc.plot_tot_steps_costs(view="opex",detail=3)
 	# sc.plot_tot_steps_costs(view="opex",detail=2)
 	# sc.plot_tot_steps_costs(view="variable",detail=3)

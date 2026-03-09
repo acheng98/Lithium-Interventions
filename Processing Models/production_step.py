@@ -740,9 +740,9 @@ class ProductionStep:
 				self._calc_capital_costs()
 
 				# --- STEP 4: Totals ---
-				self.tot_var_cost = self.tot_mat_cost + self.labor_cost + self.utility_cost
+				self.tot_var_cost = self.tot_mat_cost + self.labor_cost + self.utility_cost + self.opex_excess
 				# "OPEX" here corresponds to annual operating expenditures (variable + fixed O&M).
-				self.tot_opex = self.tot_var_cost + self.maint_cost + self.fixed_over_cost
+				self.tot_opex = self.tot_var_cost + self.maint_cost + self.fixed_over_cost + self.opex_excess
 
 				self.tot_capex = getattr(self, "tot_capex_annualized", (self.machine_cost + self.tool_cost + self.building_cost + self.aux_equip_cost))
 				self.tot_fixed_cost = self.tot_capex + self.maint_cost + self.fixed_over_cost
@@ -846,9 +846,10 @@ class ProductionStep:
 				# --- Machine cost ---
 				if self.prim_equip_life is not None:
 						equip_crf = self.facility.calc_crf(self.facility.dr, self.prim_equip_life)
-						self.machine_cost = equip_crf * self.scaled_equip_cost
+						self.machine_cost = equip_crf * self.scaled_equip_cost * self.facility.machine_cost_factor
 				else:
-						self.machine_cost = self.facility.crf * self.scaled_equip_cost # Assume machine life is life of facility
+						# Assume machine life is life of facility
+						self.machine_cost = self.facility.crf * self.scaled_equip_cost * self.facility.machine_cost_factor 
 
 				# --- Tool cost ---
 				if hasattr(self, "tool_price") and self.tool_price:
@@ -879,6 +880,8 @@ class ProductionStep:
 				self.fixed_over_cost = (self.machine_cost + self.tool_cost +
 																self.building_cost + self.aux_equip_cost +
 																self.maint_cost) * self.facility.fixed_over
+				self.opex_excess = (self.machine_cost + self.tool_cost + self.building_cost +
+															self.aux_equip_cost + self.maint_cost) * self.opex_fraction_of_capex
 
 		########################
 		# CLASS HELPER METHODS #

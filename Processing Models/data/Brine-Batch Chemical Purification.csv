@@ -52,9 +52,9 @@ primary_output_1_ccf,Constituent conversion factor of constituent units to step 
 primary_output_1_ccf_units,Units for constituent conversion factor,kg/L (conc. brine density ≈ treated slurry density),kg/L (conc. brine density ≈ clarified brine density)
 primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,TRUE
 coproduct_1_name,,,residue
-coproduct_1_sink,,,tailings
-coproduct_1_conversion_factor,,,0.005
-coproduct_1_units,,,m3_wet_solids per m3 treated slurry
+coproduct_1_sink,,,tailings_35
+coproduct_1_conversion_factor,,,0.000005
+coproduct_1_units,,,"m3_wet_solids per L treated slurry, estimate ~35% density"
 coproduct_1_constituents,,,Mg(OH)2; CaCO3; brine
 coproduct_1_constituent_fractions,,,0.25; 0.25; 0.50
 coproduct_2_name,,,wash_liquor

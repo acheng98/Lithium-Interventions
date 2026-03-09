@@ -52,7 +52,7 @@ primary_output_1_ccf,Constituent conversion factor of constituent units to step 
 primary_output_1_ccf_units,Units for constituent conversion factor,kg/L (brine density),kg•year/m2 (equivalent to density divided by evaporation rate)
 primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE
 coproduct_1_name,,,
-coproduct_1_sink,,,
+coproduct_1_sink,,,Air
 coproduct_1_conversion_factor,,,
 coproduct_1_units,,,
 coproduct_1_constituents,,,
@@ -64,7 +64,7 @@ coproduct_2_units,,,
 coproduct_2_constituents,,,
 coproduct_2_constituent_fractions,,,
 coproduct_3_name,,,
-coproduct_3_sink,,,Air
+coproduct_3_sink,,,
 coproduct_3_conversion_factor,,,
 coproduct_3_units,,,
 coproduct_3_constituents,,,

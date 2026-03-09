@@ -54,7 +54,7 @@ primary_output_1_chemistry_dependence,Does the chemistry for this primary output
 coproduct_1_name,,,pressed_water,wash_water,evaporated_water
 coproduct_1_sink,,,wastewater_treatment,wastewater_treatment,atmosphere
 coproduct_1_conversion_factor,,,0.8,0.1,0.4286
-coproduct_1_units,,,,,
+coproduct_1_units,,,m3/m3,,
 coproduct_1_constituents,,,Various ions but mostly water,Na; K; Mg,H2O
 coproduct_1_constituent_fractions,,,1,1,1
 coproduct_2_name,,,,,

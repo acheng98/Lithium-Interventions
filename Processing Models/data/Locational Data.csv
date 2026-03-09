@@ -22,6 +22,8 @@ machine_cost_factor,"Machine costs factor, relative to baseline reported costs",
 aux_equip,Annualized auxiliary Equipment cost,% of main machine cost,0%,0%,0%,0%,0%,,,
 maint,Annualized maintenance costs,% of main machine cost,5%,5%,5%,5%,5%,,,
 fixed_over,Annualized fixed overhead costs,"% of the total of {main machine, building, auxiliary equipment, and maintenance} costs",10%,10%,10%,10%,3%,,,
+tailings_nonhazardous_cost,,,,,,$67.00,$240.00,,,
+tailings_hazardous_cost,,,,,,$67.00,$240.00,,,
 impact_factor.electricity.co2,Grid emissions intensity ,kgCO2e/kWh,0.27343,0.27343,0.32716,0.35507,0.66307,0.58023,0.11541,0.06398
 impact_factor.electricity.water,Water usage intensity of grid electricity,L/kWh,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 impact_factor.natural_gas.co2,Combustion emissions intensity of natural gas,kgCO2e/MMBTU,53.06,53.06,53.06,53.06,53.06,53.06,53.06,53.06

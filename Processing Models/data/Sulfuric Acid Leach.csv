@@ -52,9 +52,9 @@ primary_output_1_ccf,Constituent conversion factor of constituent units to step 
 primary_output_1_ccf_units,Units for constituent conversion factor,kg ore / tonne ore • 1/PPM ,kg ore / m^3 20% slurry • 1/PPM ,kg ore / m^3 15% slurry • 1/PPM ,kg ore / m^3 55% slurry • 1/PPM ,kg ore / m^3 ~34% slurry • 1/PPM ,kg ore / m^3 ~34% slurry • 1/PPM ,kg / m^3 PLS density,kg / m^3 PLS density
 primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,TRUE,TRUE,FALSE,TRUE,TRUE,TRUE,TRUE
 coproduct_1_name,,rejected_coarse,,,thickener_overflow,,,filter_cake,impurity_sludge
-coproduct_1_sink,,tailings,,,wastewater_treatment,,,tailings,tailings
-coproduct_1_conversion_factor,,0.375,,,0.73,,,0.3,0.05
-coproduct_1_units,,,,,m3/h,,,m3/h,m3/h
+coproduct_1_sink,,tailings_solid,,,wastewater_treatment,,,tailings_65,tailings_25
+coproduct_1_conversion_factor,,0.1389,,,0,,,0.3,0.05
+coproduct_1_units,,m3/tonne,,,m3/m3,,,m3/m3,m3/m3
 coproduct_1_constituents,,,,,"water, fine_solids",,,"solids (clay, precipitated Fe/Al/Ca/Mg/B), entrained_liquor","precipitated_impurities (Mg/Ca/B), gypsum, minor Li-bearing liquor"
 coproduct_1_constituent_fractions,,,,,,,,,
 coproduct_2_name,,,,,,,,,

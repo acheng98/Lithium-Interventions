@@ -53,7 +53,7 @@ primary_output_1_ccf_units,Units for constituent conversion factor,kg ore / tonn
 primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,FALSE
 coproduct_1_name,,waste
 coproduct_1_sink,,waste_pile
-coproduct_1_conversion_factor,,
+coproduct_1_conversion_factor,,0
 coproduct_1_units,,
 coproduct_1_constituents,,
 coproduct_1_constituent_fractions,,

@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 import copy
 from collections import defaultdict
+from typing import NamedTuple
 
 from production_step import ProductionStep
 from helpers import plot_stacked_bars, plot_production_curve
@@ -49,6 +50,8 @@ class Facility:
 			self.steam_price = 0 # Cost of steam, $/kg. Assume ~1.2 cents / pound, or 2.65 cents / kg
 			self.comp_air_price = 0 # Cost of compressed air, in $/Nm^3 (normal m^3). Assume 4 cents for now.
 			self.build_price = 0 # Building space cost, $/m^2
+			self.tailings_nonhazardous_cost = 0 # Cost of disposal for nonhazardous tailings for this facility
+			self.tailings_hazardous_cost = 0 # Cost of disposal for hazardous tailings for this facility
 			self.crp = 0 # Capital Recovery Period
 			self.brp = 0 # Building Recovery Period
 			self.aux_equip = 0 # Annualized auxiliary Equipment cost, as a percentage of main machine cost
@@ -540,7 +543,139 @@ class Facility:
 
 				plot_production_curve(apvs,tot_costs,xscale=1,yscale=1,title='APV vs Average Cost',xlab='Annual Production Volume (APV)',ylab='Unit Cost')
 
+class DewateringResult(NamedTuple):
+		cost: float   # $/t dry solids — OPEX excl. electricity cost
+		elec: float   # kWh/t dry solids — for separate emissions calc
+		# diesel: float # diesel usage/t dry solids - for separate emissions calc
 
+def tailings_handling(sc):
+		# ------------------------------------------------------------------
+		# Disposal gate fees — applied to off-site streams only
+		# Units: $/tonne wet as-received at gate
+		# To convert to $/t DS: divide by s (cake solids fraction)
+		# ------------------------------------------------------------------
+		EREF_NONHAZ_NV	= 67.0		# $/t wet; non-hazardous landfill, Nevada (EREF 2024). Change to loading in from locational data later
+		NDRC_HAZ_JX			= 240.0		# $/t wet; hazardous secure landfill, Jiangxi (NDRC 2024, regional inference). Change to loading in from locational data later
+
+		# On-site CTFS operating cost — Thacker Pass lined tailings facility
+		# Covers liner amortization, leachate collection, monitoring, stormwater mgmt
+		# Applied on top of dewatering cost for streams entering the CTFS
+		# $/t DS; placeholder pending permit operational data
+		ONSITE_CTFS_OPEX = 5.0		# $/t DS
+
+		# ------------------------------------------------------------------
+		# Dewatering / stacking cost tables (unchanged from prior definition)
+		# ------------------------------------------------------------------
+		DEWATERING_COST_BREAKPOINTS = {
+				# (s_low, s_high): (c_at_s_low, c_at_s_high)  $/t dry solids
+				# Estimated costs based on thickener and mechanical dewatering block models
+				(0.08, 0.15): (8,  17),		# gravity thickening
+				(0.15, 0.25): (17, 30),		# belt filter press
+				(0.25, 0.50): (30, 48),		# plate-and-frame filter press
+		}
+		DEWATERING_ELECTRICITY_BREAKPOINTS = {
+				# kWh/t dry solids
+				(0.08, 0.15): (3,   8),		# gravity thickening: essentially pumping only
+				(0.15, 0.25): (20, 35),		# belt filter press: belts + wash water pumps
+				(0.25, 0.50): (35, 60),		# plate-and-frame: hydraulic press + feed pump
+		}
+		TAILINGS_STACKING_COST = {
+				# (s_low, s_high): (c_at_s_low, c_at_s_high)  $/t dry solids
+				(0.55, 0.75): (3.0, 8.0),	# paste pumping + conveyor stacking; wear rises with stiffness
+				(0.75, 1.00): (4.0, 1.5),	# dry stack / conveyor only; cost falls with dryness
+		}
+		TAILINGS_STACKING_ELECTRICITY = {
+				# kWh/t dry solids; decreases monotonically as s increases
+				(0.55, 0.75): (20.0, 8.0),	# paste pump dominates; eases toward dry handoff
+				(0.75, 1.00): (4.0,  2.0),	# conveyor + compaction only
+		}
+
+		def dewatering_stacking(s: float, elec_cost: float = 0.0) -> DewateringResult:
+				"""
+				Returns dewatering OPEX (s < 0.55) or stacking OPEX (s >= 0.55), in $/t DS.
+				Does NOT include disposal gate fee or on-site CTFS opex — add those separately.
+				"""
+				if s < 0.55:
+						breakpoints      = DEWATERING_COST_BREAKPOINTS
+						elec_breakpoints = DEWATERING_ELECTRICITY_BREAKPOINTS
+				else:
+						breakpoints      = TAILINGS_STACKING_COST
+						elec_breakpoints = TAILINGS_STACKING_ELECTRICITY
+				for (s_lo, s_hi), (c_lo, c_hi) in breakpoints.items():
+						if s_lo <= s <= s_hi:
+								frac        = (s - s_lo) / (s_hi - s_lo)
+								base_cost   = c_lo + frac * (c_hi - c_lo)
+								e_lo, e_hi  = elec_breakpoints[(s_lo, s_hi)]
+								electricity = e_lo + frac * (e_hi - e_lo)
+								cost        = base_cost + electricity * elec_cost
+								return DewateringResult(cost=cost, elec=electricity)
+				raise ValueError(
+						f"s={s:.3f} outside modeled range. "
+						f"Sludge dewatering: [0.08, 0.55). Coarse stacking: [0.55, 1.00]."
+				)
+
+		# ------------------------------------------------------------------
+		# Helper — dry solids mass (t) per m³ of slurry at weight fraction w_s
+		# Used to convert $/t DS → $/m³ slurry for sink cost registration
+		# Basis: mixture density  rho_mix = 1 / (w_s/rho_s + (1-w_s)/rho_w)
+		# ------------------------------------------------------------------
+		def ds_per_m3(w_s: float, rho_s: float = 2.7, rho_w: float = 1.0) -> float:
+				rho_mix = 1.0 / (w_s / rho_s + (1.0 - w_s) / rho_w)
+				return w_s * rho_mix
+
+		sc.topo_order()
+		fac = sc.rev[0]
+		ep = fac.elec_price
+
+		# ------------------------------------------------------------------
+		# Sink cost registrations
+		# Formula: $/m³ slurry = (c_handling_per_t_ds + c_disposal_per_t_ds) * ds_per_m3(w_s)
+		#
+		# Off-site:  c_disposal = gate_fee / s   (gate fee is $/t wet as-received)
+		# On-site:   c_disposal = ONSITE_CTFS_OPEX (flat $/t DS, no gate fee) 
+		# Stacking:  c_disposal = 0 (stacking cost already in dewatering_stacking for s >= 0.55)
+		# ------------------------------------------------------------------
+
+		# --- Silver Peak: brine chemical treatment residue (Mg(OH)2 / CaCO3 filter cake) ---
+		# Route: off-site non-hazardous landfill (Nevada).  Disposal cost: EREF 2024.
+		s_brine = 0.35
+		c_brine = dewatering_stacking(s_brine, ep).cost + EREF_NONHAZ_NV / s_brine
+		sc.register_sink_cost("tailings_35", c_brine * ds_per_m3(s_brine))
+
+		# --- Thacker Pass: impurity sludge (Mg/Ca precipitates, thickener underflow) ---
+		# Route: on-site CTFS (lined).  No gate fee; CTFS opex added explicitly.
+		# CHANGED: was dewatering_stacking(0.25).cost only; now adds ONSITE_CTFS_OPEX
+		s_tp_sludge = 0.25
+		c_tp_sludge = dewatering_stacking(s_tp_sludge, ep).cost + ONSITE_CTFS_OPEX
+		sc.register_sink_cost("tailings_25", c_tp_sludge * ds_per_m3(s_tp_sludge))
+
+		# --- Thacker Pass + Jianxiawo: on-site stackable material (s ~ 0.62-0.68, use 0.65) ---
+		# Streams: Thacker Pass CCD filter cake; Jianxiawo coarse reject; Jianxiawo leach residue
+		# Route: on-site stacking.  Stacking cost is returned directly by dewatering_stacking.
+		s_stack = 0.65
+		c_stack = dewatering_stacking(s_stack, ep).cost		# stacking cost only; no gate fee
+		sc.register_sink_cost("tailings_65", c_stack * ds_per_m3(s_stack))
+
+		# --- Jianxiawo: impurity sludge (metal hydroxide precipitates, hazardous) ---
+		# Route: off-site hazardous secure landfill (Jiangxi).  Disposal cost: NDRC 2024.
+		# CHANGED: was dewatering_stacking(0.20).cost only; now adds NDRC hazardous gate fee / s
+		s_haz = 0.20
+		c_haz = dewatering_stacking(s_haz, ep).cost + NDRC_HAZ_JX / s_haz
+		sc.register_sink_cost("tailings_20", c_haz * ds_per_m3(s_haz))
+
+		# --- All pathways: crushed reject / waste rock (dry, on-site pile) ---
+		# Route: on-site waste rock stack; no dewatering, no gate fee.
+		# s ~ 0.95 (residual handling moisture); cost is conveyor + dozer only.
+		# CHANGED: was dewatering_stacking(1, ...) * 2.7; now uses s=0.95 and ds_per_m3
+		s_rock = 1
+		c_rock = dewatering_stacking(s_rock, ep).cost
+		sc.register_sink_cost("tailings_solid", c_rock * ds_per_m3(s_rock))
+
+		sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
+
+
+def brine_reinjection(sc):
+		sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
 
 
 

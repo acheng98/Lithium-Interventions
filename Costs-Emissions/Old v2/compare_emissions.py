@@ -1,299 +1,289 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.lines import Line2D
 
+def parse_number_to_float(x):
+	# Parses values like "4.45", "", None into float or NaN
+	if x is None:
+		return np.nan
+	s = str(x).strip()
+	if s == "" or s.lower() in {"na", "n/a", "null", "-", "none"}:
+		return np.nan
+	s = s.replace(",", "")
+	try:
+		return float(s)
+	except ValueError:
+		return np.nan
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def parse_num(x):
-    """Parse currency/numeric strings to float, returning NaN on failure or zero."""
-    if x is None:
-        return np.nan
-    s = str(x).strip().replace(",", "").replace("$", "")
-    if s.lower() in {"", "na", "n/a", "null", "-", "none"}:
-        return np.nan
-    try:
-        v = float(s)
-        return np.nan if v == 0 else v   # treat 0 as missing
-    except ValueError:
-        return np.nan
-
-
-def nanrange(arr):
-    """Return (min, max) of finite values, or (NaN, NaN) if none."""
-    finite = arr[np.isfinite(arr)]
-    if len(finite) == 0:
-        return np.nan, np.nan
-    return finite.min(), finite.max()
-
-
-def nice_tick(data_range, n_ticks_target=6):
-    """
-    Return a 'nice' tick interval that divides data_range into roughly
-    n_ticks_target intervals, choosing from a set of round multiples.
-    """
-    raw = data_range / n_ticks_target
-    magnitude = 10 ** np.floor(np.log10(raw))
-    residual = raw / magnitude
-    if residual < 1.5:
-        nice = 1
-    elif residual < 3.5:
-        nice = 2
-    elif residual < 7.5:
-        nice = 5
-    else:
-        nice = 10
-    return nice * magnitude
-
-
-# ---------------------------------------------------------------------------
-# Column definitions
-# ---------------------------------------------------------------------------
-
-# Metadata columns — never treated as numeric data
-METADATA_COLS = {"Project", "Company", "Location", "Material", "Dimension"}
-
-# Our Study columns — same names used for both Cost and Emissions rows.
-# Edit here if you rename them in the CSV.
-OUR_COLS = {
-    "low":  "Our Study-Low",
-    "mid":  "Our Study-Midpoint",
-    "high": "Our Study-High",
-}
-
-# Literature columns are detected dynamically at load time:
-# every column that isn't in METADATA_COLS or OUR_COLS is treated as a
-# literature source. No manual updates needed when new studies are added.
-
-# Colour palette by material type
-MATERIAL_COLORS = {
-    "Brine":      "#1f77b4",   # blue
-    "Brine-DLE":  "#aec7e8",   # light blue
-    "Clay":       "#d62728",   # red
-    "Spodumene":  "#2ca02c",   # green
-    "Lepidolite": "#9467bd",   # purple
-}
-DEFAULT_COLOR = "#7f7f7f"
-
-
-# ---------------------------------------------------------------------------
-# Main plotting function
-# ---------------------------------------------------------------------------
-
-def plot_cost_vs_emissions(
-    csv_path: str,
-    title: str = "Cost vs. Emissions by project",
-    figsize: tuple = (8, 8),          # square keeps 45° property
-    save_path: str | None = None,
-    our_alpha: float = 0.55,           # opacity of Our Study box fill
-    lit_alpha: float = 0.18,           # opacity of literature box fill
-    our_edge_alpha: float = 0.90,
-    lit_edge_alpha: float = 0.45,
+def plot_project_reported_emissions(
+	csv_path: str,
+	value_label: str = "Reported emissions (t CO2e/t LCE)",
+	title: str = "Reported emissions by project",
+	figsize=(12, 8),
+	save_path: str | None = None,
+	legend_loc: str = "center left",
+	legend_bbox=(1.02, 0.5),
+	show_separators: bool = True,
+	xmin: float = 0.0,
 ):
-    # ------------------------------------------------------------------
-    # Load & parse
-    # ------------------------------------------------------------------
-    df = pd.read_csv(csv_path)
+	df = pd.read_csv(csv_path)
 
-    numeric_cols = [c for c in df.columns if c not in METADATA_COLS]
-    for c in numeric_cols:
-        df[c] = df[c].map(parse_num)
+	col_map = {
+		"Material": "Material",
+		"Our Low": "Our Study-Low",
+		"Our Mid": "Our Study-Midpoint",
+		"Our High": "Our Study-High",
+		"Kelly Low": "Kelly et al. 2021-Low",
+		"Kelly High": "Kelly et al. 2021-High",
+		"IyerKelly Low": "Iyer and Kelly 2024-Low",
+		"IyerKelly High": "Iyer and Kelly 2024-High",
+		"Mousavinezhad 2024": "Mousavinezhad et al. 2024",
+		"Mousavinezhad 2025": "Mousavinezhad et al. 2025",
+		"Sun 2025": "Sun et al. 2025",
+		"Khakmardan 2024": "Khakmardan et al. 2024",
+		"Roy 2024": "Roy et al. 2024",
+		"Liu 2025": "Liu et al. 2025",
+		"SchenkerPfister 2025": "Schenker and Pfister 2025",
+		"Manjong Low": "Manjong et al. 2021-Low",
+		"Manjong High": "Manjong et al. 2021-High",
+		"Ambrose High Grade": "Ambrose and Kendall 2020b-High Grade",
+		"Ambrose Low Grade": "Ambrose and Kendall 2020b-Low Grade",
+		"Ambrose Low Grade Unfavorable": "Ambrose and Kendall 2020b-Low Grade, Unfavorable",
+	}
 
-    # Dynamically identify literature columns: numeric cols minus Our Study cols
-    our_col_set = set(OUR_COLS.values())
-    lit_cols = [c for c in numeric_cols if c not in our_col_set]
+	for k, c in col_map.items():
+		if c in df.columns:
+			if k == "Material":
+				df[c] = df[c].astype(str)
+			else:
+				df[c] = df[c].map(parse_number_to_float)
 
-    cost_df  = df[df["Dimension"] == "Cost"].copy()
-    emiss_df = df[df["Dimension"] == "Emissions"].copy()
+	# Only keep rows where data from 'Our Study' exists
+	mask_our = (
+		df[col_map["Our Low"]].notna()
+		| df[col_map["Our Mid"]].notna()
+		| df[col_map["Our High"]].notna()
+	)
+	df = df.loc[mask_our].copy()
+	if df.empty:
+		raise ValueError("No rows have 'Our Study' data.")
 
-    # ------------------------------------------------------------------
-    # Build per-project records
-    # ------------------------------------------------------------------
-    records = []
+	df["ProjectLabel"] = df["Project"].astype(str) + " (" + df["Material"].astype(str) + ")"
 
-    # Only plot projects that have Our Study data in BOTH dimensions
-    our_vals = list(OUR_COLS.values())
-    cost_our_mask  = cost_df[our_vals].notna().any(axis=1)
-    emiss_our_mask = emiss_df[our_vals].notna().any(axis=1)
+	# Vertical slots (Our Study first)
+	study_slots = [
+		"Our Study",
+		"Kelly et al. 2021",
+		"Iyer and Kelly 2024",
+		"Mousavinezhad et al. 2025",
+		"Mousavinezhad et al. 2024",
+		"Sun et al. 2025",
+		"Khakmardan et al. 2024",
+		"Roy et al. 2024",
+		"Liu et al. 2025",
+		"Schenker and Pfister 2025",
+		"Manjong et al. 2021",
+		"Ambrose and Kendall 2020b",	# combined slot
+	]
 
-    cost_with_our  = set(cost_df.loc[cost_our_mask,  "Project"])
-    emiss_with_our = set(emiss_df.loc[emiss_our_mask, "Project"])
-    both_projects  = cost_with_our & emiss_with_our
+	slot_step = 0.045
+	project_gap = 0.70
+	slots_per_project = len(study_slots)
 
-    for project in sorted(both_projects):
-        crow = cost_df[cost_df["Project"] == project].iloc[0]
-        erow = emiss_df[emiss_df["Project"] == project].iloc[0]
+	def y_for(project_index: int, slot_index: int) -> float:
+		return project_index * (project_gap + slot_step * (slots_per_project - 1)) + slot_index * slot_step
 
-        material = crow["Material"]
+	colors = {
+		"Our Study": "#000000",						# black
+		"Kelly et al. 2021": "#ff7f0e",				# orange
+		"Iyer and Kelly 2024": "#bcbd22",			# olive
+		"Mousavinezhad et al. 2025": "#1f77b4",		# blue
+		"Mousavinezhad et al. 2024": "#6baed6",		# light blue
+		"Sun et al. 2025": "#2ca02c",				# green
+		"Khakmardan et al. 2024": "#d62728",		# red
+		"Roy et al. 2024": "#9467bd",				# purple
+		"Liu et al. 2025": "#8c564b",				# brown
+		"Schenker and Pfister 2025": "#e377c2",		# pink
+		"Manjong et al. 2021": "#17becf",			# cyan
+		"Ambrose and Kendall 2020b": "#c7c7c7",		# light gray (combined)
+	}
 
-        # Our Study box corners (same column names for cost and emissions)
-        c_lo  = crow[OUR_COLS["low"]]
-        c_mid = crow[OUR_COLS["mid"]]
-        c_hi  = crow[OUR_COLS["high"]]
-        e_lo  = erow[OUR_COLS["low"]]
-        e_mid = erow[OUR_COLS["mid"]]
-        e_hi  = erow[OUR_COLS["high"]]
+	def _range_with_end_dots(ax, x_lo, x_hi, yv, color, label, linewidth, dotsize):
+		ax.hlines(yv, x_lo, x_hi, color=color, linewidth=linewidth, zorder=2)
+		ax.scatter(x_lo, yv, color=color, s=dotsize, zorder=4)
+		ax.scatter(x_hi, yv, color=color, s=dotsize, zorder=4)
+		ax.plot([], [], color=color, linewidth=linewidth, label=label)
 
-        # Literature ranges — all lit cols present in each row
-        lit_cost_vals  = crow[[c for c in lit_cols if c in crow.index]].to_numpy(dtype=float)
-        lit_emiss_vals = erow[[c for c in lit_cols if c in erow.index]].to_numpy(dtype=float)
+	def _scatter_points(ax, xs, ys, color, label, size):
+		ax.scatter(xs, ys, color=color, s=size, zorder=3, label=label)
 
-        lit_c_lo, lit_c_hi = nanrange(lit_cost_vals)
-        lit_e_lo, lit_e_hi = nanrange(lit_emiss_vals)
+	projects = df["ProjectLabel"].astype(str).tolist()
+	n_projects = len(projects)
 
-        records.append(dict(
-            project=project,
-            material=material,
-            c_lo=c_lo, c_mid=c_mid, c_hi=c_hi,
-            e_lo=e_lo, e_mid=e_mid, e_hi=e_hi,
-            lit_c_lo=lit_c_lo, lit_c_hi=lit_c_hi,
-            lit_e_lo=lit_e_lo, lit_e_hi=lit_e_hi,
-        ))
+	fig, ax = plt.subplots(figsize=figsize)
 
-    if not records:
-        raise ValueError("No projects found with Our Study data in both cost and emissions.")
+	if show_separators and n_projects > 1:
+		for i in range(n_projects - 1):
+			y_top_of_next = y_for(i + 1, 0)
+			y_bottom_of_prev = y_for(i, slots_per_project - 1)
+			ax.axhline((y_top_of_next + y_bottom_of_prev) / 2, linewidth=0.6, alpha=0.25)
 
-    # ------------------------------------------------------------------
-    # Determine axis limits with equal-interval 45° scaling
-    # ------------------------------------------------------------------
-    all_c = [r[k] for r in records for k in
-             ("c_lo", "c_mid", "c_hi", "lit_c_lo", "lit_c_hi") if np.isfinite(r[k])]
-    all_e = [r[k] for r in records for k in
-             ("e_lo", "e_mid", "e_hi", "lit_e_lo", "lit_e_hi") if np.isfinite(r[k])]
+	y_tick_pos = []
+	for i in range(n_projects):
+		y_tick_pos.append((y_for(i, 0) + y_for(i, slots_per_project - 1)) / 2)
 
-    c_max_data = max(all_c)
-    e_max_data = max(all_e)
+	# Our Study (range + midpoint)
+	slot_our = study_slots.index("Our Study")
+	y_our = np.array([y_for(i, slot_our) for i in range(n_projects)], dtype=float)
 
-    # Choose nice tick intervals, then force both axes to the same interval
-    # count so grid squares are visually square on a square figure (45° lines).
-    tick_c = nice_tick(c_max_data)
-    tick_e = nice_tick(e_max_data)
+	x_olo = df[col_map["Our Low"]].to_numpy(dtype=float)
+	x_omid = df[col_map["Our Mid"]].to_numpy(dtype=float)
+	x_ohi = df[col_map["Our High"]].to_numpy(dtype=float)
 
-    n_c = int(np.ceil(c_max_data / tick_c))
-    n_e = int(np.ceil(e_max_data / tick_e))
-    n_intervals = max(n_c, n_e)   # pad the shorter axis to match
+	mask_both = np.isfinite(x_olo) & np.isfinite(x_ohi)
+	if mask_both.any():
+		_range_with_end_dots(
+			ax,
+			x_olo[mask_both],
+			x_ohi[mask_both],
+			y_our[mask_both],
+			colors["Our Study"],
+			"Our study (low–high)",
+			linewidth=3.5,
+			dotsize=55,
+		)
 
-    c_max = tick_c * n_intervals
-    e_max = tick_e * n_intervals
+	mask_mid = np.isfinite(x_omid)
+	if mask_mid.any():
+		_scatter_points(
+			ax,
+			x_omid[mask_mid],
+			y_our[mask_mid],
+			colors["Our Study"],
+			"Our study (midpoint)",
+			size=85,
+		)
 
-    # ------------------------------------------------------------------
-    # Plot
-    # ------------------------------------------------------------------
-    fig, ax = plt.subplots(figsize=figsize)
+	def plot_single_series(series_name, col_name, slot_name, size=50):
+		xv = df[col_name].to_numpy(dtype=float)
+		mask = np.isfinite(xv)
+		if not mask.any():
+			return
+		slot_idx = study_slots.index(slot_name)
+		yy = np.array([y_for(i, slot_idx) for i in range(n_projects)], dtype=float)
+		ax.scatter(xv[mask], yy[mask], color=colors[series_name], s=size, zorder=3, label=series_name)
 
-    legend_handles = []
-    seen_materials = set()
+	def plot_range_series(series_name, lo_col, hi_col, slot_name, linewidth=2.2, dotsize=26):
+		x_lo = df[lo_col].to_numpy(dtype=float)
+		x_hi = df[hi_col].to_numpy(dtype=float)
+		mask = np.isfinite(x_lo) & np.isfinite(x_hi)
+		if not mask.any():
+			return
+		slot_idx = study_slots.index(slot_name)
+		yy = np.array([y_for(i, slot_idx) for i in range(n_projects)], dtype=float)
+		_range_with_end_dots(
+			ax,
+			x_lo[mask],
+			x_hi[mask],
+			yy[mask],
+			colors[series_name],
+			f"{series_name} (range)",
+			linewidth=linewidth,
+			dotsize=dotsize,
+		)
 
-    for r in records:
-        color = MATERIAL_COLORS.get(r["material"], DEFAULT_COLOR)
-        rgb   = plt.matplotlib.colors.to_rgb(color)
+	# Literature series
+	plot_range_series("Kelly et al. 2021", col_map["Kelly Low"], col_map["Kelly High"], "Kelly et al. 2021", linewidth=2.2, dotsize=26)
+	plot_range_series("Iyer and Kelly 2024", col_map["IyerKelly Low"], col_map["IyerKelly High"], "Iyer and Kelly 2024", linewidth=2.2, dotsize=26)
+	plot_single_series("Mousavinezhad et al. 2025", col_map["Mousavinezhad 2025"], "Mousavinezhad et al. 2025", size=55)
+	plot_single_series("Mousavinezhad et al. 2024", col_map["Mousavinezhad 2024"], "Mousavinezhad et al. 2024", size=50)
+	plot_single_series("Sun et al. 2025", col_map["Sun 2025"], "Sun et al. 2025", size=50)
+	plot_single_series("Khakmardan et al. 2024", col_map["Khakmardan 2024"], "Khakmardan et al. 2024", size=50)
+	plot_single_series("Roy et al. 2024", col_map["Roy 2024"], "Roy et al. 2024", size=50)
+	plot_single_series("Liu et al. 2025", col_map["Liu 2025"], "Liu et al. 2025", size=50)
+	plot_single_series("Schenker and Pfister 2025", col_map["SchenkerPfister 2025"], "Schenker and Pfister 2025", size=50)
+	plot_range_series("Manjong et al. 2021", col_map["Manjong Low"], col_map["Manjong High"], "Manjong et al. 2021", linewidth=2.2, dotsize=26)
 
-        # ---- Literature bounding box (transparent) -------------------
-        if (np.isfinite(r["lit_c_lo"]) and np.isfinite(r["lit_c_hi"]) and
-                np.isfinite(r["lit_e_lo"]) and np.isfinite(r["lit_e_hi"])):
+	# -------------------------
+	# Ambrose & Kendall combined: one error bar (min..max) + three dots
+	# Dots correspond to: High Grade, Low Grade, Low Grade Unfavorable
+	# -------------------------
+	slot_ak = study_slots.index("Ambrose and Kendall 2020b")
+	y_ak = np.array([y_for(i, slot_ak) for i in range(n_projects)], dtype=float)
 
-            rect_lit = mpatches.FancyBboxPatch(
-                (r["lit_c_lo"], r["lit_e_lo"]),
-                r["lit_c_hi"] - r["lit_c_lo"],
-                r["lit_e_hi"] - r["lit_e_lo"],
-                boxstyle="square,pad=0",
-                linewidth=1.2,
-                edgecolor=(*rgb, lit_edge_alpha),
-                facecolor=(*rgb, lit_alpha),
-                zorder=2,
-            )
-            ax.add_patch(rect_lit)
+	x_hg = df[col_map["Ambrose High Grade"]].to_numpy(dtype=float)
+	x_lg = df[col_map["Ambrose Low Grade"]].to_numpy(dtype=float)
+	x_unf = df[col_map["Ambrose Low Grade Unfavorable"]].to_numpy(dtype=float)
 
-        # ---- Our Study bounding box (opaque) -------------------------
-        if (np.isfinite(r["c_lo"]) and np.isfinite(r["c_hi"]) and
-                np.isfinite(r["e_lo"]) and np.isfinite(r["e_hi"])):
+	stack = np.vstack([x_hg, x_lg, x_unf])
+	mask_any = np.isfinite(stack).any(axis=0)
+	if mask_any.any():
+		x_min = np.nanmin(stack[:, mask_any], axis=0)
+		x_max = np.nanmax(stack[:, mask_any], axis=0)
 
-            rect_our = mpatches.FancyBboxPatch(
-                (r["c_lo"], r["e_lo"]),
-                r["c_hi"] - r["c_lo"],
-                r["e_hi"] - r["e_lo"],
-                boxstyle="square,pad=0",
-                linewidth=1.6,
-                edgecolor=(*rgb, our_edge_alpha),
-                facecolor=(*rgb, our_alpha),
-                zorder=3,
-            )
-            ax.add_patch(rect_our)
+		_range_with_end_dots(
+			ax,
+			x_min,
+			x_max,
+			y_ak[mask_any],
+			colors["Ambrose and Kendall 2020b"],
+			"Ambrose & Kendall 2020b",
+			linewidth=2.2,
+			dotsize=26,
+		)
 
-        # ---- Central midpoint ----------------------------------------
-        if np.isfinite(r["c_mid"]) and np.isfinite(r["e_mid"]):
-            ax.scatter(
-                r["c_mid"], r["e_mid"],
-                color=color, s=70, zorder=5,
-                edgecolors="white", linewidths=0.8,
-            )
+		# Three dots (same y); note ordering HG/LG/Unfavorable
+		mask_hg = np.isfinite(x_hg)
+		if mask_hg.any():
+			ax.scatter(x_hg[mask_hg], y_ak[mask_hg], color=colors["Ambrose and Kendall 2020b"], s=46, zorder=5)
 
-        # ---- Project label -------------------------------------------
-        lx = r["c_mid"] if np.isfinite(r["c_mid"]) else (r["c_lo"] + r["c_hi"]) / 2
-        ly = r["e_mid"] if np.isfinite(r["e_mid"]) else (r["e_lo"] + r["e_hi"]) / 2
-        ax.annotate(
-            r["project"],
-            xy=(lx, ly), xytext=(6, 6),
-            textcoords="offset points",
-            fontsize=8, color=color, zorder=6,
-        )
+		mask_lg = np.isfinite(x_lg)
+		if mask_lg.any():
+			ax.scatter(x_lg[mask_lg], y_ak[mask_lg], color=colors["Ambrose and Kendall 2020b"], s=36, zorder=5)
 
-        # ---- Legend entry (one per material type) --------------------
-        if r["material"] not in seen_materials:
-            seen_materials.add(r["material"])
-            legend_handles.append(
-                mpatches.Patch(facecolor=color, label=r["material"])
-            )
+		mask_unf = np.isfinite(x_unf)
+		if mask_unf.any():
+			ax.scatter(x_unf[mask_unf], y_ak[mask_unf], color=colors["Ambrose and Kendall 2020b"], s=28, zorder=5)
 
-    # ---- Shared legend proxies for box types -------------------------
-    legend_handles += [
-        mpatches.Patch(facecolor="gray", alpha=our_alpha,
-                       edgecolor="gray", linewidth=1.6,
-                       label="Our Study range"),
-        mpatches.Patch(facecolor="gray", alpha=lit_alpha,
-                       edgecolor="gray", linewidth=1.2,
-                       label="Literature range"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="gray",
-               markersize=7, markeredgecolor="white", label="Our Study midpoint"),
-    ]
+		# Dummy legend entries to communicate dot mapping without cluttering the plot
+		ax.scatter([], [], color=colors["Ambrose and Kendall 2020b"], s=46, label="A&K dot: High grade")
+		ax.scatter([], [], color=colors["Ambrose and Kendall 2020b"], s=36, label="A&K dot: Low grade")
+		ax.scatter([], [], color=colors["Ambrose and Kendall 2020b"], s=28, label="A&K dot: Low grade (unfav)")
 
-    # ------------------------------------------------------------------
-    # Axes formatting
-    # ------------------------------------------------------------------
-    ax.set_xlim(0, c_max)
-    ax.set_ylim(0, e_max)
+	ax.set_yticks(y_tick_pos)
+	ax.set_yticklabels(projects)
+	ax.set_ylim(y_for(n_projects - 1, slots_per_project - 1) + 0.15, y_for(0, 0) - 0.15)
 
-    ax.set_xticks(np.arange(0, c_max + tick_c * 0.01, tick_c))
-    ax.set_yticks(np.arange(0, e_max + tick_e * 0.01, tick_e))
+	ax.set_xlabel(value_label)
+	ax.set_title(title)
+	ax.set_xlim(left=xmin)
+	ax.grid(True, axis="x", linestyle=":", alpha=0.4)
 
-    ax.set_xlabel("Cost ($/t Li₂CO₃)", fontsize=11)
-    ax.set_ylabel("Emissions (t CO₂e / t Li₂CO₃)", fontsize=11)
-    ax.set_title(title, fontsize=12, pad=10)
+	handles, labels = ax.get_legend_handles_labels()
+	seen = set()
+	uniq_h = []
+	uniq_l = []
+	for h, l in zip(handles, labels):
+		if l not in seen:
+			seen.add(l)
+			uniq_h.append(h)
+			uniq_l.append(l)
 
-    ax.grid(True, linestyle=":", alpha=0.4)
-    # No set_aspect("equal") — 45° comes from equal interval count on a square figure.
+	ax.legend(uniq_h, uniq_l, loc=legend_loc, bbox_to_anchor=legend_bbox)
 
-    ax.legend(handles=legend_handles, loc="upper left", fontsize=8, framealpha=0.85)
+	plt.tight_layout()
+	if save_path is not None:
+		plt.savefig(save_path, dpi=300, bbox_inches="tight")
+	plt.show()
 
-    plt.tight_layout()
+	return fig
 
-    if save_path is not None:
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
-        print(f"Saved to {save_path}")
-
-    plt.show()
-    return fig
+# Example:
+# plot_project_reported_emissions("reported_emissions.csv")
+plot_project_reported_emissions("reported_emissions.csv", save_path="emissions_compare")
 
 
-# ---------------------------------------------------------------------------
-# Run
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    plot_cost_vs_emissions(
-        "reported_both.csv",
-        # save_path="cost_vs_emissions.png",
-    )
+
+
+
+
