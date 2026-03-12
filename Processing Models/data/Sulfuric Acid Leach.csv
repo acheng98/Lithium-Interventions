@@ -25,7 +25,7 @@ primary_input_1_chemistry_dependence,Does the chemistry for this primary input d
 reagent_1_name,Reagent name,,dispersant,,flocculant,sulfuric_acid,limestone,flocculant,lime
 reagent_1_name_long,Long/descriptive reagent name,,Slurry dispersant for clay/silt,,Polymer flocculant for thickener underflow,Sulfuric acid (or other leach acid) for Li extraction,Limestone (CaCO₃) for bulk neutralization,High-molecular-weight flocculant for CCD overflow/underflow separation,CaO
 reagent_1_target_constituents,,,scrubbed_slurry_throughput,,thickener_feed_throughput,leach_slurry_throughput,pls_being_neutralized,CCD_feed_throughput,pregnant_solution_throughput
-reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.001,,0.00026,100,11.2,0.04,29.1
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.001,,0.00026,85,11.2,0.04,29.1
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,0,0,0,0,0
 reagent_1_units,,,kg/m^3 slurry,,kg/m^3 slurry,kg acid/m^3,kg/m^3 pls,kg/m^3 ccd_feed_throughput,kg/m^3 pregnant_solution_throughput
 reagent_2_name,Reagent name,,process_water,,,process_water,flocculant,,soda_ash

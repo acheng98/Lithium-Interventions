@@ -258,6 +258,7 @@ class ProductionStep:
 				# Opex / availability / downtime
 				# -------------------------
 				self.opex_fraction_of_capex: float = safe_float(machine_data.get("opex_fraction_of_capex"), 0.0)
+				self.maint: float = safe_float(machine_data.get("maint_override"), self.facility.maint)
 				self.unplanned_downtime: float = safe_float(machine_data.get("unplanned_downtime"), 0.0)
 				self.proc_avail_factor: float = safe_float(machine_data.get("proc_avail_factor"), 1.0)
 				self.scheduled_maintenance: float = safe_float(machine_data.get("scheduled_maintenance"), 0.0)
@@ -687,9 +688,11 @@ class ProductionStep:
 				scope_two_impacts: Dict[str, float] = {}
 				scope_three_impacts: Dict[str, float] = {}
 				total_step_impacts: Dict[str, float] = {}
-				for cats in utility_impacts.values():
+				SCOPE_ONE_UTILITIES = {"natural_gas", "diesel", "propane"}
+				for utility_key, cats in utility_impacts.items():
+						target = scope_one_impacts if utility_key in SCOPE_ONE_UTILITIES else scope_two_impacts
 						for cat, val in cats.items():
-								scope_two_impacts[cat] = scope_two_impacts.get(cat, 0.0) + val
+								target[cat] = target.get(cat, 0.0) + val
 								total_step_impacts[cat] = total_step_impacts.get(cat, 0.0) + val
 				for by_coproduct in sink_impacts.values():
 						for cats in by_coproduct.values():
@@ -742,7 +745,7 @@ class ProductionStep:
 				# --- STEP 4: Totals ---
 				self.tot_var_cost = self.tot_mat_cost + self.labor_cost + self.utility_cost + self.opex_excess
 				# "OPEX" here corresponds to annual operating expenditures (variable + fixed O&M).
-				self.tot_opex = self.tot_var_cost + self.maint_cost + self.fixed_over_cost + self.opex_excess
+				self.tot_opex = self.tot_var_cost + self.maint_cost + self.fixed_over_cost
 
 				self.tot_capex = getattr(self, "tot_capex_annualized", (self.machine_cost + self.tool_cost + self.building_cost + self.aux_equip_cost))
 				self.tot_fixed_cost = self.tot_capex + self.maint_cost + self.fixed_over_cost
@@ -876,7 +879,7 @@ class ProductionStep:
 
 				self.building_cost = self.facility.bcrf * self.facility.build_price * footprint
 				self.aux_equip_cost = self.machine_cost * self.facility.aux_equip
-				self.maint_cost = self.machine_cost * self.facility.maint # Change to scaled machine cost? 
+				self.maint_cost = self.scaled_equip_cost * self.maint
 				self.fixed_over_cost = (self.machine_cost + self.tool_cost +
 																self.building_cost + self.aux_equip_cost +
 																self.maint_cost) * self.facility.fixed_over

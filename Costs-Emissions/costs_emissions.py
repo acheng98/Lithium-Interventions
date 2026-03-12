@@ -237,7 +237,7 @@ def plot_cost_vs_emissions(
         ly = r["e_mid"] if np.isfinite(r["e_mid"]) else (r["e_lo"] + r["e_hi"]) / 2
         ax.annotate(
             r["project"],
-            xy=(lx, ly), xytext=(6, 6),
+            xy=(lx, ly), xytext=(-18, -15),
             textcoords="offset points",
             fontsize=8, color=color, zorder=6,
         )
@@ -253,7 +253,7 @@ def plot_cost_vs_emissions(
     legend_handles += [
         mpatches.Patch(facecolor="gray", alpha=our_alpha,
                        edgecolor="gray", linewidth=1.6,
-                       label="Our Study range"),
+                       label="Our Study range \n(specific projects)"),
         mpatches.Patch(facecolor="gray", alpha=lit_alpha,
                        edgecolor="gray", linewidth=1.2,
                        label="Literature range"),

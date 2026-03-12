@@ -128,8 +128,8 @@ def clay_lepidolite(sc,project_data,data_folder):
 		
 	# Get conversion factor from physical volume moved to tonnes diluted ore 
 	loading.set_conversion_factor("rom_ore_feed",1-loss,field="yield_rate")
-	loading.set_conversion_factor("rom_ore_feed",rho_loose * 1/(1+strip_ratio)) # get from ore --> total moved (ore + waste)
-	loading.set_conversion_factor("waste",rho_loose * (strip_ratio + loss)/(1+strip_ratio)) # (calculate waste = strip ratio + loss)
+	loading.set_conversion_factor("rom_ore_feed",1/(1+strip_ratio)) # get from ore --> total moved (ore + waste)
+	loading.set_conversion_factor("waste", (strip_ratio + loss)/(1+strip_ratio)) # (calculate waste = strip ratio + loss)
 
 	# Update initial and final chemical compositions for each subsequent facility module
 	if project_data["Type"] == "Clays":
@@ -198,6 +198,7 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 
 	# for target_pv in target_pvs:
 	target_pv = project_data["Production Volume"] # convert to kg
+	helpers.update_materials(sc,project_data,"midpoint")
 	# print("Summary statistics:")
 	summary_midpoint = sc.update_apv(target_pv)
 	summary["midpoint"] = summary_midpoint
@@ -227,6 +228,8 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 		pprint(sc.get_step_labor())
 		print("\nCosts at each step:")
 		pprint(sc.get_step_costs(transp=True,detail=2))
+		print("\nImpacts at each step:")
+		pprint(sc.get_step_impacts(transp=True))
 
 	if detail == 2.5:	
 		wk_compare(sc,project_type) # Output comparison metrics vs Wesselkamper et al. 2025
@@ -235,19 +238,22 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 		print(sc.get_step_reagent_usage())
 		pprint(sc.get_step_utilities_detailed())
 		
-	# sc.plot_tot_steps_costs(view="opex",detail=3)
-	# sc.plot_tot_steps_costs(view="opex",detail=2)
-	# sc.plot_tot_steps_costs(view="variable",detail=3)
-	# sc.plot_tot_steps_costs(view="variable",detail=2)
+	# sc.plot_step_costs(mode="average",view="opex",detail=3)
+	sc.plot_step_costs(mode="average",view="opex",detail=2)
+	sc.plot_step_impacts(mode="average")
+	# sc.plot_step_costs(view="variable",detail=3)
+	# sc.plot_step_costs(view="variable",detail=2)
 	# sc.plot_tot_steps_impacts()
 	# sc.plot_total_cc()
 
 	helpers.update_machines(sc,"conservative")
+	helpers.update_materials(sc,project_data,"conservative")
 	summary_conservative = sc.update_apv(target_pv,recalc=True)
 	summary["conservative"] = summary_conservative
 	# pprint(summary_conservative)
 
 	helpers.update_machines(sc,"optimistic")
+	helpers.update_materials(sc,project_data,"optimistic")
 	summary_optimistic = sc.update_apv(target_pv,recalc=True)
 	summary["optimistic"] = summary_optimistic
 	# pprint(summary_optimistic)
@@ -401,15 +407,14 @@ if __name__ == '__main__':
 	################
 	# Pick project #
 	################
-	# projects = ["Silver Peak"]
+	projects = ["Silver Peak"]
 	# projects = ["Thacker Pass"]
 	# projects = ["Jianxiawo"]
-	projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
+	# projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
-	# write=False
-	write=True
-	detail=0
-	# detail=1
+	write=False
+	# write=True
+	detail=3
 	# detail=2
 	# detail=2.5
 	# detail=3

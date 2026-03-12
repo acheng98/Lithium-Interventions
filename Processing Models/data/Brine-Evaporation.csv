@@ -3,8 +3,8 @@ step_id,Step ID (unique),brine_pumping,evap_ponds
 step_name,Human-readable (long) process step name,Brine pumping,Evaporation Ponds
 key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A,Concentration of lithium brine via evaporation
 notes,"Key information, notes","Includes cost of installation and other capex, estimated to be roughly $1M per input data. Electricity usage depends on depth of drilling, but not represented here either.",
-machine_options,,brine_pump.conservative; brine_pump.midpoint; brine_pump.optimistic,evaporation_pond.conservative; evaporation_pond.midpoint; evaporation_pond.optimistic
-machine_default,,brine_pump.midpoint,evaporation_pond.midpoint
+machine_options,,brine_pump.conservative; brine_pump.midpoint; brine_pump.optimistic,evaporation_pond_unlined.conservative; evaporation_pond_unlined.midpoint; evaporation_pond_unlined.optimistic
+machine_default,,brine_pump.midpoint,evaporation_pond_unlined.midpoint
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,brine_pump_throughput,brine_evaporation_pond_size
 step_basis_unit,,L brine pump throughput/year,m2
 step_ccf,Constituent conversion factor from constituent units to step_basis units,0.000001058,0.000942255

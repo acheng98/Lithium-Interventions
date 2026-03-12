@@ -256,10 +256,14 @@ def build_data_dict(data_folder,file,col=2,param_split=".",skip_rows=["notes", "
 				for column in inputs_dict:
 					inputs_dict[column][var] = row[column]
 			elif param_split in var:
-				var_name,rank = var.split(param_split)
+				parts = var.split(param_split)
+				rank = parts[-1]		# last segment is always the rank
+				key_path = parts[:-1]	# all preceding segments form the nested path
 				for column in inputs_dict:
-					var_dict = inputs_dict[column].setdefault(var_name,{})
-					var_dict[rank] = clean_input_str(row[column])
+					target = inputs_dict[column]
+					for key in key_path[:-1]: # navigate / create intermediate dicts
+						target = target.setdefault(key, {})
+					target.setdefault(key_path[-1], {})[rank] = clean_input_str(row[column])
 			else:
 				for column in inputs_dict:
 					inputs_dict[column][var] = clean_input_str(row[column])
@@ -284,32 +288,49 @@ def build_locations_dict(data_folder,file,skip_rows=["notes", "sources", "key_eq
 				continue
 
 			# Nested impact factors: impact_factor.<utility>.<category>
-			if var.startswith("impact_factor."):
+			if var.startswith("utility_impact."):
 				parts = [p.strip() for p in var.split(".")]
 				if len(parts) != 3:
-					raise ValueError(f"Invalid impact_factor variable_name: '{var}'")
+					raise ValueError(
+						f"Invalid utility_impact variable_name: '{var}' -- "
+						f"must be utility_impact.<utility>.<category> (e.g. utility_impact.electricity.co2)."
+					)
 
 				_, utility, category = parts
-
 				for loc in location_names:
 					val = clean_input_str(row.get(loc))
 					if val is None:
 						continue
 					locations_dict[loc].setdefault("impact_factors", {}).setdefault(utility, {})[category] = val
 
-			# Nested material overrides: material.<material_name>.<category>
-			elif var.startswith("material."):
+			# Nested material overrides: material_impact.<material_name>.<category>
+			elif var.startswith("material_impact."):
 				parts = [p.strip() for p in var.split(".")]
 				if len(parts) != 3:
-					raise ValueError(f"Invalid material override variable_name: '{var}'")
+					raise ValueError(
+						f"Invalid material_impact variable_name: '{var}' -- "
+						f"must be material_impact.<material>.<category> (e.g. material_impact.soda_ash.co2)."
+					)
 
 				_, material, category = parts
-
 				for loc in location_names:
 					val = clean_input_str(row.get(loc))
 					if val is None:
 						continue
 					locations_dict[loc].setdefault("material", {}).setdefault(material, {})[category] = val
+
+			# Material cost override: material_cost.<material>  -> material_data_overrides dict
+			elif var.startswith("material_cost."):
+				parts = [p.strip() for p in var.split(".")]
+				if len(parts) != 2:
+					raise ValueError(f"Invalid material_cost variable_name: '{var}' — expected 2 parts.")
+				
+				_, material = parts
+				for loc in location_names:
+					val = clean_input_str(row.get(loc))
+					if val is None:
+						continue
+					locations_dict[loc].setdefault("material_data_overrides", {}).setdefault(material, {})["cost"] = val
 
 			# Flat variables
 			else:
@@ -578,6 +599,53 @@ def update_machines(sc, machine_rank):
 		updates[(fac_id, step_id)] = {"old": old_block, "new": new_block, "rank": rank_to_apply}
 	return updates
 
+def update_materials(sc, project_data, rank):
+	"""Apply project-specific material cost and impact overrides at a given rank.
+
+	Reads from two keys in project_data (populated by build_data_dict):
+	  material_cost.<material>.<rank>              -> facility.material_data[material]["cost"]
+	  material_impact.<material>.<category>.<rank> -> facility.material_data[material][category]
+
+	Applies to all facilities in the supply chain.
+	Silently skips entries where the ranked value is None, 0, or the material
+	is not present in a facility's material_data.
+
+	Parameters
+	----------
+	sc          : SupplyChain
+	project_data: dict   -- single-project slice from build_data_dict
+	rank        : str    -- "optimistic", "midpoint", or "conservative"
+	"""
+	cost_overrides = project_data.get("material_cost",   {}) or {}
+	impact_overrides = project_data.get("material_impact", {}) or {}
+	base_mat_data = sc.material_data
+
+	for fac in sc.facilities.values():
+		mat_data = fac.material_data
+
+		# material_cost.<material>.<rank>
+		for material, ranks in cost_overrides.items():
+			if material not in mat_data:
+				print(f"update_materials: material '{material}' not in facility '{fac.fac_id}' material_data; skipping.")
+				continue
+			val = (ranks or {}).get(rank)
+			if val is not None and val != 0:
+				mat_data[material]["cost"] = val
+			else: # Reset to base so prior rank's mutation does not persist
+				mat_data[material]["cost"] = (base_mat_data.get(material) or {}).get("cost", mat_data[material].get("cost"))
+
+		# material_impact.<material>.<category>.<rank>
+		for material, categories in impact_overrides.items():
+			if material not in mat_data:
+				print(f"update_materials: material '{material}' not in facility '{fac.fac_id}' material_data; skipping.")
+				continue
+			for category, ranks in (categories or {}).items():
+				val = (ranks or {}).get(rank)
+				if val is not None and val != 0:
+					mat_data[material][category] = val
+				else: # Reset to base so prior rank's mutation does not persist
+					mat_data[material][category] = (base_mat_data.get(material) or {}).get(category, mat_data[material].get(category))
+
 
 # PLOTTING HELPERS
 def _wrap_labels(labels, width=14):
@@ -605,6 +673,9 @@ def plot_stacked_bars(labels, series_dict, *,
 	legend_order='top_to_bottom',     # 'top_to_bottom' or 'bottom_to_top'
 	legend_loc='upper right',
 	wrap_width=12,
+	label_rotation=None, # degrees; None = auto (0 if n<=10, 40 if n<=18, 60 if more)
+	label_fontsize=None, # pt; None = auto (9 if n<=14, 8 if n<=20, 7 otherwise)
+	top_margin=0.12, 
 	show=True,
 	):
 	"""
@@ -672,8 +743,38 @@ def plot_stacked_bars(labels, series_dict, *,
 			return '\n'.join([s[i:i+width] for i in range(0, len(s), width)]) if len(s) > width else s
 		tick_labels = [_simple_wrap(str(s), wrap_width) for s in labels]
 
+	# Auto label rotation and font size based on bar count
+	if label_rotation is None:
+		rotation = 0 if n <= 10 else (40 if n <= 18 else 60)
+	else:
+		rotation = label_rotation
+	if label_fontsize is None:
+		fontsize = 9 if n <= 14 else (8 if n <= 20 else 7)
+	else:
+		fontsize = label_fontsize
+
+	# When rotated, word-wrapping fights readability -- use a slightly wider wrap and right-align
+	if rotation == 0:
+		effective_wrap = wrap_width
+		ha = 'center'
+	else:
+		effective_wrap = max(wrap_width, 18)  # less aggressive wrap when angled
+		ha = 'right'
+
+	# Ticks (uses your _wrap_labels if present, else raw labels)
+	try:
+		tick_labels = _wrap_labels(labels, width=effective_wrap)
+	except NameError:
+		def _simple_wrap(s, width):
+			return '\n'.join([s[i:i+width] for i in range(0, len(s), width)]) if len(s) > width else s
+		tick_labels = [_simple_wrap(str(s), effective_wrap) for s in labels]
+
 	ax.set_xticks(x)
-	ax.set_xticklabels(tick_labels, ha='center')
+	ax.set_xticklabels(tick_labels, ha=ha, rotation=rotation, fontsize=fontsize)
+
+	# Expand figure height when labels are rotated to avoid clipping
+	if rotation > 0:
+		fig.set_size_inches(fig.get_figwidth(), fig.get_figheight() + 1.5)
 
 	# Labels and title
 	ax.set_xlabel(xlab)
@@ -688,6 +789,9 @@ def plot_stacked_bars(labels, series_dict, *,
 		ax.set_xlim(xlims)
 	if ylims is not None:
 		ax.set_ylim(ylims)
+	else:
+		ymax = ax.get_ylim()[1]
+		ax.set_ylim(0, ymax * (1 + top_margin))
 
 	# Legend that mirrors the visible stack (top first) or the stacking order (bottom first)
 	if legend_order not in ('top_to_bottom', 'bottom_to_top'):

@@ -252,6 +252,14 @@ class Facility:
 								for material,cat_val in value.items():
 										for category,val in cat_val.items():
 												self.material_data[material][category] = val
+						elif key == "material_data_overrides":
+							for material, cat_val in (value or {}).items():
+								if material not in self.material_data:
+									print(f"Warning: material '{material}' in locational overrides not found in material_data; skipping.")
+									continue
+								for category, val in (cat_val or {}).items():
+									if val is not None and val != 0:
+										self.material_data[material][category] = val
 						else:
 								print(f"Attribute {key} in the location data is not defined as a facility attribute.")
  
@@ -555,7 +563,7 @@ def tailings_handling(sc):
 		# To convert to $/t DS: divide by s (cake solids fraction)
 		# ------------------------------------------------------------------
 		EREF_NONHAZ_NV	= 67.0		# $/t wet; non-hazardous landfill, Nevada (EREF 2024). Change to loading in from locational data later
-		NDRC_HAZ_JX			= 240.0		# $/t wet; hazardous secure landfill, Jiangxi (NDRC 2024, regional inference). Change to loading in from locational data later
+		NDRC_HAZ_JX			= 280.0		# $/t wet; hazardous secure landfill, Jiangxi (NDRC 2024) - ~$2000 yuan/ton. Change to loading in from locational data later
 
 		# On-site CTFS operating cost — Thacker Pass lined tailings facility
 		# Covers liner amortization, leachate collection, monitoring, stormwater mgmt

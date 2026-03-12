@@ -205,8 +205,8 @@ class SupplyChain:
 				"avg_opex": cached_opex / self.apv if self.apv else 0.0,
 				"avg_capex": cached_capex / self.apv if self.apv else 0.0,
 				"avg_cost": cached_total / self.apv if self.apv else 0.0,
- 				"total_co2": self.env_impacts.get("co2", 0.0),
- 				"avg_co2": (self.env_impacts.get("co2", 0.0) / self.apv) if self.apv else 0.0,
+				"total_co2": self.env_impacts.get("co2", 0.0),
+				"avg_co2": (self.env_impacts.get("co2", 0.0) / self.apv) if self.apv else 0.0,
 			}
 
 		self.apv = float(apv)
@@ -389,6 +389,8 @@ class SupplyChain:
 					impacts = {
 						"scope_one": dict(getattr(node, "scope_one_impacts", {}) or {}),
 						"scope_two": dict(getattr(node, "scope_two_impacts", {}) or {}),
+						"scope_three": dict(getattr(node, "scope_three_impacts", {}) or {}),
+						"total": dict(getattr(node, "total_step_impacts", {}) or {}),
 					}
 
 				snaps.append(OrderedDict([
@@ -653,6 +655,54 @@ class SupplyChain:
 			])
 		return out
 
+	def get_step_impacts(self, transp: bool = False) -> List[OrderedDict]:
+		"""
+		Return environmental impacts at each step in topo order.
+
+		Each record contains:
+		  step_id, step_name, kind,
+		  scope_one   {category: value}  -- direct combustion / sink emissions
+		  scope_two   {category: value}  -- upstream utility emissions
+		  scope_three {category: value}  -- embodied material emissions
+		  total       {category: value}  -- sum of all scopes
+
+		Transport legs expose a flat emissions_totals dict mapped onto scope_one;
+		scope_two / scope_three / total are derived accordingly.
+		Sink snapshots carry no impact data and are omitted.
+		"""
+		out: List[OrderedDict] = []
+		for s in self._get_step_snapshots(transp=transp):
+			kind = s.get("kind")
+			if kind == "sink":
+				continue
+
+			step_id   = s["step_id"]
+			step_name = s["step_name"]
+			imp       = s.get("impacts") or {}
+
+			if kind == "transport":
+				# Transport has a flat emissions_totals; treat as scope one
+				scope_one   = dict(imp.get("emissions_totals", {}) or {})
+				scope_two   = {}
+				scope_three = {}
+				total       = {k: v for k, v in scope_one.items()}
+			else:
+				scope_one   = dict(imp.get("scope_one",   {}) or {})
+				scope_two   = dict(imp.get("scope_two",   {}) or {})
+				scope_three = dict(imp.get("scope_three", {}) or {})
+				total       = dict(imp.get("total",       {}) or {})
+
+			out.append(OrderedDict([
+				("step_id",		step_id),
+				("step_name",	step_name),
+				("kind",		kind),
+				("scope_one",	scope_one),
+				("scope_two",	scope_two),
+				("scope_three",	scope_three),
+				("total",		total),
+			]))
+		return out
+
 	def get_coproducts(self) -> List[List[Any]]:
 		"""Return [step_name, coproduct_name, sink, volume] for every coproduct at each step."""
 		out: List[List[Any]] = []
@@ -665,6 +715,7 @@ class SupplyChain:
 					float(props.get("volume", 0.0) or 0.0),
 				])
 		return out
+
 
 	def get_detailed_pvs(self) -> List[List[Any]]:
 		out: List[List[Any]] = []
@@ -712,9 +763,9 @@ class SupplyChain:
 			  1 -> [step_name, selected_total]
 			  2 -> category breakdown for view
 			  3 -> like 2 plus:
-			       - material_cost_items (per-reagent from secondary_inputs)
-			       - utility_cost_items (per-utility from *_consumed / *_cost)
-			       Itemization is ALWAYS included where applicable.
+				   - material_cost_items (per-reagent from secondary_inputs)
+				   - utility_cost_items (per-utility from *_consumed / *_cost)
+				   Itemization is ALWAYS included where applicable.
 		"""
 		if view not in {"total", "opex", "capex", "variable", "fixed", "raw"}:
 			raise ValueError("`view` must be one of: 'total', 'opex', 'capex', 'variable', 'fixed', 'raw'.")
@@ -758,8 +809,8 @@ class SupplyChain:
 						out.append([step_id, selected_total])
 					else:
 						out.append(OrderedDict([
-							("step_name", step_name),
 							("step_id", step_id),
+							("step_name", step_name),
 							("total_cost", total_cost),
 							("variable_costs", var_cost),
 							("fixed_costs", fix_cost),
@@ -857,6 +908,7 @@ class SupplyChain:
 					continue
 				out.append(OrderedDict([
 					("step_id", step_id),
+					("step_name", step_name),
 					("capex_total", capex_total),
 					("capex_breakdown", {k: comp.get(k, 0.0) for k in capex_fields}),
 				]))
@@ -872,9 +924,11 @@ class SupplyChain:
 
 				rec = OrderedDict([
 					("step_id", step_id),
+					("step_name", step_name),
 					("opex_total", opex_total),
 					("opex_variable", opex_var),
 					("opex_fixed_like", opex_fix),
+					("opex_excess", comp["variable_costs"] - opex_var),
 					("opex_variable_breakdown", {k: comp.get(k, 0.0) for k in opex_variable_fields}),
 					("opex_fixed_like_breakdown", {k: comp.get(k, 0.0) for k in opex_fixed_fields}),
 					("material_costs", comp["tot_mat_cost"]),
@@ -895,6 +949,7 @@ class SupplyChain:
 
 				rec = OrderedDict([
 					("step_id", step_id),
+					("step_name", step_name),
 					("variable_total", var_total),
 					("material_costs", comp["tot_mat_cost"]),
 					("labor_costs", comp["labor_cost"]),
@@ -914,6 +969,7 @@ class SupplyChain:
 
 				rec = OrderedDict([
 					("step_id", step_id),
+					("step_name", step_name),
 					("fixed_total", fix_total),
 					("machine_cost", comp["machine_cost"]),
 					("tool_cost", comp["tool_cost"]),
@@ -977,6 +1033,216 @@ class SupplyChain:
 	# -------------------------
 	# Plotting
 	# -------------------------
+	def _build_steps_cost_series(
+		self,
+		view: str,
+		detail: int,
+		transp: bool,
+		top_n,
+		) -> tuple:
+		"""
+		Shared data-building logic for plot_tot_steps_costs and plot_avg_steps_costs.
+		Returns (labels, series, stack_order) with raw total-cost values.
+		The caller is responsible for any per-unit scaling (e.g. dividing by APV).
+		"""
+		labels: List[str] = []
+		series: Dict[str, List[float]] = defaultdict(list)
+		sink_cost_buf: Dict[str, float] = {}	# accumulates sink total_costs per sink name for detail=2
+
+		def _pad_all():
+			for k in list(series.keys()):
+				while len(series[k]) < len(labels):
+					series[k].append(0.0)
+
+		def _append(name: str, val: float):
+			while len(series[name]) < len(labels) - 1:
+				series[name].append(0.0)
+			series[name].append(float(val or 0.0))
+
+		def _topn_bucket(items_dict: Dict[str, Dict[str, Any]], key_name: str, topn: int) -> Dict[str, float]:
+			if not items_dict:
+				return {}
+			pairs = []
+			for item, rec in items_dict.items():
+				try:
+					v = float(rec.get(key_name, 0.0) or 0.0)
+				except Exception:
+					v = 0.0
+				pairs.append((item, v))
+			pairs.sort(key=lambda x: x[1], reverse=True)
+			top = pairs[:max(topn, 0)]
+			rest = pairs[max(topn, 0):]
+			out = {k: v for k, v in top}
+			other = sum(v for _, v in rest)
+			if other > 0:
+				out["Other"] = other
+			return out
+
+		def _items_as_values(items_dict, key_name: str):
+			out = {}
+			for k, rec in (items_dict or {}).items():
+				try:
+					v = float((rec or {}).get(key_name, 0.0) or 0.0)
+				except Exception:
+					v = 0.0
+				if v != 0.0:
+					out[k] = v
+			return out
+
+		def _get_itemized_maps(rec):
+			raw_mat = rec.get("material_cost_items", {}) or {}
+			raw_util = rec.get("utility_cost_items", {}) or {}
+			if top_n is None:
+				return _items_as_values(raw_mat, "total_cost"), _items_as_values(raw_util, "cost")
+			if top_n <= 0:
+				return {}, {}
+			return _topn_bucket(raw_mat, "total_cost", top_n), _topn_bucket(raw_util, "cost", top_n)
+
+		report = self.get_step_cost_report(view=view, transp=transp, detail=detail)
+
+		for rec in report:
+			if detail == 1:
+				labels.append(rec[0])
+				_append(view.upper(), rec[1])
+				continue
+
+			# ---- Sink records: aggregate at detail=2, filter zeros at detail=3 ----
+			if rec.get("kind") == "sink" or "::" in str(rec.get("step_id", "")):
+				cost = float(rec.get("total_cost", rec.get("variable_costs", 0.0)) or 0.0)
+				if detail == 2:
+					sink_name = rec.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
+					if sink_name.startswith("tailings"):
+						sink_name = "Tailings"
+					sink_cost_buf[sink_name] = sink_cost_buf.get(sink_name, 0.0) + cost
+				else:	# detail == 3: per-coproduct bar, skip zero-cost sinks
+					if cost == 0.0:
+						continue
+					labels.append(rec.get("step_name"))
+					_append("Sink Costs", cost)
+				continue
+
+			labels.append(rec.get("step_name"))
+
+			if view == "total":
+				if detail == 2:
+					_append("Fixed Costs", rec.get("fixed_costs", 0.0))
+					_append("Variable Costs", rec.get("variable_costs", 0.0))
+				else:
+					_append("Machine Cost", rec.get("machine_cost", 0.0))
+					_append("Tool Cost", rec.get("tool_cost", 0.0))
+					_append("Building Cost", rec.get("building_cost", 0.0))
+					_append("Aux Equip Cost", rec.get("aux_equip_cost", 0.0))
+					_append("Maintenance", rec.get("maint_cost", 0.0))
+					_append("Fixed Overhead", rec.get("fixed_over_cost", 0.0))
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+					mat_items, util_items = _get_itemized_maps(rec)
+					if mat_items:
+						for k, v in mat_items.items():
+							_append(f"MAT: {k}", v)
+					else:
+						_append("Material Costs", rec.get("material_costs", 0.0))
+					if util_items:
+						for k, v in util_items.items():
+							_append(f"UTIL: {k}", v)
+					else:
+						_append("Utility Costs", rec.get("utility_costs", 0.0))
+
+			elif view == "variable":
+				if detail == 2:
+					_append("Material Costs", rec.get("material_costs", 0.0))
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+					_append("Utility Costs", rec.get("utility_costs", 0.0))
+				else:
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+					mat_items, util_items = _get_itemized_maps(rec)
+					if mat_items:
+						for k, v in mat_items.items():
+							_append(f"MAT: {k}", v)
+					else:
+						_append("Material Costs", rec.get("material_costs", 0.0))
+					if util_items:
+						for k, v in util_items.items():
+							_append(f"UTIL: {k}", v)
+					else:
+						_append("Utility Costs", rec.get("utility_costs", 0.0))
+
+			elif view == "fixed":
+				_append("Machine Cost", rec.get("machine_cost", 0.0))
+				_append("Tool Cost", rec.get("tool_cost", 0.0))
+				_append("Building Cost", rec.get("building_cost", 0.0))
+				_append("Aux Equip Cost", rec.get("aux_equip_cost", 0.0))
+				_append("Maintenance", rec.get("maint_cost", 0.0))
+				_append("Fixed Overhead", rec.get("fixed_over_cost", 0.0))
+
+			elif view == "capex":
+				bd = rec.get("capex_breakdown", {}) or {}
+				_append("Machine Cost", bd.get("machine_cost", 0.0))
+				_append("Tool Cost", bd.get("tool_cost", 0.0))
+				_append("Building Cost", bd.get("building_cost", 0.0))
+				_append("Aux Equip Cost", bd.get("aux_equip_cost", 0.0))
+
+			elif view == "opex":
+				if detail == 2:
+					other = rec.get("opex_excess", 0.0) + rec.get("opex_fixed_like", 0.0)
+					_append("Material Costs", rec.get("material_costs", 0.0))
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+					_append("Utility Costs", rec.get("utility_costs", 0.0))
+					_append("Other", other)
+				else:
+					bd_fix = rec.get("opex_fixed_like_breakdown", {}) or {}
+					_append("Maintenance", bd_fix.get("maint_cost", 0.0))
+					_append("Fixed Overhead", bd_fix.get("fixed_over_cost", 0.0))
+					_append("Labor Costs", rec.get("labor_costs", 0.0))
+					mat_items, util_items = _get_itemized_maps(rec)
+					if mat_items:
+						for k, v in mat_items.items():
+							_append(f"MAT: {k}", v)
+					else:
+						_append("Material Costs", rec.get("material_costs", 0.0))
+					if util_items:
+						for k, v in util_items.items():
+							_append(f"UTIL: {k}", v)
+					else:
+						_append("Utility Costs", rec.get("utility_costs", 0.0))
+
+			else:
+				raise ValueError("Unhandled view")
+
+		# Flush sink buffer: one bar per sink name at detail=2 (skip zero-cost sinks)
+		if sink_cost_buf and detail == 2:
+			for sink_name, total in sink_cost_buf.items():
+				if total != 0.0:
+					labels.append(sink_name)
+					_append(sink_name, total)
+
+		_pad_all()
+
+		# Determine stack order
+		if view == "total" and detail == 2:
+			stack_order = ["Fixed Costs", "Variable Costs"]
+		elif view == "opex" and detail == 2:
+			base_order = ["Material Costs", "Labor Costs", "Utility Costs", "Other"]
+			sink_keys = [k for k in series if k not in base_order]
+			stack_order = base_order + sink_keys
+		else:
+			stack_order = list(series.keys())
+
+		# Filter to only populated series
+		stack_order = [k for k in stack_order if k in series]
+
+		return labels, series, stack_order
+
+	@staticmethod
+	def _validate_cost_plot_args(view, detail, top_n):
+		view = str(view).lower().strip()
+		if view not in {"total", "variable", "fixed", "opex", "capex", "combo"}:
+			raise ValueError("view must be one of: total|variable|fixed|opex|capex|combo")
+		if detail not in {1, 2, 3}:
+			raise ValueError("detail must be 1, 2, or 3")
+		if top_n is not None and not isinstance(top_n, int):
+			raise ValueError("top_n must be an int or None")
+		return view
+
 	def plot_tot_fac_costs(self, apv=None, xscale=1, yscale=1, title='Cost of Steps', xlab='Step Names',
 						   ylab='Total Cost', xlims=None, ylims=None):
 		if apv is not None:
@@ -1002,279 +1268,156 @@ class SupplyChain:
 		plot_stacked_bars(labels, costs, stack_order=["Fixed Costs", "Variable Costs"], xscale=xscale, yscale=yscale,
 						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims)
 
-	def plot_tot_steps_costs(
+	def plot_step_costs(
 		self,
 		apv=None,
 		xscale=1,
 		yscale=1,
-		title='Cost of Steps',
+		title=None,
 		xlab='Step Names',
-		ylab='Total Cost',
+		ylab=None,
 		xlims=None,
 		ylims=None,
 		*,
-		view: str = "total", # total|variable|fixed|opex|capex|combo
-		detail: int = 2, # 1|2|3
-		top_n = None, # int -> bucket to top_n + Other, None -> show all items; only used when detail=3
+		mode: str = "average",   # "total" | "average"
+		view: str = "total",   # total|variable|fixed|opex|capex|combo
+		detail: int = 2,       # 1|2|3
+		top_n = None,
 		transp: bool = True,
 		wrap_width: int = 12,
 		):
 		"""
-		Plot step costs using get_step_cost_report().
+		Plot costs at each step.
 
-		view:
-		  - "total": all costs
-		  - "variable": variable-only (materials, labor, utilities)
-		  - "fixed": fixed-only (machine, tool, building, aux, maint, overhead)
-		  - "opex": materials, labor, utilities, maint, overhead (aux excluded)
-		  - "capex": machine, tool, building, aux
-		  - "combo": stacked CAPEX + OPEX totals (forces detail=1 behavior)
+		mode:
+		  "total"   -> raw total costs per step
+		  "average" -> per-unit costs (total divided by APV)
 
-		detail:
-		  1 -> single bar per step (total for the chosen view)
-		  2 -> category-level stack for chosen view
-		  3 -> category-level + automatic itemization of materials and utilities where applicable.
-		       (to keep plots readable, top_n buckets per step if needed)
+		view:   total|variable|fixed|opex|capex|combo
+		detail: 1 = single bar | 2 = category stack | 3 = itemised materials/utilities
+		top_n:  bucket materials/utilities to top_n + Other (detail=3 only; None = show all)
 		"""
 		if apv is not None:
 			self.update_apv(apv)
 		elif len(self.prod_map.keys()) == 0:
 			raise ValueError("No APV values have been run; rerun with some target production volume.")
 
-		view = str(view).lower().strip()
-		if view not in {"total", "variable", "fixed", "opex", "capex", "combo"}:
-			raise ValueError("view must be one of: total|variable|fixed|opex|capex|combo")
-		if detail not in {1, 2, 3}:
-			raise ValueError("detail must be 1, 2, or 3")
-		if top_n is not None and not isinstance(top_n, int):
-			raise ValueError("top_n must be an int or None")
+		mode = str(mode).lower().strip()
+		if mode not in {"total", "average"}:
+			raise ValueError("mode must be 'total' or 'average'")
+		if mode == "average" and not self.apv:
+			raise ValueError("APV is zero; cannot compute average costs.")
 
-		labels: List[str] = []
-		series: Dict[str, List[float]] = defaultdict(list)
+		view = self._validate_cost_plot_args(view, detail, top_n)
 
-		def _pad_all():
-			for k in list(series.keys()):
-				while len(series[k]) < len(labels):
-					series[k].append(0.0)
-
-		def _append(name: str, val: float):
-			while len(series[name]) < len(labels) - 1:
-				series[name].append(0.0)
-			series[name].append(float(val or 0.0))
-
-		def _topn_bucket(items_dict: Dict[str, Dict[str, Any]], key_name: str, topn: int) -> Dict[str, float]:
-			"""
-			Return top_n items + 'Other' bucket if remainder > 0.
-			Assumes top_n is a positive integer.
-			"""
-			if not items_dict:
-				return {}
-			pairs = []
-			for item, rec in items_dict.items():
-				try:
-					v = float(rec.get(key_name, 0.0) or 0.0)
-				except Exception:
-					v = 0.0
-				pairs.append((item, v))
-			pairs.sort(key=lambda x: x[1], reverse=True)
-			top = pairs[:max(topn, 0)]
-			rest = pairs[max(topn, 0):]
-			out = {k: v for k, v in top}
-			other = sum(v for _, v in rest)
-			if other > 0:
-				out["Other"] = other
-			return out
-
-		def _items_as_values(items_dict, key_name: str):
-			"""Convert {item: {key_name: v}} -> {item: v} filtering zeros."""
-			out = {}
-			for k, rec in (items_dict or {}).items():
-				try:
-					v = float((rec or {}).get(key_name, 0.0) or 0.0)
-				except Exception:
-					v = 0.0
-				if v != 0.0:
-					out[k] = v
-			return out
-
-		def _get_itemized_maps(rec):
-			"""
-			Return (mat_items, util_items) as {name: value}.
-			- If top_n is None: all items.
-			- If top_n <= 0: empty dicts (meaning "don't itemize").
-			- If top_n > 0: bucket to top_n + Other.
-			"""
-			raw_mat = rec.get("material_cost_items", {}) or {}
-			raw_util = rec.get("utility_cost_items", {}) or {}
-
-			if top_n is None:
-				return _items_as_values(raw_mat, "total_cost"), _items_as_values(raw_util, "cost")
-			if top_n <= 0:
-				return {}, {}
-			return _topn_bucket(raw_mat, "total_cost", top_n), _topn_bucket(raw_util, "cost", top_n)
+		# Default axis labels depend on mode
+		if title is None:
+			title = "Cost of Steps" if mode == "total" else "Average Cost per Unit at each Step"
+		if ylab is None:
+			ylab = "Total Cost" if mode == "total" else "Average Cost ($/t)"
 
 		if view == "combo":
+			labels: List[str] = []
+			series: Dict[str, List[float]] = defaultdict(list)
 			cap = self.get_step_cost_report(view="capex", transp=transp, detail=1)
-			opx = self.get_step_cost_report(view="opex", transp=transp, detail=1)
+			opx = self.get_step_cost_report(view="opex",  transp=transp, detail=1)
 			for (nm1, capex_total), (nm2, opex_total) in zip(cap, opx):
 				if nm1 != nm2:
 					raise ValueError("Step ordering mismatch between CAPEX and OPEX reports.")
 				labels.append(nm1)
-				_append("CAPEX", capex_total)
-				_append("OPEX", opex_total)
-			_pad_all()
-			plot_stacked_bars(labels, series, stack_order=["CAPEX","OPEX"], xscale=xscale, yscale=yscale,
+				divisor = self.apv if mode == "average" else 1.0
+				series["CAPEX"].append(capex_total / divisor * yscale)
+				series["OPEX"].append(opex_total  / divisor * yscale)
+			plot_stacked_bars(labels, series, stack_order=["CAPEX", "OPEX"], xscale=xscale, yscale=1,
 							  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims, wrap_width=wrap_width)
 			return
 
-		report = self.get_step_cost_report(view=view, transp=transp, detail=detail)
+		labels, series, stack_order = self._build_steps_cost_series(view, detail, transp, top_n)
 
-		for rec in report:
-			if detail == 1:
-				labels.append(rec[0])
-				_append(view.upper(), rec[1])
-				continue
-
-			labels.append(rec.get("step_name"))
-
-			if view == "total":
-				if detail == 2:
-					_append("Fixed Costs", rec.get("fixed_costs", 0.0))
-					_append("Variable Costs", rec.get("variable_costs", 0.0))
-				else: # detail == 3
-					# fixed
-					_append("Machine Cost", rec.get("machine_cost", 0.0))
-					_append("Tool Cost", rec.get("tool_cost", 0.0))
-					_append("Building Cost", rec.get("building_cost", 0.0))
-					_append("Aux Equip Cost", rec.get("aux_equip_cost", 0.0))
-					_append("Maintenance", rec.get("maint_cost", 0.0))
-					_append("Fixed Overhead", rec.get("fixed_over_cost", 0.0))
-
-					# Variable: labor aggregate; materials/utilities itemized if available
-					_append("Labor Costs", rec.get("labor_costs", 0.0))
-
-					mat_items, util_items = _get_itemized_maps(rec)
-
-					if mat_items:
-						for k, v in mat_items.items():
-							_append(f"MAT: {k}", v)
-					else:
-						_append("Material Costs", rec.get("material_costs", 0.0))
-
-					if util_items:
-						for k, v in util_items.items():
-							_append(f"UTIL: {k}", v)
-					else:
-						_append("Utility Costs", rec.get("utility_costs", 0.0))
-
-			elif view == "variable":
-				if detail == 2:
-					_append("Material Costs", rec.get("material_costs", 0.0))
-					_append("Labor Costs", rec.get("labor_costs", 0.0))
-					_append("Utility Costs", rec.get("utility_costs", 0.0))
-				else:  # detail == 3
-					_append("Labor Costs", rec.get("labor_costs", 0.0))
-
-					mat_items, util_items = _get_itemized_maps(rec)
-
-					if mat_items:
-						for k, v in mat_items.items():
-							_append(f"MAT: {k}", v)
-					else:
-						_append("Material Costs", rec.get("material_costs", 0.0))
-
-					if util_items:
-						for k, v in util_items.items():
-							_append(f"UTIL: {k}", v)
-					else:
-						_append("Utility Costs", rec.get("utility_costs", 0.0))
-
-			elif view == "fixed":
-				_append("Machine Cost", rec.get("machine_cost", 0.0))
-				_append("Tool Cost", rec.get("tool_cost", 0.0))
-				_append("Building Cost", rec.get("building_cost", 0.0))
-				_append("Aux Equip Cost", rec.get("aux_equip_cost", 0.0))
-				_append("Maintenance", rec.get("maint_cost", 0.0))
-				_append("Fixed Overhead", rec.get("fixed_over_cost", 0.0))
-
-			elif view == "capex":
-				bd = rec.get("capex_breakdown", {}) or {}
-				_append("Machine Cost", bd.get("machine_cost", 0.0))
-				_append("Tool Cost", bd.get("tool_cost", 0.0))
-				_append("Building Cost", bd.get("building_cost", 0.0))
-				_append("Aux Equip Cost", bd.get("aux_equip_cost", 0.0))
-
-			elif view == "opex":
-				if detail == 2:
-					_append("OPEX Fixed-like", rec.get("opex_fixed_like", 0.0))
-					_append("OPEX Variable", rec.get("opex_variable", 0.0))
-				else:  # detail == 3
-					bd_fix = rec.get("opex_fixed_like_breakdown", {}) or {}
-					_append("Maintenance", bd_fix.get("maint_cost", 0.0))
-					_append("Fixed Overhead", bd_fix.get("fixed_over_cost", 0.0))
-
-					_append("Labor Costs", rec.get("labor_costs", 0.0))
-					mat_items, util_items = _get_itemized_maps(rec)
-
-					if mat_items:
-						for k, v in mat_items.items():
-							_append(f"MAT: {k}", v)
-					else:
-						_append("Material Costs", rec.get("material_costs", 0.0))
-
-					if util_items:
-						for k, v in util_items.items():
-							_append(f"UTIL: {k}", v)
-					else:
-						_append("Utility Costs", rec.get("utility_costs", 0.0))
-
-			else:
-				raise ValueError("Unhandled view")
-
-		_pad_all()
-
-		# Prefer “fixed first” when applicable
-		if view == "total" and detail == 2:
-			stack_order = ["Fixed Costs", "Variable Costs"]
-		elif view == "opex" and detail == 2:
-			stack_order = ["OPEX Fixed-like", "OPEX Variable"]
-		else:
-			stack_order = list(series.keys())
-
+		if mode == "average":
+			series = {k: [v / self.apv * yscale for v in vals] for k, vals in series.items()}
+			yscale = 1  # already applied above
+		
+		print(labels, series)
 		plot_stacked_bars(labels, series, stack_order=stack_order, xscale=xscale, yscale=yscale,
 						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims, wrap_width=wrap_width)
 
-	def plot_tot_steps_impacts(self, apv=None, xscale=1, yscale=1, title='GHGs at each Step',
-								xlab='Step Names', ylab='Total GHGs', xlims=None, ylims=None):
-		# Left as existing behavior; consider refactoring analogous to costs.
+	def plot_step_impacts(
+		self,
+		apv=None,
+		xscale=1,
+		yscale=1,
+		title=None,
+		xlab='Step Names',
+		ylab=None,
+		xlims=None,
+		ylims=None,
+		*,
+		mode: str = "average",    # "total" | "average"
+		impact: str = "co2",    # impact category key to plot (e.g. "co2", "ghg")
+		transp: bool = True,
+		wrap_width: int = 12,
+		):
+		"""
+		Plot environmental impacts at each step, broken out by scope.
+
+		mode:
+		  "total"   -> raw total impacts per step
+		  "average" -> per-unit impacts (total divided by APV)
+
+		impact: the key to look up within each scope dict (default "co2").
+		  Note: transport legs store emissions under "ghg"; when impact="co2"
+		  transport scope_one falls back to "ghg" automatically.
+
+		Scopes plotted: Scope One, Scope Two, Scope Three.
+		"""
 		if apv is not None:
 			self.update_apv(apv)
 		elif len(self.prod_map.keys()) == 0:
 			raise ValueError("No APV values have been run; rerun with some target production volume.")
 
-		labels = []
-		scopes = defaultdict(list)
+		mode = str(mode).lower().strip()
+		if mode not in {"total", "average"}:
+			raise ValueError("mode must be 'total' or 'average'")
+		if mode == "average" and not self.apv:
+			raise ValueError("APV is zero; cannot compute average impacts.")
 
-		for node in self.topo_order_transp():
-			if isinstance(node, Facility):
-				for step in node.fwd:
-					labels.append(step.step_name)
-					scopes["Scope One"].append(step.scope_one_impacts.get('co2', 0))
-					scopes["Scope Two"].append(step.scope_two_impacts.get('co2', 0))
-					scopes["Scope Three"].append(getattr(step, "scope_three_impacts", {}).get('co2', 0))
-			elif isinstance(node, TransportRoute):
-				for leg in node.legs:
-					labels.append(leg.name)
-					scopes["Scope One"].append(leg.emissions_totals.get('ghg', 0))
-					scopes["Scope Two"].append(0)
+		if title is None:
+			title = f"{impact.upper()} Impacts at each Step" if mode == "total" else f"Average {impact.upper()} Impact per Unit at each Step"
+		if ylab is None:
+			ylab = f"Total {impact.upper()} (kg)" if mode == "total" else f"Avg {impact.upper()} (kg/t)"
+
+		labels: List[str] = []
+		scopes: Dict[str, List[float]] = defaultdict(list)
+
+		for rec in self.get_step_impacts(transp=transp):
+			labels.append(rec["step_name"])
+
+			# Transport legs store emissions under 'ghg'; fall back if impact key absent
+			if rec["kind"] == "transport":
+				s1 = float(rec["scope_one"].get(impact) or rec["scope_one"].get("ghg", 0.0))
 			else:
-				raise ValueError("Unidentified node in the supply chain's topographic order")
+				s1 = float(rec["scope_one"].get(impact, 0.0) or 0.0)
 
-		stack_order = ["Scope One", "Scope Two"]
-		colors = {"Scope One": "#f28e2b", "Scope Two": "#4e79a7"}
-		plot_stacked_bars(labels, scopes, stack_order=stack_order, colors=colors, xscale=xscale, yscale=yscale,
-						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims)
+			s2 = float(rec["scope_two"].get(impact,   0.0) or 0.0)
+			s3 = float(rec["scope_three"].get(impact, 0.0) or 0.0)
 
+			scopes["Scope One"].append(s1)
+			scopes["Scope Two"].append(s2)
+			scopes["Scope Three"].append(s3)
+
+		if mode == "average":
+			scopes = {k: [v / self.apv * yscale for v in vals] for k, vals in scopes.items()}
+			yscale = 1
+
+		# Only include scopes that have at least one non-zero value
+		stack_order = [s for s in ["Scope One", "Scope Two", "Scope Three"]
+					   if any(v != 0.0 for v in scopes.get(s, []))]
+
+		colors = {"Scope One": "#f28e2b", "Scope Two": "#4e79a7", "Scope Three": "#76b7b2"}
+		plot_stacked_bars(labels, scopes, stack_order=stack_order, colors=colors,
+						  xscale=xscale, yscale=yscale, title=title, xlab=xlab, ylab=ylab,
+						  xlims=xlims, ylims=ylims, wrap_width=wrap_width)
 	def plot_unit_cc(self, xscale=1, yscale=1, title='APV vs Average Cost',
 					 xlab='Annual Production Volume (APV)', ylab='Unit Cost'):
 		apvs = [apv * xscale for apv in self.prod_map.keys()]
