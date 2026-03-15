@@ -3,11 +3,11 @@ step_id,Step ID (unique),crushing,classifying,grinding,dewatering,sulfate_roasti
 step_name,Human-readable process step,Crushing,Classification,Grinding via mill,Dewatering to allow for high-temp roasting,Roasting of lepidolate with sulfate salts,Water leaching,Impurity Removal,Lithium Stream Clarification
 key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A (mechanical),N/A (size separation),N/A (mechanical).,Mechanical dewatering from 60% to 80% slurry.,,,"Impurity precipitation / neutralization, e.g. Fe³⁺ + 3OH⁻ → Fe(OH)₃(s); Mg²⁺ + CO₃²⁻ → MgCO₃(s); Ca²⁺ + CO₃²⁻ → CaCO₃(s); Al³⁺ + 3OH⁻ → Al(OH)₃(s). Lithium remains mostly in solution.",
 notes,"Key information, notes","Primary & secondary crushing, generates crushed ore for wet circuit",Hydrocyclones+screens to split coarse vs fine; assume coarse refeed to achieve input/output; fines feed thickener,,"Go from 40% water slurry to 20% water cake. 60% slurry has density of 1/(0.60/2.7+0.4/1) = 1.607 --> 0.6*1.607 = 0.965 t/m3 solids. At 80% cake, new density is 0.964/0.8 = 1.205 t/m3; water goes from 0.643 t/m3 --> 0.241 t/m3, or ~0.4 t/m3≈0.4 m3/m3 water removed from intermediate slurry ",,,"Chemical removal of impurities (Mg, Ca, Fe, Al, etc.) via pH adjustment and precipitation; produces purified Li solution for downstream recovery and an impurity sludge for disposal.",
-machine_options,,crushing_cycle.conservative; crushing_cycle.midpoint; crushing_cycle.optimistic,classifier_generic.conservative; classifier_generic.midpoint; classifier_generic.optimistic,high_energy_grinding_mill,presser,sulfate_roasting_train_lepidolite,water_leach,staged_neutralization,solid_liquid_separation
-machine_default,,crushing_cycle.midpoint,classifier_generic.midpoint,high_energy_grinding_mill,presser,sulfate_roasting_train_lepidolite,water_leach,staged_neutralization,solid_liquid_separation
+machine_options,,crushing_cycle.conservative; crushing_cycle.midpoint; crushing_cycle.optimistic,classifier_flotation.conservative; classifier_flotation.midpoint; classifier_flotation.optimistic,high_energy_grinding_mill.conservative; high_energy_grinding_mill.midpoint; high_energy_grinding_mill.optimistic,mechanical_dewatering.conservative; mechanical_dewatering.midpoint; mechanical_dewatering.optimistic,sulfate_roasting_train_lepidolite.conservative; sulfate_roasting_train_lepidolite.midpoint; sulfate_roasting_train_lepidolite.optimistic,water_leach.conservative; water_leach.midpoint; water_leach.optimistic,staged_neutralization.conservative; staged_neutralization.midpoint; staged_neutralization.optimistic,solid_liquid_separation.conservative; solid_liquid_separation.midpoint; solid_liquid_separation.optimistic
+machine_default,,crushing_cycle.midpoint,classifier_flotation.midpoint,high_energy_grinding_mill.midpoint,mechanical_dewatering.midpoint,sulfate_roasting_train_lepidolite.midpoint,water_leach.midpoint,staged_neutralization.midpoint,solid_liquid_separation.midpoint
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,crushed_ore_throughput,classified_slurry_throughput,slurry_being_ground,slurry_press_throughput,roasting_mix,leaching_slurry,pregnant_solution_throughput,mixture_being_separated
 step_basis_unit,,tonnes crushed ore,m^3 slurry (30wt%),m^3 slurry (60wt%),m^3 slurry being pressed into cake,"tonnes (80% solids cake being dried, roasted, and cooled)",m^3 20wt% solid slurry,m^3 raw pregnant leach solution,m^3 pregant leach solution being clarified
-step_ccf,Constituent conversion factor from constituent units to step_basis units,0.001,0.0003699,0.0009643,0.0009643,0.0005263,0.0001507,0.0002288,0.0002288
+step_ccf,Constituent conversion factor from constituent units to step_basis units,0.001,0.0003699,0.0009643,0.0009643,0.0005000,0.0001507,0.0002288,0.0002288
 step_ccf_units,Units to convert constituents into step_basis units,kg ore / tonne ore • 1/PPM ,kg ore / tonne ore • 1/PPM ,kg ore / m3 60% slurry,kg ore / m3 60% slurry,kg ore / tonne roasting mix,kg ore / m3 20% slurry,kg ore / m3 20% slurry,kg ore / m3 20% slurry
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",crushed_ore_throughput,Li,slurry_being_ground,slurry_press_throughput,roasting_mix,Li,pregnant_solution_throughput,mixture_being_separated
 volume_defining_basis_unit,What unit is the process volume or constituent in?,tonnes,ppm Li / kg slurry (30wt%),m^3 slurry (60wt%),m^3 slurry being pressed into cake,"tonnes (80% solids cake being dried, roasted, and cooled)",ppm Li / kg slurry (30wt%),m^3 raw pregnant leach solution,m^3 pregant leach solution being clarified
@@ -15,7 +15,7 @@ volume_defining_output,What is the output or output constituent that needs to be
 volume_defining_output_unit,What unit is that output in?,tonnes crushed ore,ppm Li / kg slurry (60wt%),m^3 ground slurry (60wt%),"tonnes (80wt% solids cake to be dried, roasted, and cooled)",tonnes roasted sulfated ore mix,ppm Li / kg slurry (60wt%),m^3 pregant leach solution to be clarified,L clarified PLS
 primary_input_1_name,,rom_ore_feed,crushed_ore,classified_slurry,ground_slurry,roaster_feed,roasted_mix,pregnant_leach_solution,neutralized_pls
 primary_input_1_units,Primary input units,m^3 ore,tonnes crushed ore,m^3 slurry (60wt%),m^3 ground slurry (60wt%),"tonnes (80wt% solids cake to be dried, roasted, and cooled)",tonnes roasted sulfated ore mix,m^3 PLS to be neutralized,m^3 pregant leach solution to be clarified
-primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,2.7,2.7037,1.000,1.000,1.52,4.37,1,1
+primary_input_1_conversion_factor,Conversion factor of input into step basis. (Input * CF = Basis) ,2.7,2.7037,1.000,1.000,1.6,4.37,1,1
 primary_input_1_constituents,Names of input constituents,Li,Li,Li,Li,Li,Li,Li,Li
 primary_input_1_constituent_fractions,Values of input constituents,,,,,,,,
 primary_input_1_constituent_units,Units for each input constituent,ppm (wt),ppm (mg Li / kg ore),ppm (wt),ppm (wt),ppm (wt),ppm (wt),ppm (wt),ppm (wt)
@@ -25,25 +25,25 @@ primary_input_1_chemistry_dependence,Does the chemistry for this primary input d
 reagent_1_name,Reagent name,,process_water,,,sodium_sulfate,process_water,neutralizing_agent,flocculant
 reagent_1_name_long,Long/descriptive reagent name,,Water to be added to allow for classification via hydrocyclone,,,Sodium sulfate (Na2SO4),Water to be for leaching,Lime / limestone / NaOH / similar reagents mix for impurity precipitation and pH control.,High-molecular-weight flocculant for CCD overflow/underflow separation
 reagent_1_target_constituents,,,classified_slurry_throughput,,,roasting_mix,leaching_slurry,pregnant_solution_throughput,mixture_being_separated
-reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.863,,,263.16,0.915,4.000,0.005
+reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.863,,,250.00,0.915,4.000,0.005
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,,0,0,0,0
 reagent_1_units,,,m^3/m^3 classified slurry,,,kg/tonne roaster_mix,m^3/m^3 classified slurry,kg/m^3 solution,kg/m^3 slurry
-reagent_2_name,Reagent name,,,,,lime,,flocculant,
-reagent_2_name_long,Long/descriptive reagent name,,,,,"Lime (to target Fluorine species, which is siphoned off by silica and alumina; amount is ~standard industrial buffer)",,High-molecular-weight flocculant for CCD overflow/underflow separation,
-reagent_2_target_constituents,,,,,,roasting_mix,,pregnant_solution_throughput,
-reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,,,,78.95,,0.005,
-reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,,,,0.95,,0,
-reagent_2_units,,,,,,kg/tonne roaster_mix,,kg/m^3 slurry,
-reagent_3_name,Reagent name,,,,,,,sulfuric_acid,
-reagent_3_name_long,Long/descriptive reagent name,,,,,,,Sulfuric acid for pH adjustments,
-reagent_3_target_constituents,,,,,,,,pregnant_solution_throughput,
-reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,,,,,,1,
-reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,,,,,,0,
-reagent_3_units,,,,,,,,kg/m^3 slurry,
+reagent_2_name,Reagent name,,depressants,,,lime,,flocculant,
+reagent_2_name_long,Long/descriptive reagent name,,"sodium hexametaphosphate, for flotation",,,"Lime (to target Fluorine species, which is siphoned off by silica and alumina; amount reported from Yan et al. 2012)",,High-molecular-weight flocculant for CCD overflow/underflow separation,
+reagent_2_target_constituents,,,classified_slurry_throughput,,,roasting_mix,,pregnant_solution_throughput,
+reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,0.1,,,75.00,,0.005,
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,,0,,0,
+reagent_2_units,,,kg/m^3,,,kg/tonne roaster_mix,,kg/m^3 slurry,
+reagent_3_name,Reagent name,,collectors,,,potassium_sulfate,,sulfuric_acid,
+reagent_3_name_long,Long/descriptive reagent name,,"dodecylamine, for flotation",,,Potassiume Sulfate,,Sulfuric acid for pH adjustments,
+reagent_3_target_constituents,,,classified_slurry_throughput,,,roasting_mix,,pregnant_solution_throughput,
+reagent_3_constituent_ratio,Reagent per target (e.g. kg/kg),,0.12,,,50.00,,1,
+reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,,0,,0,
+reagent_3_units,,,kg/m^3,,,kg/tonne roaster_mix,,kg/m^3 slurry,
 primary_output_1_name,Output stream/material,crushed_ore,classified_slurry,ground_slurry,roaster_feed,roasted_mix,pregnant_leach_solution,neutralized_pls,pls_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,classifying,grinding,dewatering,sulfate_roasting,water_leach,impurity_removal,stream_clarification,Final
-primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",0.99,0.92,0.995,1,1,0.95,0.95,0.995
-primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,0.3836,1,1.205,0.8684,0.869,1,1000
+primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",0.99,0.6,0.995,1,1,0.95,0.95,0.995
+primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,0.3836,1,1.205,0.8750,0.869,1,1000
 primary_output_1_units,Units after conversion is applied,tonnes crushed ore,m^3 slurry (60wt%),m^3 ground slurry (60wt%),"tonnes (80wt% solids cake to be dried, roasted, and cooled)",tonnes roasted sulfated ore mix,m^3 PLS to be neutralized,m^3 pregant leach solution to be clarified,L clarified PLS
 primary_output_1_constituents,,,Li,,,,Li,,
 primary_output_1_constituent_fractions,,,,,,,,,
@@ -53,7 +53,7 @@ primary_output_1_ccf_units,Units for constituent conversion factor,kg ore / tonn
 primary_output_1_chemistry_dependence,Does the chemistry for this primary output depend on the chemistry of any of the primary inputs?,TRUE,FALSE,TRUE,TRUE,TRUE,FALSE,TRUE,TRUE
 coproduct_1_name,,,coarse_reject,,wash_liquor,fluorine_offgas,leach_residue,impurity_sludge,impurity_sludge
 coproduct_1_sink,,,tailings_65,,wastewater_treatment,offgas_handling,tailings_65,tailings_20,tailings_20
-coproduct_1_conversion_factor,,,0.65,,0.4,,0.131,0.05,0.005
+coproduct_1_conversion_factor,,,0.65,,0.4,0,0.131,0.05,0.005
 coproduct_1_units,,,m3/m3 slurry being classified,,m3/m3,,m3/m3,m3/m3 PLS,m3/m3 PLS
 coproduct_1_constituents,,,,,,,"Al, Fe, Si, CaF2","precipitated_impurities (Mg/Ca/B), minor Li-bearing liquor","precipitated_impurities (Mg/Ca/B), minor Li-bearing liquor"
 coproduct_1_constituent_fractions,,,,,,,,,

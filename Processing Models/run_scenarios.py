@@ -1,6 +1,6 @@
 import helpers
 from supply_chain import SupplyChain
-from facility import Facility, tailings_handling, brine_reinjection
+from facility import Facility, tailings_handling
 from production_step import ProductionStep
 from transportation import Transportation, TransportRoute
 
@@ -37,7 +37,6 @@ def lithium_evaporation(sc,project_data,data_folder):
 	evap.set_conversion_factor("concentrated_lithium_brine",evap_rate) # Convert to m^2 of area
 	evap.set_conversion_factor("pumped_brine",1/evap_rate) # Convert from m^2 of area to brine to be pumped
 
-
 	# Transportation
 	products = {"concentrated_lithium_brine": 1}
 	if project_data["Transport 1"] is None: 
@@ -67,7 +66,7 @@ def lithium_evaporation(sc,project_data,data_folder):
 def clay_lepidolite(sc,project_data,data_folder):
 	# Pregnant Solution Processing facility
 	lithium_extraction = Facility(fac_id="Lithium Extraction", supply_chain=sc,
-								sinks=["tailings_20","tailings_25","tailings_35","tailings_65","tailings_solid",
+								sinks=["tailings_20","tailings_25","tailings_30","tailings_35","tailings_65","tailings_solid",
 								"wastewater_treatment","atmosphere"],
 								location=project_data["Location 2"], # Assume lithium extraction is adjacent to leaching plant 
 								steps=helpers.build_facility_dict(data_folder,project_data["Pathway 3"]))
@@ -75,7 +74,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 
 	# Communition and Leaching facility 
 	material_refining = Facility(fac_id="Material Refining", supply_chain=sc,
-								sinks = ["tailings_20","tailings_25","tailings_35","tailings_65","tailings_solid",
+								sinks = ["tailings_20","tailings_25","tailings_30","tailings_35","tailings_65","tailings_solid",
 								"offgas_handling","wastewater_treatment","atmosphere"],
 								location=project_data["Location 2"],
 								steps=helpers.build_facility_dict(data_folder,project_data["Pathway 2"]))
@@ -178,14 +177,13 @@ def clay_lepidolite(sc,project_data,data_folder):
 
 	return sc 
 
-def evaluate_project(sc,project_data,data_folder,detail=1):
+def evaluate_project(sc,project_data,data_folder,detail=1,plot=1):
 	summary = {}
 
 	project_type = project_data["Type"]
 	if project_type == "Brine-Evaporative":
 		sc = lithium_evaporation(sc,project_data,data_folder)
 		tailings_handling(sc)
-		brine_reinjection(sc)
 	elif project_type == "Brine-DLE":
 		pass 
 	elif project_type == "Spodumene":
@@ -209,8 +207,6 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 		print("\nStep Production volumes:", sc.get_detailed_pvs())
 		# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
 		# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
-	
-	if detail <= 2:
 		pprint(sc.get_step_costs(transp=True,detail=1))
 
 	if (detail > 1) and (detail <=2):
@@ -237,14 +233,15 @@ def evaluate_project(sc,project_data,data_folder,detail=1):
 	if detail > 3:
 		print(sc.get_step_reagent_usage())
 		pprint(sc.get_step_utilities_detailed())
-		
-	# sc.plot_step_costs(mode="average",view="opex",detail=3)
-	sc.plot_step_costs(mode="average",view="opex",detail=2)
-	sc.plot_step_impacts(mode="average")
-	# sc.plot_step_costs(view="variable",detail=3)
-	# sc.plot_step_costs(view="variable",detail=2)
-	# sc.plot_tot_steps_impacts()
-	# sc.plot_total_cc()
+	
+	if plot == 1:
+		# sc.plot_step_costs(mode="average",view="opex",detail=3)
+		sc.plot_step_costs(mode="average",view="opex",detail=2)
+		sc.plot_step_impacts(mode="average")
+		# sc.plot_step_costs(view="variable",detail=3)
+		# sc.plot_step_costs(view="variable",detail=2)
+		# sc.plot_tot_steps_impacts()
+		# sc.plot_total_cc()
 
 	helpers.update_machines(sc,"conservative")
 	helpers.update_materials(sc,project_data,"conservative")
@@ -320,18 +317,47 @@ def wk_compare(sc,proj): # Outputs metrics for comparison against Wesselkamper e
 		"\nAvg. Other Process costs:", proc_other/apv,
 		"\nAvg. Process Capex costs:", proc_capex/apv)
 
-def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write,detail=1):
+def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=False,detail=1,plot=1):
+	"""
+	write=False  -> do not write to CSV
+	write=True   -> write full conservative/midpoint/optimistic to standard columns
+	write=N (int)-> also write a top-N restricted scenario to columns suffixed '-N'
+	               (e.g. 'Our Study-Low-3', 'Our Study-Midpoint-3', 'Our Study-High-3')
+	"""
 	project_summaries = {}
+	topn_summaries    = {}  # populated only when write is an integer
 
 	for project in projects:
 		project_data = projects_data[project]
 		sc = SupplyChain(transp_data,loc_data,machine_data,material_data)
-		summary = evaluate_project(sc,project_data,data_folder,detail)
+		summary = evaluate_project(sc,project_data,data_folder,detail,plot=plot)
+		if plot == 2:
+			plot_scenario_step_costs(sc, project_data, project_data["Production Volume"],
+				view="opex",	# total|variable|fixed|opex|capex  (combo not supported)
+				mode="average",	# "total" | "average"
+				detail=2,		# 1|2|3 — applied to midpoint bars; conservative/optimistic always use detail=1
+				transp=True,
+				# title=None,
+			)
+			plot_scenario_step_impacts(sc, project_data, project_data["Production Volume"],
+				mode="average",         # "total" | "average"
+				impact="co2",           # impact category key (e.g. "co2", "ghg")
+				# title=None,
+			)
+		if plot == 3:
+			tornado = run_tornado_data(sc, project_data, apv=project_data["Production Volume"])
+			helpers.plot_tornado(tornado, metric="avg_opex", top_n=5)
+			helpers.plot_tornado(tornado, metric="avg_co2",  top_n=5)
+
 		project_summaries[project] = summary 
-		# pprint(summary)
+		
+		# If write is an integer, run the top-N restricted scenarios now while sc is built
+		if isinstance(write, int) and write > 0:
+			topn_summaries[project] = run_topn_scenarios(
+				sc, project_data, project_data["Production Volume"], top_n=write
+			)
 
 	# pprint(project_summaries)
-
 	extracted_data = {}
 	for key, value in project_summaries.items():
 		extracted_data[key] = {}
@@ -342,11 +368,12 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 				'avg_var_cost': sub_value['avg_var_cost'],
 				'avg_co2': sub_value['avg_co2']/1000 # Divide by 1000 to get tonnes
 			}
-	pprint(extracted_data)
-
+	
+	if detail == 1:
+		pprint(extracted_data)
 	# helpers.plot_project_summaries(project_summaries)
 
-	if write:
+	if write is not False and write is not None:
 		# Assumes:
 		# Lithium Interventions/
 		#	Processing Models/run_scenarios.py  (this file)
@@ -354,45 +381,363 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 		#	Cost-Emissions/reported_emissions.csv
 		base_dir = os.path.dirname(os.path.abspath(__file__))
 		cost_emissions_dir = os.path.normpath(os.path.join(base_dir,"..","Costs-Emissions"))
-
-		# cost_csv_path = os.path.join(cost_emissions_dir,"reported_costs.csv")
-		# emissions_csv_path = os.path.join(cost_emissions_dir,"reported_emissions.csv")
 		both_csv_path = os.path.join(cost_emissions_dir,"reported_both.csv")
 
-		write_project_outputs_to_csv(extracted_data,both_csv_path)
+		# Full outputs to standard columns
+		write_project_outputs_to_csv(extracted_data, both_csv_path)
+		# Write top-N outputs to suffixed columns
+		if isinstance(write, int) and write > 0:
+			write_project_outputs_to_csv(topn_summaries, both_csv_path, col_suffix=f"-{write}")
 
 	return extracted_data
 
-def write_project_outputs_to_csv(extracted_data,both_csv_path):
-	# Map scenario names -> "Our Study" columns
+def write_project_outputs_to_csv(extracted_data, both_csv_path, col_suffix=""):
+	"""
+	Write extracted_data to the CSV at both_csv_path.
+ 
+	col_suffix: appended to each column name.
+	  ""   -> writes to "Our Study-Low", "Our Study-Midpoint", "Our Study-High"
+	  "-3" -> writes to "Our Study-Low-3" and "Our Study-High-3" only
+	         (midpoint is omitted when a suffix is present — it's always the same)
+	"""
 	scen_to_col = {
-		"optimistic": "Our Study-Low",
-		"midpoint": "Our Study-Midpoint",
-		"conservative": "Our Study-High",
+		"optimistic":   f"Our Study-Low{col_suffix}",
+		"midpoint":		 "Our Study-Midpoint",
+		"conservative": f"Our Study-High{col_suffix}",
 	}
-
+	
 	df = pd.read_csv(both_csv_path)
 
-	for project,scens in extracted_data.items():
+	# Create any missing columns so loc assignment doesn't fail
+	for col in scen_to_col.values():
+		if col not in df.columns:
+			df[col] = None
+ 
+	for project, scens in extracted_data.items():
 		project_mask = df["Project"].astype(str) == str(project)
 		if not project_mask.any():
 			continue
-
+ 
 		cost_mask  = project_mask & (df["Dimension"] == "Cost")
 		emiss_mask = project_mask & (df["Dimension"] == "Emissions")
-
+ 
 		for scen, col in scen_to_col.items():
 			# Write avg_opex into Cost row
 			cost_val = (scens.get(scen) or {}).get("avg_opex", None)
 			if cost_mask.any():
 				df.loc[cost_mask, col] = helpers.format_currency(cost_val)
-
+ 
 			# Write avg_co2 into Emissions row
 			emiss_val = (scens.get(scen) or {}).get("avg_co2", None)
 			if emiss_mask.any():
 				df.loc[emiss_mask, col] = emiss_val
+ 
+	df.to_csv(both_csv_path, index=False)
 
-	df.to_csv(both_csv_path,index=False)
+def plot_scenario_step_costs(sc, project_data, apv, *,
+	view="opex",       # total|variable|fixed|opex|capex  (combo not supported)
+	mode="average",       # "total" | "average"
+	detail=2,           # 1|2|3 — applied to midpoint bars; conservative/optimistic always get aggregated to detail=1
+	transp=True,
+	wrap_width=12,
+	xscale=1,
+	yscale=1,
+	title=None,
+	xlab='Step Names',
+	ylab=None,
+	):
+	"""
+	Plot midpoint step costs as stacked bars (detail=detail) with asymmetric error bars
+	showing the conservative (lower) and optimistic (upper) scenario extents.
+ 
+	The sc object must already have its facilities built (e.g. after evaluate_project or
+	the relevant lithium_evaporation / clay_lepidolite call).  All three scenarios are
+	re-run internally; the sc is left in the optimistic state after the call.
+ 
+	view='combo' is not supported here — use view='opex' or view='capex' separately.
+	"""
+	import numpy as np
+ 
+	view = str(view).lower().strip()
+	if view == "combo":
+		raise ValueError("view='combo' is not supported in plot_scenario_step_costs; use 'opex' or 'capex' separately.")
+ 
+	mode = str(mode).lower().strip()
+	if mode not in {"total", "average"}:
+		raise ValueError("mode must be 'total' or 'average'")
+	if mode == "average" and not apv:
+		raise ValueError("apv is zero; cannot compute average costs.")
+ 
+	def _get_totals(labels, series):
+		"""Sum across all series keys to get one total per step."""
+		n = len(labels)
+		totals = np.zeros(n)
+		for vals in series.values():
+			totals += np.asarray(vals, dtype=float)
+		return totals
+ 
+	# ---- Conservative ----
+	helpers.update_machines(sc, "conservative")
+	helpers.update_materials(sc, project_data, "conservative")
+	sc.update_apv(apv, recalc=True)
+	con_labels, con_series, _ = sc._build_steps_cost_series(view=view, detail=detail, transp=transp, top_n=None)
+	con_totals = _get_totals(con_labels, con_series)
+ 
+	# ---- Optimistic ----
+	helpers.update_machines(sc, "optimistic")
+	helpers.update_materials(sc, project_data, "optimistic")
+	sc.update_apv(apv, recalc=True)
+	opt_labels, opt_series, _ = sc._build_steps_cost_series(view=view, detail=detail, transp=transp, top_n=None)
+	opt_totals = _get_totals(opt_labels, opt_series)
+
+	# ---- Midpoint ----
+	helpers.update_machines(sc, "midpoint")
+	helpers.update_materials(sc, project_data, "midpoint")
+	sc.update_apv(apv, recalc=True)
+	mid_labels, mid_series, stack_order = sc._build_steps_cost_series(view=view, detail=detail, transp=transp, top_n=None)
+	mid_totals = _get_totals(mid_labels, mid_series)
+
+	# print(con_labels, mid_labels, opt_labels)
+	# print(con_totals, mid_totals, opt_totals)
+	# Sanity check — all three runs should produce the same step ordering
+	if con_labels != mid_labels or opt_labels != mid_labels:
+		raise ValueError("Step label mismatch across scenarios; check that all three runs produce the same steps.")
+ 
+	# ---- Compute asymmetric error extents ----
+	err_low  = np.maximum(mid_totals - opt_totals, 0.0)  # downward: midpoint -> optimistic
+	err_high = np.maximum(con_totals - mid_totals, 0.0)  # upward:   midpoint -> conservative
+ 
+	# ---- Apply mode scaling ----
+	divisor = apv if mode == "average" else 1.0
+	mid_series = {k: [v / divisor for v in vals] for k, vals in mid_series.items()}
+	err_low  = err_low  / divisor
+	err_high = err_high / divisor
+ 
+	# ---- Default labels ----
+	if title is None:
+		base = "Cost of Steps" if mode == "total" else "Average Cost per Unit at each Step"
+		title = f"{base} (with scenario range)"
+	if ylab is None:
+		ylab = "Total Cost" if mode == "total" else "Average Cost ($/t)"
+ 
+	helpers.plot_stacked_bars(
+		mid_labels, mid_series,
+		stack_order=stack_order,
+		xscale=xscale, yscale=yscale,
+		title=title, xlab=xlab, ylab=ylab,
+		wrap_width=wrap_width,
+		err_low=err_low,
+		err_high=err_high,
+	)
+
+def plot_scenario_step_impacts(sc, project_data, apv, *,
+	mode="average",         # "total" | "average"
+	impact="co2",           # impact category key (e.g. "co2", "ghg")
+	transp=True,
+	wrap_width=12,
+	xscale=1,
+	yscale=1,
+	title=None,
+	xlab='Step Names',
+	ylab=None,
+	):
+	"""
+	Plot midpoint step impacts as stacked scope bars with asymmetric error bars
+	showing the conservative (higher emissions) and optimistic (lower emissions) extents.
+ 
+	The sc object must already have its facilities built. All three scenarios are
+	re-run internally; the sc is left in the optimistic state after the call.
+	"""
+	import numpy as np
+ 
+	mode = str(mode).lower().strip()
+	if mode not in {"total", "average"}:
+		raise ValueError("mode must be 'total' or 'average'")
+	if mode == "average" and not apv:
+		raise ValueError("apv is zero; cannot compute average impacts.")
+ 
+	def _get_totals(scopes):
+		"""Sum across all scope keys to get one total per step."""
+		totals = None
+		for vals in scopes.values():
+			arr = np.asarray(vals, dtype=float)
+			totals = arr if totals is None else totals + arr
+		return totals if totals is not None else np.zeros(0)
+ 
+	# ---- Conservative ----
+	helpers.update_machines(sc, "conservative")
+	helpers.update_materials(sc, project_data, "conservative")
+	sc.update_apv(apv, recalc=True)
+	con_labels, con_scopes, _ = sc._build_steps_impact_series(impact=impact, transp=transp)
+	con_totals = _get_totals(con_scopes)
+ 
+	# ---- Optimistic ----
+	helpers.update_machines(sc, "optimistic")
+	helpers.update_materials(sc, project_data, "optimistic")
+	sc.update_apv(apv, recalc=True)
+	opt_labels, opt_scopes, _ = sc._build_steps_impact_series(impact=impact, transp=transp)
+	opt_totals = _get_totals(opt_scopes)
+ 
+	# ---- Midpoint ----
+	helpers.update_machines(sc, "midpoint")
+	helpers.update_materials(sc, project_data, "midpoint")
+	sc.update_apv(apv, recalc=True)
+	mid_labels, mid_scopes, stack_order = sc._build_steps_impact_series(impact=impact, transp=transp)
+	mid_totals = _get_totals(mid_scopes)
+ 
+	# Sanity check
+	if con_labels != mid_labels or opt_labels != mid_labels:
+		raise ValueError("Step label mismatch across scenarios.")
+ 
+	# ---- Compute asymmetric error extents ----
+	# Conservative = higher emissions (upward bar), optimistic = lower (downward bar)
+	err_high = np.maximum(con_totals - mid_totals, 0.0)
+	err_low  = np.maximum(mid_totals - opt_totals, 0.0)
+ 
+	# ---- Apply mode scaling ----
+	divisor = apv if mode == "average" else 1.0
+	mid_scopes = {k: [v / divisor for v in vals] for k, vals in mid_scopes.items()}
+	err_low  = err_low  / divisor
+	err_high = err_high / divisor
+ 
+	# ---- Default labels ----
+	if title is None:
+		base = f"{impact.upper()} Impacts at each Step" if mode == "total" else f"Average {impact.upper()} Impact per Unit at each Step"
+		title = f"{base} (with scenario range)"
+	if ylab is None:
+		ylab = f"Total {impact.upper()} (kg)" if mode == "total" else f"Avg {impact.upper()} (kg/t)"
+ 
+	colors = {"Scope One": "#f28e2b", "Scope Two": "#4e79a7", "Scope Three": "#76b7b2"}
+	helpers.plot_stacked_bars(
+		mid_labels, mid_scopes,
+		stack_order=stack_order,
+		colors=colors,
+		xscale=xscale, yscale=yscale,
+		title=title, xlab=xlab, ylab=ylab,
+		wrap_width=wrap_width,
+		err_low=err_low,
+		err_high=err_high,
+	)
+
+def run_tornado_data(sc, project_data, apv):
+	def _record(summary):
+		return {
+			"avg_opex":     summary.get("avg_opex",     0.0),
+			"avg_var_cost": summary.get("avg_var_cost", 0.0),
+			"avg_co2":      summary.get("avg_co2",      0.0),
+		}
+
+	def _reset_to_midpoint():
+		helpers.update_machines(sc, "midpoint")
+		helpers.update_materials(sc, project_data, "midpoint")
+
+	results = {"baseline": {}, "machines": {}, "materials": {}}
+
+	# Baseline
+	_reset_to_midpoint()
+	results["baseline"] = _record(sc.update_apv(apv, recalc=True))
+
+	# Machines — vary one base at a time, hold all else at midpoint
+	machine_bases = set()
+	for step in sc.get_steps(transp=False):
+		block = getattr(step, "machine_block", None)
+		if block:
+			machine_bases.add(block.split(".", 1)[0])
+
+	for base in sorted(machine_bases):
+		results["machines"][base] = {}
+		for rank in ("conservative", "optimistic"):
+			_reset_to_midpoint()
+			helpers.update_machines(sc, {base: rank})
+			results["machines"][base][rank] = _record(sc.update_apv(apv, recalc=True))
+
+	# Materials — vary one material at a time, hold all else at midpoint
+	mat_costs   = project_data.get("material_cost",   {}) or {}
+	mat_impacts = project_data.get("material_impact", {}) or {}
+	all_materials = set(mat_costs.keys()) | set(mat_impacts.keys())
+
+	for material in sorted(all_materials):
+		results["materials"][material] = {}
+		single_proj = {
+			"material_cost":   {material: mat_costs.get(material, {})},
+			"material_impact": {material: mat_impacts.get(material, {})},
+		}
+		for rank in ("conservative", "optimistic"):
+			_reset_to_midpoint()
+			helpers.update_materials(sc, single_proj, rank)
+			results["materials"][material][rank] = _record(sc.update_apv(apv, recalc=True))
+
+	# Restore to midpoint
+	_reset_to_midpoint()
+	sc.update_apv(apv, recalc=True)
+
+	return results
+
+def run_topn_scenarios(sc, project_data, apv, top_n, metric="avg_opex"):
+	"""
+	Re-run conservative/midpoint/optimistic scenarios varying only the top_n most
+	impactful machines and materials (ranked by |conservative - optimistic| range
+	on `metric`).  Everything else is held at midpoint.
+ 
+	Internally calls run_tornado_data to establish the ranking, then runs three
+	targeted scenario passes.  sc is restored to midpoint after the call.
+ 
+	Returns a dict with the same structure as evaluate_project:
+	{
+	    "conservative": {"apv": ..., "avg_opex": ..., "avg_var_cost": ..., "avg_co2": ...},
+	    "midpoint":     {...},
+	    "optimistic":   {...},
+	}
+	"""
+	# Step 1: get tornado ranking
+	tornado = run_tornado_data(sc, project_data, apv)
+ 
+	# Step 2: build ranked list of (kind, name, opt_val, con_val)
+	entries = []
+	for name, vals in tornado.get("machines", {}).items():
+		entries.append(("machine", name, vals["optimistic"][metric], vals["conservative"][metric]))
+	for name, vals in tornado.get("materials", {}).items():
+		entries.append(("material", name, vals["optimistic"][metric], vals["conservative"][metric]))
+ 
+	entries.sort(key=lambda x: abs(x[3] - x[2]), reverse=True)
+	top_entries = entries[:top_n]
+ 
+	top_machines  = {e[1] for e in top_entries if e[0] == "machine"}
+	top_materials = {e[1] for e in top_entries if e[0] == "material"}
+ 
+	# Build a project_data slice covering only the top materials
+	mat_costs   = project_data.get("material_cost",   {}) or {}
+	mat_impacts = project_data.get("material_impact", {}) or {}
+	top_proj = {
+		"material_cost":   {m: mat_costs.get(m,   {}) for m in top_materials},
+		"material_impact": {m: mat_impacts.get(m, {}) for m in top_materials},
+	}
+ 
+	# Step 3: run three scenario passes
+	summary = {}
+	for rank in ("conservative", "midpoint", "optimistic"):
+		# Always start from a clean midpoint
+		helpers.update_machines(sc, "midpoint")
+		helpers.update_materials(sc, project_data, "midpoint")
+		# Then apply only the top-N variables at the current rank
+		if top_machines:
+			helpers.update_machines(sc, {base: rank for base in top_machines})
+		if top_materials:
+			helpers.update_materials(sc, top_proj, rank)
+		result = sc.update_apv(apv, recalc=True)
+		summary[rank] = {
+			"apv":          result["apv"],
+			"avg_opex":     result["avg_opex"],
+			"avg_var_cost": result["avg_var_cost"],
+			"avg_co2":      result.get("avg_co2", 0.0) / 1000,  # kg -> t to match extracted_data convention
+		}
+ 
+	# Restore to midpoint
+	helpers.update_machines(sc, "midpoint")
+	helpers.update_materials(sc, project_data, "midpoint")
+	sc.update_apv(apv, recalc=True)
+ 
+	return summary
 
 if __name__ == '__main__':
 	data_folder = "./data/"
@@ -407,20 +752,28 @@ if __name__ == '__main__':
 	################
 	# Pick project #
 	################
-	projects = ["Silver Peak"]
+	# projects = ["Silver Peak"]
 	# projects = ["Thacker Pass"]
 	# projects = ["Jianxiawo"]
-	# projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
+	# projects = ["Jianxiawo","Thacker Pass"]
+	projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
 	write=False
 	# write=True
-	detail=3
+	# write=3
+	# write=5
+	detail=1
 	# detail=2
 	# detail=2.5
 	# detail=3
+	# plot=0
+	# plot=1
+	# plot=2
+	plot=3
 
-	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail)
-
+	# for write in [True,3,5]:
+	# 	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
+	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
 
 
 

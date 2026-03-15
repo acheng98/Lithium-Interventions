@@ -285,9 +285,7 @@ class Facility:
 				"""
 				if not recalc and apv in self.prod_map: # Don't need to re-run if already recorded
 						print("Input production volume has already been calculated.")
-						return
-				else:
-						return self.calculate_all(apv=apv)
+				return self.calculate_all(apv=apv)
 
 		# ============================================================
 		# UTILITIES & ENVIRONMENTAL IMPACTS
@@ -644,45 +642,55 @@ def tailings_handling(sc):
 		# Stacking:  c_disposal = 0 (stacking cost already in dewatering_stacking for s >= 0.55)
 		# ------------------------------------------------------------------
 
-		# --- Silver Peak: brine chemical treatment residue (Mg(OH)2 / CaCO3 filter cake) ---
-		# Route: off-site non-hazardous landfill (Nevada).  Disposal cost: EREF 2024.
-		s_brine = 0.35
-		c_brine = dewatering_stacking(s_brine, ep).cost + EREF_NONHAZ_NV / s_brine
-		sc.register_sink_cost("tailings_35", c_brine * ds_per_m3(s_brine))
-
+		# --- Jianxiawo: impurity sludge (metal hydroxide precipitates, hazardous) ---
+		# Route: off-site hazardous secure landfill (Jiangxi).  Disposal cost: NDRC 2024.
+		s_haz = 0.20
+		c_haz = dewatering_stacking(s_haz, ep).cost + NDRC_HAZ_JX / s_haz
+		sc.register_sink_cost("tailings_20", c_haz * ds_per_m3(s_haz))
+		
 		# --- Thacker Pass: impurity sludge (Mg/Ca precipitates, thickener underflow) ---
 		# Route: on-site CTFS (lined).  No gate fee; CTFS opex added explicitly.
-		# CHANGED: was dewatering_stacking(0.25).cost only; now adds ONSITE_CTFS_OPEX
 		s_tp_sludge = 0.25
 		c_tp_sludge = dewatering_stacking(s_tp_sludge, ep).cost + ONSITE_CTFS_OPEX
 		sc.register_sink_cost("tailings_25", c_tp_sludge * ds_per_m3(s_tp_sludge))
 
+		# --- Jianxiawo: classification/flotation coarse reject (nonhazardous gangue, wet slurry) ---
+		# Stream: dilute slurry discharged from classifying step at ~30wt% solids; not mechanically
+		# dewatered prior to disposal.  Route: on-site conventional wet tailings storage facility
+		# (TSF), Jiangxi.  No liner requirement for nonhazardous lepidolite gangue under China
+		# standards; basic earthwork + seepage monitoring + water reclaim circuit.
+		# Cost basis:
+		#   - Slurry pumping to TSF:   2.0 kWh/t DS (hilly Jiangxi terrain; placeholder)
+		#   - TSF OPEX:                4.0 $/t DS    (earthwork, monitoring, water reclaim)
+		#   - No gate fee (on-site); no mechanical dewatering (slurry pumped as-is)
+		# NOTE: dewatering_stacking() is NOT used here - this stream would be below the dewatering
+		# model range, but since it's nonhazardous, is not mechanically dewatered before placement.
+		WET_TSF_PUMP_KWH_PER_TDS = 2.0   # kWh/t DS
+		WET_TSF_OPEX_PER_TDS     = 4.0   # $/t DS
+		s_wet = 0.30
+		c_wet_tsf = WET_TSF_OPEX_PER_TDS + WET_TSF_PUMP_KWH_PER_TDS * ep
+		sc.register_sink_cost("tailings_30", c_wet_tsf * ds_per_m3(s_wet))
+
+		# --- Silver Peak: brine chemical treatment residue (Mg(OH)2 / CaCO3 filter cake) ---
+		# Route: on-site stacking. Stacking cost is returned directly by dewatering_stacking.
+		s_brine = 0.35
+		c_brine = dewatering_stacking(s_brine, ep).cost + ONSITE_CTFS_OPEX
+		sc.register_sink_cost("tailings_35", c_brine * ds_per_m3(s_brine))
+
 		# --- Thacker Pass + Jianxiawo: on-site stackable material (s ~ 0.62-0.68, use 0.65) ---
-		# Streams: Thacker Pass CCD filter cake; Jianxiawo coarse reject; Jianxiawo leach residue
+		# Streams: Thacker Pass CCD filter cake; Jianxiawo leach residue
 		# Route: on-site stacking.  Stacking cost is returned directly by dewatering_stacking.
 		s_stack = 0.65
 		c_stack = dewatering_stacking(s_stack, ep).cost		# stacking cost only; no gate fee
 		sc.register_sink_cost("tailings_65", c_stack * ds_per_m3(s_stack))
 
-		# --- Jianxiawo: impurity sludge (metal hydroxide precipitates, hazardous) ---
-		# Route: off-site hazardous secure landfill (Jiangxi).  Disposal cost: NDRC 2024.
-		# CHANGED: was dewatering_stacking(0.20).cost only; now adds NDRC hazardous gate fee / s
-		s_haz = 0.20
-		c_haz = dewatering_stacking(s_haz, ep).cost + NDRC_HAZ_JX / s_haz
-		sc.register_sink_cost("tailings_20", c_haz * ds_per_m3(s_haz))
-
 		# --- All pathways: crushed reject / waste rock (dry, on-site pile) ---
 		# Route: on-site waste rock stack; no dewatering, no gate fee.
 		# s ~ 0.95 (residual handling moisture); cost is conveyor + dozer only.
-		# CHANGED: was dewatering_stacking(1, ...) * 2.7; now uses s=0.95 and ds_per_m3
 		s_rock = 1
 		c_rock = dewatering_stacking(s_rock, ep).cost
 		sc.register_sink_cost("tailings_solid", c_rock * ds_per_m3(s_rock))
 
-		sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
-
-
-def brine_reinjection(sc):
 		sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
 
 

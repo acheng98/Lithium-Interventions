@@ -676,6 +676,8 @@ def plot_stacked_bars(labels, series_dict, *,
 	label_rotation=None, # degrees; None = auto (0 if n<=10, 40 if n<=18, 60 if more)
 	label_fontsize=None, # pt; None = auto (9 if n<=14, 8 if n<=20, 7 otherwise)
 	top_margin=0.12, 
+	err_low=None,   # array-like, length n — downward extent from bar top (conservative - midpoint)
+	err_high=None,  # array-like, length n — upward extent from bar top (optimistic - midpoint)
 	show=True,
 	):
 	"""
@@ -733,6 +735,13 @@ def plot_stacked_bars(labels, series_dict, *,
 		)
 		handle_map[name] = h
 		running_bottom += data[name]
+
+	# Plot error bars, if any; draw before limits so auto-ylim includes their extents
+	if err_low is not None or err_high is not None:
+		_low  = np.asarray(err_low  if err_low  is not None else np.zeros(n), dtype=float) * yscale
+		_high = np.asarray(err_high if err_high is not None else np.zeros(n), dtype=float) * yscale
+		ax.errorbar(x, running_bottom, yerr=[_low, _high],
+					fmt='none', color='black', capsize=4, linewidth=1.2, zorder=5)
 
 	# Ticks (uses your _wrap_labels if present, else raw labels)
 	try:
@@ -1028,7 +1037,55 @@ def plot_project_summaries(
 	
 	return fig, ax
 
+def plot_tornado(
+	tornado_data,
+	metric="avg_opex",      # "avg_opex" | "avg_co2" | "avg_var_cost"
+	top_n=5,
+	title=None,
+	xlab=None,
+	show=True,
+	):
+	baseline = tornado_data["baseline"][metric]
 
+	# Build flat list of (label, opt_val, con_val)
+	entries = []
+	for name, vals in tornado_data.get("machines", {}).items():
+		con = vals["conservative"][metric]
+		opt = vals["optimistic"][metric]
+		entries.append((f"Machine: {name}", opt, con))
+	for name, vals in tornado_data.get("materials", {}).items():
+		con = vals["conservative"][metric]
+		opt = vals["optimistic"][metric]
+		entries.append((f"Material: {name}", opt, con))
+
+	# Sort by range descending, take top_n, reverse so largest is at top
+	entries.sort(key=lambda x: abs(x[2] - x[1]), reverse=True)
+	entries = entries[:top_n][::-1]
+
+	labels   = [e[0] for e in entries]
+	opt_vals = np.array([e[1] for e in entries])
+	con_vals = np.array([e[2] for e in entries])
+
+	y = np.arange(len(entries))
+	fig, ax = plt.subplots(figsize=(10, max(4, len(entries) * 0.7 + 1.5)))
+
+	# Conservative bars — extend right (worse outcome)
+	ax.barh(y, con_vals - baseline, left=baseline, color="#f28e2b", label="Conservative", zorder=3)
+	# Optimistic bars — extend left (better outcome, negative width)
+	ax.barh(y, opt_vals - baseline, left=baseline, color="#4e79a7", label="Optimistic", zorder=3)
+
+	ax.axvline(baseline, color="black", linewidth=1.0, zorder=4)
+	ax.set_yticks(y)
+	ax.set_yticklabels(labels, fontsize=9)
+	ax.set_title(title or f"Tornado Plot — {metric}", pad=12)
+	ax.set_xlabel(xlab or metric)
+	ax.grid(axis="x", linestyle=":", alpha=0.4, zorder=0)
+	ax.legend(loc="lower right", frameon=True, facecolor="white", edgecolor="none")
+
+	plt.tight_layout()
+	if show:
+		plt.show()
+	return fig, ax
 
 
 

@@ -792,7 +792,7 @@ class SupplyChain:
 				if view == "capex":
 					selected_total = 0.0
 					if detail == 1:
-						out.append([step_id, selected_total])
+						out.append([step_name, selected_total])
 					else:
 						out.append(OrderedDict([
 							("step_id", step_id),
@@ -806,7 +806,7 @@ class SupplyChain:
 				if view in {"total", "variable", "fixed", "opex"}:
 					selected_total = total_cost
 					if detail == 1:
-						out.append([step_id, selected_total])
+						out.append([step_name, selected_total])
 					else:
 						out.append(OrderedDict([
 							("step_id", step_id),
@@ -875,7 +875,7 @@ class SupplyChain:
 			if view == "total":
 				total_cost = comp["variable_costs"] + comp["fixed_costs"]
 				if detail == 1:
-					out.append([step_id, total_cost])
+					out.append([step_name, total_cost])
 					continue
 
 				rec = OrderedDict([
@@ -904,7 +904,7 @@ class SupplyChain:
 			if view == "capex":
 				capex_total = sum(comp.get(k, 0.0) for k in capex_fields)
 				if detail == 1:
-					out.append([step_id, capex_total])
+					out.append([step_name, capex_total])
 					continue
 				out.append(OrderedDict([
 					("step_id", step_id),
@@ -919,7 +919,7 @@ class SupplyChain:
 				opex_fix = sum(comp.get(k, 0.0) for k in opex_fixed_fields)
 				opex_total = opex_var + opex_fix
 				if detail == 1:
-					out.append([step_id, opex_total])
+					out.append([step_name, opex_total])
 					continue
 
 				rec = OrderedDict([
@@ -944,7 +944,7 @@ class SupplyChain:
 			if view == "variable":
 				var_total = comp["variable_costs"]
 				if detail == 1:
-					out.append([step_id, var_total])
+					out.append([step_name, var_total])
 					continue
 
 				rec = OrderedDict([
@@ -964,7 +964,7 @@ class SupplyChain:
 			if view == "fixed":
 				fix_total = comp["fixed_costs"]
 				if detail == 1:
-					out.append([step_id, fix_total])
+					out.append([step_name, fix_total])
 					continue
 
 				rec = OrderedDict([
@@ -1113,6 +1113,8 @@ class SupplyChain:
 					sink_name = rec.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
 					if sink_name.startswith("tailings"):
 						sink_name = "Tailings"
+					elif sink_name.startswith("wastewater"):
+						sink_name = "Wastewater Treatment"
 					sink_cost_buf[sink_name] = sink_cost_buf.get(sink_name, 0.0) + cost
 				else:	# detail == 3: per-coproduct bar, skip zero-cost sinks
 					if cost == 0.0:
@@ -1342,6 +1344,41 @@ class SupplyChain:
 		plot_stacked_bars(labels, series, stack_order=stack_order, xscale=xscale, yscale=yscale,
 						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims, wrap_width=wrap_width)
 
+	def _build_steps_impact_series(
+		self,
+		impact: str,
+		transp: bool,
+		) -> tuple:
+		"""
+		Shared data-building logic for plot_step_impacts and plot_scenario_step_impacts.
+		Returns (labels, scopes, stack_order) with raw total impact values (not divided by APV).
+		The caller is responsible for any per-unit scaling.
+		"""
+		labels: List[str] = []
+		scopes: Dict[str, List[float]] = defaultdict(list)
+ 
+		for rec in self.get_step_impacts(transp=transp):
+			labels.append(rec["step_name"])
+ 
+			# Transport legs store emissions under 'ghg'; fall back if impact key absent
+			if rec["kind"] == "transport":
+				s1 = float(rec["scope_one"].get(impact) or rec["scope_one"].get("ghg", 0.0))
+			else:
+				s1 = float(rec["scope_one"].get(impact, 0.0) or 0.0)
+ 
+			s2 = float(rec["scope_two"].get(impact,   0.0) or 0.0)
+			s3 = float(rec["scope_three"].get(impact, 0.0) or 0.0)
+ 
+			scopes["Scope One"].append(s1)
+			scopes["Scope Two"].append(s2)
+			scopes["Scope Three"].append(s3)
+ 
+		# Only include scopes that have at least one non-zero value
+		stack_order = [s for s in ["Scope One", "Scope Two", "Scope Three"]
+					   if any(v != 0.0 for v in scopes.get(s, []))]
+
+		return labels, scopes, stack_order
+
 	def plot_step_impacts(
 		self,
 		apv=None,
@@ -1353,8 +1390,8 @@ class SupplyChain:
 		xlims=None,
 		ylims=None,
 		*,
-		mode: str = "average",    # "total" | "average"
-		impact: str = "co2",    # impact category key to plot (e.g. "co2", "ghg")
+		mode: str = "average",
+		impact: str = "co2",
 		transp: bool = True,
 		wrap_width: int = 12,
 		):
@@ -1387,37 +1424,17 @@ class SupplyChain:
 		if ylab is None:
 			ylab = f"Total {impact.upper()} (kg)" if mode == "total" else f"Avg {impact.upper()} (kg/t)"
 
-		labels: List[str] = []
-		scopes: Dict[str, List[float]] = defaultdict(list)
-
-		for rec in self.get_step_impacts(transp=transp):
-			labels.append(rec["step_name"])
-
-			# Transport legs store emissions under 'ghg'; fall back if impact key absent
-			if rec["kind"] == "transport":
-				s1 = float(rec["scope_one"].get(impact) or rec["scope_one"].get("ghg", 0.0))
-			else:
-				s1 = float(rec["scope_one"].get(impact, 0.0) or 0.0)
-
-			s2 = float(rec["scope_two"].get(impact,   0.0) or 0.0)
-			s3 = float(rec["scope_three"].get(impact, 0.0) or 0.0)
-
-			scopes["Scope One"].append(s1)
-			scopes["Scope Two"].append(s2)
-			scopes["Scope Three"].append(s3)
+		labels, scopes, stack_order = self._build_steps_impact_series(impact=impact, transp=transp)
 
 		if mode == "average":
 			scopes = {k: [v / self.apv * yscale for v in vals] for k, vals in scopes.items()}
 			yscale = 1
 
-		# Only include scopes that have at least one non-zero value
-		stack_order = [s for s in ["Scope One", "Scope Two", "Scope Three"]
-					   if any(v != 0.0 for v in scopes.get(s, []))]
-
 		colors = {"Scope One": "#f28e2b", "Scope Two": "#4e79a7", "Scope Three": "#76b7b2"}
 		plot_stacked_bars(labels, scopes, stack_order=stack_order, colors=colors,
-						  xscale=xscale, yscale=yscale, title=title, xlab=xlab, ylab=ylab,
-						  xlims=xlims, ylims=ylims, wrap_width=wrap_width)
+						xscale=xscale, yscale=yscale, title=title, xlab=xlab, ylab=ylab,
+						xlims=xlims, ylims=ylims, wrap_width=wrap_width)
+
 	def plot_unit_cc(self, xscale=1, yscale=1, title='APV vs Average Cost',
 					 xlab='Annual Production Volume (APV)', ylab='Unit Cost'):
 		apvs = [apv * xscale for apv in self.prod_map.keys()]
