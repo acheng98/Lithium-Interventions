@@ -663,34 +663,38 @@ def _wrap_labels(labels, width=14):
 			wrapped.append('\n'.join(tw.wrap(s)))
 	return wrapped
 
-def plot_stacked_bars(labels, series_dict, *, 
+def plot_stacked_bars(labels, series_dict, *,
 	stack_order=None,                 # list of series labels from bottom -> top
 	colors=None,                      # dict like {"Fixed": "#f28e2b", "Variable": "#4e79a7"}
 	xscale=1, yscale=1,
-	title='Cost of Steps',xlab='Step Names',ylab='Total',
+	title='Cost of Steps', xlab='Step Names', ylab='Total',
 	xlims=None, ylims=None,
-	fixed_width=None,base_width_per_bar=0.5,
+	fixed_width=None, 
+	base_width_per_bar=0.5,
 	legend_order='top_to_bottom',     # 'top_to_bottom' or 'bottom_to_top'
 	legend_loc='upper right',
+	show_legend=False,                # show legend (default False)
 	wrap_width=12,
-	label_rotation=None, # degrees; None = auto (0 if n<=10, 40 if n<=18, 60 if more)
-	label_fontsize=None, # pt; None = auto (9 if n<=14, 8 if n<=20, 7 otherwise)
-	top_margin=0.12, 
-	err_low=None,   # array-like, length n — downward extent from bar top (conservative - midpoint)
-	err_high=None,  # array-like, length n — upward extent from bar top (optimistic - midpoint)
+	label_rotation=None,              # degrees; None = auto; ignored in horizontal mode
+	label_fontsize=None,              # pt;      None = auto
+	top_margin=0.08,                  # fractional whitespace beyond the tallest/widest bar
+	err_low=None,                     # array-like len n; downward/leftward extent from bar tip
+	err_high=None,                    # array-like len n; upward/rightward extent from bar tip
+	orientation='horizontal',         # 'horizontal' | 'vertical'
+	bar_thickness=0.8,                # bar height in horizontal mode (0.0–1.0; default 0.6)
 	show=True,
 	):
 	"""
-	labels: sequence of category names (x-axis)
-	series_dict: {series_label: iterable of values}, all same length as labels
-	stack_order: explicit order bottom->top; defaults to insertion/key order of series_dict
-	colors: optional color mapping per series label
-	legend_order: 'top_to_bottom' mirrors the visible stack; 'bottom_to_top' follows stacking order
+	labels       : sequence of category names
+	series_dict  : {series_label: iterable of values}, all same length as labels
+	stack_order  : explicit order bottom->top (vertical) / left->right (horizontal)
+	orientation  : 'horizontal' (default) or 'vertical'
 	"""
-
+ 
 	labels = list(labels)
 	n = len(labels)
-
+	horiz = (str(orientation).lower().strip() == 'horizontal')
+ 
 	# Validate and scale data
 	data = {}
 	for k, vals in series_dict.items():
@@ -698,123 +702,149 @@ def plot_stacked_bars(labels, series_dict, *,
 		if arr.shape[0] != n:
 			raise ValueError(f"Series '{k}' length {arr.shape[0]} != number of labels {n}.")
 		data[k] = arr * yscale
-
-	# Determine stacking order (bottom -> top)
+ 
+	# Determine stacking order
 	if stack_order is None:
-		# Preserve dict insertion order (Python 3.7+)
 		order = list(series_dict.keys())
 	else:
-		# Validate provided order
 		missing = set(series_dict.keys()) - set(stack_order)
-		extra = set(stack_order) - set(series_dict.keys())
+		extra   = set(stack_order)   - set(series_dict.keys())
 		if missing:
 			raise ValueError(f"stack_order missing series: {sorted(missing)}")
 		if extra:
 			raise ValueError(f"stack_order has unknown series: {sorted(extra)}")
 		order = list(stack_order)
-
-	# Figure width
+ 
+	# Figure sizing
 	if fixed_width is not None:
-		fig_width = fixed_width
+		fig_w = fixed_width
+		fig_h = 6
+	elif horiz:
+		fig_w = 6
+		fig_h = max(4,  n * bar_thickness * 0.6 + 0.8)
 	else:
-		fig_width = 2 * min(max(6, n * base_width_per_bar * max(xscale, 0.01)), 14)
-
-	fig, ax = plt.subplots(figsize=(fig_width, 6))
-
-	# X positions
-	x = np.arange(n)
-
-	# Plot bottom-up
-	running_bottom = np.zeros(n, dtype=float)
+		fig_w = 2 * min(max(6, n * base_width_per_bar * max(xscale, 0.01)), 14)
+		fig_h = 6
+ 
+	fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+	fig.patch.set_facecolor('none')
+	ax.set_facecolor('none')
+ 
+	pos = np.arange(n)
+ 
+	# Draw stacked bars
+	running = np.zeros(n, dtype=float)
 	handle_map = {}
 	for name in order:
-		h = ax.bar(
-			x, data[name], bottom=running_bottom,
-			label=name,
-			color=(colors.get(name) if colors and name in colors else None)
-		)
+		clr = (colors.get(name) if colors and name in colors else None)
+		if horiz:
+			h = ax.barh(pos, data[name], left=running, height=bar_thickness, label=name, color=clr)
+		else:
+			h = ax.bar(pos, data[name], bottom=running, label=name, color=clr)
 		handle_map[name] = h
-		running_bottom += data[name]
-
-	# Plot error bars, if any; draw before limits so auto-ylim includes their extents
+		running += data[name]
+ 
+	# Error bars
 	if err_low is not None or err_high is not None:
 		_low  = np.asarray(err_low  if err_low  is not None else np.zeros(n), dtype=float) * yscale
 		_high = np.asarray(err_high if err_high is not None else np.zeros(n), dtype=float) * yscale
-		ax.errorbar(x, running_bottom, yerr=[_low, _high],
-					fmt='none', color='black', capsize=4, linewidth=1.2, zorder=5)
-
-	# Ticks (uses your _wrap_labels if present, else raw labels)
-	try:
-		tick_labels = _wrap_labels(labels, width=wrap_width)  # noqa: F821 (assumes you already have this)
-	except NameError:
-		# Fallback: naive wrap
-		def _simple_wrap(s, width):
-			return '\n'.join([s[i:i+width] for i in range(0, len(s), width)]) if len(s) > width else s
-		tick_labels = [_simple_wrap(str(s), wrap_width) for s in labels]
-
-	# Auto label rotation and font size based on bar count
-	if label_rotation is None:
-		rotation = 0 if n <= 10 else (40 if n <= 18 else 60)
-	else:
-		rotation = label_rotation
+		if horiz:
+			ax.errorbar(running, pos, xerr=[_low, _high],
+						fmt='none', color='black', capsize=4, linewidth=1.2, zorder=5)
+		else:
+			ax.errorbar(pos, running, yerr=[_low, _high],
+						fmt='none', color='black', capsize=4, linewidth=1.2, zorder=5)
+ 
+	# Tick labels
 	if label_fontsize is None:
 		fontsize = 9 if n <= 14 else (8 if n <= 20 else 7)
 	else:
 		fontsize = label_fontsize
-
-	# When rotated, word-wrapping fights readability -- use a slightly wider wrap and right-align
-	if rotation == 0:
-		effective_wrap = wrap_width
-		ha = 'center'
-	else:
-		effective_wrap = max(wrap_width, 18)  # less aggressive wrap when angled
-		ha = 'right'
-
-	# Ticks (uses your _wrap_labels if present, else raw labels)
+ 
 	try:
-		tick_labels = _wrap_labels(labels, width=effective_wrap)
+		tick_labels = _wrap_labels(labels, width=wrap_width)
 	except NameError:
 		def _simple_wrap(s, width):
 			return '\n'.join([s[i:i+width] for i in range(0, len(s), width)]) if len(s) > width else s
-		tick_labels = [_simple_wrap(str(s), effective_wrap) for s in labels]
-
-	ax.set_xticks(x)
-	ax.set_xticklabels(tick_labels, ha=ha, rotation=rotation, fontsize=fontsize)
-
-	# Expand figure height when labels are rotated to avoid clipping
-	if rotation > 0:
-		fig.set_size_inches(fig.get_figwidth(), fig.get_figheight() + 1.5)
-
-	# Labels and title
-	ax.set_xlabel(xlab)
-	ax.set_ylabel(ylab)
-	ax.set_title(title, pad=12)
-
-	# Grid
-	ax.grid(axis='y', linestyle=':', alpha=0.4)
-
-	# Limits
-	if xlims is not None:
-		ax.set_xlim(xlims)
-	if ylims is not None:
-		ax.set_ylim(ylims)
+		tick_labels = [_simple_wrap(str(s), wrap_width) for s in labels]
+ 
+	if horiz:
+		# For horizontal bars: labels on y-axis, first label at top
+		ax.set_yticks(pos)
+		ax.set_yticklabels(tick_labels, ha='right', fontsize=fontsize)
+		ax.invert_yaxis()
 	else:
-		ymax = ax.get_ylim()[1]
-		ax.set_ylim(0, ymax * (1 + top_margin))
-
-	# Legend that mirrors the visible stack (top first) or the stacking order (bottom first)
-	if legend_order not in ('top_to_bottom', 'bottom_to_top'):
-		raise ValueError("legend_order must be 'top_to_bottom' or 'bottom_to_top'")
-
-	legend_labels = (order[::-1] if legend_order == 'top_to_bottom' else order)
-	legend_handles = [handle_map[name] for name in legend_labels]
-	ax.legend(
-		legend_handles, legend_labels,
-		frameon=True, loc=legend_loc, handlelength=1.2, handletextpad=0.4, borderpad=0.3,
-		facecolor='white', edgecolor='none'
-	)
-
+		# Auto rotation for vertical
+		if label_rotation is None:
+			rotation = 0 if n <= 10 else (40 if n <= 18 else 60)
+		else:
+			rotation = label_rotation
+ 
+		if rotation == 0:
+			effective_wrap = wrap_width
+			ha = 'center'
+		else:
+			effective_wrap = max(wrap_width, 18)
+			ha = 'right'
+ 
+		try:
+			tick_labels = _wrap_labels(labels, width=effective_wrap)
+		except NameError:
+			tick_labels = [_simple_wrap(str(s), effective_wrap) for s in labels]
+ 
+		ax.set_xticks(pos)
+		ax.set_xticklabels(tick_labels, ha=ha, rotation=rotation, fontsize=fontsize)
+ 
+		if rotation > 0:
+			fig.set_size_inches(fig.get_figwidth(), fig.get_figheight() + 1.5)
+ 
+	# Axis labels and title
+	# In horizontal mode xlab labels the category axis (y) and ylab labels the value axis (x)
+	if horiz:
+		ax.set_xlabel(ylab)
+		ax.set_ylabel(xlab)
+	else:
+		ax.set_xlabel(xlab)
+		ax.set_ylabel(ylab)
+	ax.set_title(title, pad=12)
+ 
+	# Grid on the value axis
+	ax.grid(axis=('x' if horiz else 'y'), linestyle=':', alpha=0.4)
+ 
+	# Limits — xlims/ylims always refer to the category/value axes as labelled by the caller,
+	# so we swap them internally for horizontal mode.
+	if horiz:
+		if ylims is not None:
+			ax.set_xlim(ylims)
+		else:
+			xmax = ax.get_xlim()[1]
+			ax.set_xlim(0, xmax * (1 + top_margin))
+		if xlims is not None:
+			ax.set_ylim(xlims)
+	else:
+		if xlims is not None:
+			ax.set_xlim(xlims)
+		if ylims is not None:
+			ax.set_ylim(ylims)
+		else:
+			ymax = ax.get_ylim()[1]
+			ax.set_ylim(0, ymax * (1 + top_margin))
+ 
+	# Legend
+	if show_legend:
+		if legend_order not in ('top_to_bottom', 'bottom_to_top'):
+			raise ValueError("legend_order must be 'top_to_bottom' or 'bottom_to_top'")
+		legend_labels  = (order[::-1] if legend_order == 'top_to_bottom' else order)
+		legend_handles = [handle_map[name] for name in legend_labels]
+		ax.legend(
+			legend_handles, legend_labels,
+			frameon=True, loc=legend_loc, handlelength=1.2, handletextpad=0.4, borderpad=0.3,
+			facecolor='white', edgecolor='none'
+		)
+ 
 	plt.tight_layout()
+
+	plt.savefig("output", dpi=300, bbox_inches="tight")
 	if show:
 		plt.show()
 	return fig, ax
@@ -1061,6 +1091,8 @@ def plot_tornado(
 	# Sort by range descending, take top_n, reverse so largest is at top
 	entries.sort(key=lambda x: abs(x[2] - x[1]), reverse=True)
 	entries = entries[:top_n][::-1]
+
+	# print(entries)
 
 	labels   = [e[0] for e in entries]
 	opt_vals = np.array([e[1] for e in entries])

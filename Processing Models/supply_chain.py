@@ -1353,29 +1353,76 @@ class SupplyChain:
 		Shared data-building logic for plot_step_impacts and plot_scenario_step_impacts.
 		Returns (labels, scopes, stack_order) with raw total impact values (not divided by APV).
 		The caller is responsible for any per-unit scaling.
+
+		Sink steps (tailings, wastewater, etc.) are included with zero impact values so
+		the label list matches _build_steps_cost_series exactly.
 		"""
 		labels: List[str] = []
 		scopes: Dict[str, List[float]] = defaultdict(list)
- 
-		for rec in self.get_step_impacts(transp=transp):
-			labels.append(rec["step_name"])
- 
+		sink_buf: Dict[str, None] = {}  # ordered set of sink names seen
+
+		# Build a lookup from step_name -> impact record for quick access
+		impact_map: Dict[str, OrderedDict] = {
+			rec["step_name"]: rec
+			for rec in self.get_step_impacts(transp=transp)
+		}
+
+		for s in self._get_step_snapshots(transp=transp):
+			kind = s.get("kind")
+
+			# Sink records: aggregate by sink name, flush zeros at the end
+			if kind == "sink":
+				sink_name = s.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
+				if sink_name.startswith("tailings"):
+					sink_name = "Tailings"
+				elif sink_name.startswith("wastewater"):
+					sink_name = "Wastewater Treatment"
+				else:
+					continue
+				sink_buf[sink_name] = None
+				continue
+
+			# Production / transport: look up pre-computed impact record
+			step_name = s["step_name"]
+			rec = impact_map.get(step_name)
+			if rec is None:
+				# Shouldn't happen, but guard with zeros
+				labels.append(step_name)
+				scopes["Scope One"].append(0.0)
+				scopes["Scope Two"].append(0.0)
+				scopes["Scope Three"].append(0.0)
+				continue
+
+			labels.append(step_name)
+
 			# Transport legs store emissions under 'ghg'; fall back if impact key absent
 			if rec["kind"] == "transport":
 				s1 = float(rec["scope_one"].get(impact) or rec["scope_one"].get("ghg", 0.0))
 			else:
 				s1 = float(rec["scope_one"].get(impact, 0.0) or 0.0)
- 
+
 			s2 = float(rec["scope_two"].get(impact,   0.0) or 0.0)
 			s3 = float(rec["scope_three"].get(impact, 0.0) or 0.0)
  
 			scopes["Scope One"].append(s1)
 			scopes["Scope Two"].append(s2)
 			scopes["Scope Three"].append(s3)
- 
+
+		# Flush sink buffer: one zero-value row per unique sink name
+		for sink_name in sink_buf:
+			labels.append(sink_name)
+			scopes["Scope One"].append(0.0)
+			scopes["Scope Two"].append(0.0)
+			scopes["Scope Three"].append(0.0)
+
 		# Only include scopes that have at least one non-zero value
 		stack_order = [s for s in ["Scope One", "Scope Two", "Scope Three"]
 					   if any(v != 0.0 for v in scopes.get(s, []))]
+
+		# If all scopes are zero (e.g. no impacts modelled at all), still return
+		# at least Scope One so the chart renders with empty bars rather than nothing
+		if not stack_order:
+			stack_order = ["Scope One"]
 
 		return labels, scopes, stack_order
 

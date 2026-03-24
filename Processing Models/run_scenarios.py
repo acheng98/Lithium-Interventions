@@ -248,12 +248,25 @@ def evaluate_project(sc,project_data,data_folder,detail=1,plot=1):
 	summary_conservative = sc.update_apv(target_pv,recalc=True)
 	summary["conservative"] = summary_conservative
 	# pprint(summary_conservative)
+	# print("\nConservative - Labor:")
+	# pprint(sc.get_step_labor())
+	# print("\nUtilities:")
+	# pprint(sc.get_total_utilities())
+	# print(sc.get_step_reagent_usage())
+	# pprint(sc.get_step_utilities_detailed())
 
 	helpers.update_machines(sc,"optimistic")
 	helpers.update_materials(sc,project_data,"optimistic")
 	summary_optimistic = sc.update_apv(target_pv,recalc=True)
 	summary["optimistic"] = summary_optimistic
 	# pprint(summary_optimistic)
+	# print("\nOptimistic - Labor:")
+	# pprint(sc.get_step_labor())
+	# print("\nUtilities:")
+	# pprint(sc.get_total_utilities())
+	# print(sc.get_step_reagent_usage())
+	# pprint(sc.get_step_utilities_detailed())
+		
 
 	return summary 
 
@@ -369,7 +382,7 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 				'avg_co2': sub_value['avg_co2']/1000 # Divide by 1000 to get tonnes
 			}
 	
-	if detail == 1:
+	if detail in [1,3]:
 		pprint(extracted_data)
 	# helpers.plot_project_summaries(project_summaries)
 
@@ -766,10 +779,10 @@ if __name__ == '__main__':
 	# detail=2
 	# detail=2.5
 	# detail=3
-	# plot=0
+	plot=0
 	# plot=1
-	# plot=2
-	plot=3
+	# plot=2 # step-by-step breakdown
+	# plot=3 # Tornado
 
 	# for write in [True,3,5]:
 	# 	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)

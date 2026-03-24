@@ -7,12 +7,12 @@ Salar de Atacama-Albemarle,Albemarle,Chile,Brine,Cost,,,,,,,,"$5,334.00 ",,,"$3,
 Salar de Atacama-SQM,SQM,Chile,Brine,Cost,,,,,,,,,,,"$3,567 ","$5,246 ",,,,,,,,,,,,,,,,,,,,,,,,,,
 Lanxess,Standard Lithium,USA,Brine,Cost,,,,,,,,"$7,390.00 ",,,"$4,571 ",,"$3,936 ",,,,,,,,,,,,,,,,,,,,,,,,,
 Sal de Vida,Arcadium Lithium,Argentina,Brine,Cost,,,,,,,,"$4,529.00 ",,,"$4,397 ","$5,949 ",,,,,,,,,,,,,,,,,,,,,,,,,,
-Silver Peak,Albemarle,USA,Brine,Cost,"$3,337","$4,268","$5,272","$3,431","$5,151","$3,350","$5,244","$6,163.00 ",,,"$5,523 ","$6,750 ","$6,161 ","$4,600 ",,,,,,,,,,,,,,,,,,,,,,,"$3,835","$4,742"
+Silver Peak,Albemarle,USA,Brine,Cost,"$3,397","$4,290","$5,325","$3,496","$5,199","$3,415","$5,292","$6,163.00 ",,,"$5,523 ","$6,750 ","$6,161 ","$4,600 ",,,,,,,,,,,,,,,,,,,,,,,"$3,858","$4,765"
 Clayton Valley DLE,Pure Energy Minerals,USA,Brine,Cost,,,,,,,,,,,,,"$3,236 ","$7,850 ",,,,,,,,,,,,,,,,,,,,,,,,
 Sonora,Bacanora Minerals Limited,Mexico,Clay,Cost,,,,,,,,"$3,495.00 ",,,"$5,273 ",,"$3,852 ",,,,,,,,,,,,,,,,,,,,,,,,,
 Clayton Valley South,Century Lithium,USA,Clay,Cost,,,,,,,,,,,"$5,000 ","$7,352 ","$7,852 ",,,,,,,,,,,,,,,,,,,,,,,,,
 Rhyolite Ridge,Ioneer,USA,Clay,Cost,,,,,,,,,,,"$8,080 ",,"$5,716 ",,,,,,,,,,,,,,,,,,,,,,,,,
-Thacker Pass,Lithium Americas,USA,Clay,Cost,"$6,395","$8,544","$13,291","$7,213","$12,100","$6,699","$12,806","$8,039.00 ",,,,,"$6,986 ","$6,300 ",,,,,,,,,,,,,,,,,,,,,,,"$7,848","$10,697"
+Thacker Pass,Lithium Americas,USA,Clay,Cost,"$6,373","$8,521","$13,211","$7,190","$12,076","$6,676","$12,782","$8,039.00 ",,,,,"$6,986 ","$6,300 ",,,,,,,,,,,,,,,,,,,,,,,"$7,825","$10,674"
 TLC (Tonopah Lithium Claims),American Lithium,USA,Clay,Cost,,,,,,,,"$7,443.00 ",,,,,"$7,244 ",,,,,,,,,,,,,,,,,,,,,,,,,
 Greenbushes,Talison Lithium,Australia,Spodumene,Cost,,,,,,,,"$3,713.26 ","$5,713.26 ","$7,213.26 ","$3,935 ","$5,556 ",,,,,,,,,,,,,,,,,,,,,,,,,,
 Kings Mountain - Foote deposit,Albemarle,USA,Spodumene,Cost,,,,,,,,"$2,938.67 ","$4,938.67 ","$6,438.67 ","$6,071 ","$7,420 ",,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -20,7 +20,7 @@ Grota do Cirilo–Barreiro,Sigma Lithium,Brazil,Spodumene,Cost,,,,,,,,"$2,896.74
 Grota do Cirilo–Xuxa,Sigma Lithium,Brazil,Spodumene,Cost,,,,,,,,"$3,080.54 ","$5,080.54 ","$6,580.54 ","$5,740 ","$7,765 ",,,,,,,,,,,,,,,,,,,,,,,,,,
 Georgia Lake Project,Rock Tech Lithium,Canada,Spodumene,Cost,,,,,,,,"$4,916.96 ","$6,916.96 ","$8,416.96 ","$5,940 ","$8,036 ",,,,,,,,,,,,,,,,,,,,,,,,,,
 Mt Cattlin,Arcadium Lithium,Australia,Spodumene,Cost,,,,,,,,"$1,967.14 ","$3,967.14 ","$5,467.14 ","$6,270 ","$8,483 ",,,,,,,,,,,,,,,,,,,,,,,,,,
-Jianxiawo,CATL,China,Lepidolite,Cost,"$8,411","$9,932","$12,571","$9,349","$12,211","$8,703","$12,090",,,,,,,,,,"$10,000 ","$11,120 ","$16,680 ",,,,,,,,,,,,,,,,,,"$10,420","$11,476"
+Jianxiawo,CATL,China,Lepidolite,Cost,"$8,476","$10,035","$12,756","$9,452","$12,314","$8,806","$12,193",,,,,,,,,,"$10,000 ","$11,120 ","$16,680 ",,,,,,,,,,,,,,,,,,"$10,523","$11,579"
 414 Mine-Yichun,Jiangxi Nanshi Lithium Battery New Material ,China,Lepidolite,Cost,,,,,,,,,,,,,,,"$11,230 ","$16,860 ","$10,000 ","$11,120 ","$16,680 ",,,,,,,,,,,,,,,,,,,
 Lanxess,Standard Lithium,USA,Brine-DLE,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 Clayton Valley DLE,Pure Energy Minerals,USA,Brine-DLE,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -29,11 +29,11 @@ Paradox,Anson Resources,USA,Brine-DLE,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 Salar de Atacama-Albemarle,Albemarle,Chile,Brine,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,6.17,3.19,,,,4.1,2.0,6.2,3.06,3.97,5.28,,,
 Salar de Atacama-SQM,SQM,Chile,Brine,Emissions,,,,,,,,,,,,,,,,,,,,,2.7,3.1,,,,,,,,4.1,2.0,6.2,3.06,3.97,5.28,,,
 Sal de Vida,Arcadium Lithium,Argentina,Brine,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,2.4,2.0,6.2,3.06,3.97,5.28,,,
-Silver Peak,Albemarle,USA,Brine,Emissions,3.725843422302338,5.124855424606837,6.5891349195145095,4.315523421216104,5.770002913283391,3.7428488081737408,6.545413094589286,,,,,,,4.34,,,,,,,,,,,,8.08,,,,2.8,2.0,6.2,3.06,3.97,5.28,,5.124855424606837,5.124855424606837
+Silver Peak,Albemarle,USA,Brine,Emissions,3.9959603065947826,5.242203479899389,6.698616900521345,4.597055991222834,5.887350968575942,4.02438137818047,6.662761149881835,,,,,,,4.34,,,,,,,,,,,,8.08,,,,2.8,2.0,6.2,3.06,3.97,5.28,,5.242203479899389,5.242203479899389
 Sonora,Bacanora Minerals Limited,Mexico,Clay,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,20.38,,,,,,,,,,,
 Clayton Valley South,Century Lithium,USA,Clay,Emissions,,,,,,,,,,,,,,,,,,,,,,,8.9,16.6,,,,,,,,,,,,,,
 Rhyolite Ridge,Ioneer,USA,Clay,Emissions,,,,,,,,,,,,,,,,,,,,,,,8.9,16.6,,,,,,,,,,,,,,
-Thacker Pass,Lithium Americas,USA,Clay,Emissions,10.998106334495144,16.525991543314156,23.335493446573512,14.562165638109178,18.42675156841171,11.292966548128058,22.910143379518548,,,,,,,10,,,,,,,,,8.9,16.6,,,22.51,14.53,,,,,,,,,15.525636203679191,17.463281002841697
+Thacker Pass,Lithium Americas,USA,Clay,Emissions,11.176772564869047,16.84082602161229,23.658781169592846,14.877000116407313,18.74158604670984,11.607801026426193,23.224977857816683,,,,,,,10,,,,,,,,,8.9,16.6,,,22.51,14.53,,,,,,,,,15.840470681977328,17.77811548113983
 TLC (Tonopah Lithium Claims),American Lithium,USA,Clay,Emissions,,,,,,,,,,,,,,,,,,,,,,,8.9,16.6,,,,,,,,,,,,,,
 Greenbushes,Talison Lithium,Australia,Spodumene,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 Kings Mountain - Foote deposit,Albemarle,USA,Spodumene,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -41,4 +41,4 @@ Grota do Cirilo–Barreiro,Sigma Lithium,Brazil,Spodumene,Emissions,,,,,,,,,,,,,
 Grota do Cirilo–Xuxa,Sigma Lithium,Brazil,Spodumene,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 Georgia Lake Project,Rock Tech Lithium,Canada,Spodumene,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 Mt Cattlin,Arcadium Lithium,Australia,Spodumene,Emissions,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Jianxiawo,CATL,China,Lepidolite,Emissions,13.564049098966487,20.954581129387417,34.01456636916359,15.840912201976234,31.157380127317293,13.974511470844336,33.278783581964355,,,,,,,,,,,,,,,,,,,,,,22.0,,,,,,,66.4,19.947036356869173,24.065929801267036
+Jianxiawo,CATL,China,Lepidolite,Emissions,13.984084026036847,21.636007651244288,35.10153003941211,16.52233872383311,31.838806649174163,14.655937992701203,33.96021010382122,,,,,,,,,,,,,,,,,,,,,,22.0,,,,,,,66.4,20.628462878726044,24.74735632312391

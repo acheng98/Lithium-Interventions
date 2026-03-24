@@ -102,6 +102,7 @@ def plot_cost_vs_emissions(
 	show_lit_lines:      bool = False,   # draw dashed reference lines inside boxes
 	show_lit_labels:     bool = False,   # label those lines (ignored if show_lit_lines=False)
 	show_project_labels: bool = True,    # annotate each project with its name
+	show_legend:         bool = False,   # show the legend
 	top_n:               int  = None,    # if set, use Our Study-Low-{N}/High-{N} as box bounds
 ):
 	# ------------------------------------------------------------------
@@ -346,8 +347,9 @@ def plot_cost_vs_emissions(
 				(r["lit_c_lo"], r["lit_e_lo"]),
 				r["lit_c_hi"] - r["lit_c_lo"],
 				r["lit_e_hi"] - r["lit_e_lo"],
-				boxstyle="square,pad=0", linewidth=1.2,
-				edgecolor=(*rgb, lit_edge_alpha),
+				boxstyle="square,pad=0",
+				linewidth=0 if show_lit_lines else 1.2,
+				edgecolor="none" if show_lit_lines else (*rgb, lit_edge_alpha),
 				facecolor=(*rgb, lit_alpha), zorder=2,
 			))
 
@@ -402,7 +404,8 @@ def plot_cost_vs_emissions(
 	ax.set_title(title, fontsize=12, pad=10)
 	ax.grid(True, linestyle=":", alpha=0.4)
 
-	ax.legend(handles=legend_handles, loc="upper left", fontsize=8, framealpha=0.85)
+	if show_legend:
+		ax.legend(handles=legend_handles, loc="upper left", fontsize=8, framealpha=0.85)
 	plt.tight_layout()
 
 	if save_path is False:
@@ -460,6 +463,10 @@ if __name__ == "__main__":
 		"--no-project-labels", dest="project_labels", action="store_false",
 		help="Hide project name labels",
 	)
+	parser.add_argument(
+		"--legend", dest="show_legend", action="store_true", default=False,
+		help="Show the legend (default: hidden)",
+	)
 	args = parser.parse_args()
 
 	if not args.save:
@@ -475,5 +482,6 @@ if __name__ == "__main__":
 		show_lit_lines=args.lit_lines,
 		show_lit_labels=args.lit_labels,
 		show_project_labels=args.project_labels,
+		show_legend=args.show_legend,
 		top_n=args.top_n,
 	)
