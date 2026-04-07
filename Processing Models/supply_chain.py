@@ -1375,7 +1375,7 @@ class SupplyChain:
 				sink_name = s.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
 				if sink_name.startswith("tailings"):
 					sink_name = "Tailings"
-				elif sink_name.startswith("wastewater"):
+				elif sink_name.startswith("wastewater"): # <-- comment this out for Silver Peak
 					sink_name = "Wastewater Treatment"
 				else:
 					continue

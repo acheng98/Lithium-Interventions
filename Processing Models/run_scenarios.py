@@ -339,6 +339,12 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 	"""
 	project_summaries = {}
 	topn_summaries    = {}  # populated only when write is an integer
+	
+	# CUSTOM RANGE DEFINITIONS
+	ylims_cost=(0, 7000)
+	xticks_cost=range(0, 7001, 1000)
+	ylims_emissions=(0, 30000)
+	xticks_emissions=range(0, 30001, 5000)
 
 	for project in projects:
 		project_data = projects_data[project]
@@ -351,11 +357,26 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 				detail=2,		# 1|2|3 — applied to midpoint bars; conservative/optimistic always use detail=1
 				transp=True,
 				# title=None,
+				ylims=ylims_cost,
+				xticks=xticks_cost,
 			)
 			plot_scenario_step_impacts(sc, project_data, project_data["Production Volume"],
 				mode="average",         # "total" | "average"
 				impact="co2",           # impact category key (e.g. "co2", "ghg")
 				# title=None,
+				ylims=ylims_emissions,
+				xticks=xticks_emissions,
+			)
+		if plot == 2.1 and project == "Thacker Pass": # Custom Thacker Pass Aggregation
+			helpers.thacker_pass_steps_aggregated(sc, project_data, project_data["Production Volume"],
+				ylims_cost=ylims_cost,			 xticks_cost=xticks_cost,
+				ylims_emissions=ylims_emissions, xticks_emissions=xticks_emissions,
+			)
+
+		if plot == 2.2 and project == "Jianxiawo":
+			helpers.jianxiawo_steps_aggregated(sc, project_data, project_data["Production Volume"],
+				ylims_cost=ylims_cost,			 xticks_cost=xticks_cost,
+				ylims_emissions=ylims_emissions, xticks_emissions=xticks_emissions,
 			)
 		if plot == 3:
 			tornado = run_tornado_data(sc, project_data, apv=project_data["Production Volume"])
@@ -458,6 +479,8 @@ def plot_scenario_step_costs(sc, project_data, apv, *,
 	title=None,
 	xlab='Step Names',
 	ylab=None,
+	xticks=None,         # explicit tick positions on the value axis
+	ylims=None,          # (min, max) for the value axis
 	):
 	"""
 	Plot midpoint step costs as stacked bars (detail=detail) with asymmetric error bars
@@ -541,6 +564,8 @@ def plot_scenario_step_costs(sc, project_data, apv, *,
 		wrap_width=wrap_width,
 		err_low=err_low,
 		err_high=err_high,
+		xticks=xticks,
+		ylims=ylims
 	)
 
 def plot_scenario_step_impacts(sc, project_data, apv, *,
@@ -553,6 +578,8 @@ def plot_scenario_step_impacts(sc, project_data, apv, *,
 	title=None,
 	xlab='Step Names',
 	ylab=None,
+	ylims=None,          # (min, max) for the value axis
+	xticks=None,         # explicit tick positions on the value axis
 	):
 	"""
 	Plot midpoint step impacts as stacked scope bars with asymmetric error bars
@@ -630,6 +657,8 @@ def plot_scenario_step_impacts(sc, project_data, apv, *,
 		wrap_width=wrap_width,
 		err_low=err_low,
 		err_high=err_high,
+		xticks=xticks,
+		ylims=ylims
 	)
 
 def run_tornado_data(sc, project_data, apv):
@@ -765,11 +794,12 @@ if __name__ == '__main__':
 	################
 	# Pick project #
 	################
-	# projects = ["Silver Peak"]
+	projects = ["Silver Peak"]
 	# projects = ["Thacker Pass"]
 	# projects = ["Jianxiawo"]
 	# projects = ["Jianxiawo","Thacker Pass"]
-	projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
+	# projects = ["Silver Peak","Thacker Pass"]
+	# projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
 	write=False
 	# write=True
@@ -779,9 +809,12 @@ if __name__ == '__main__':
 	# detail=2
 	# detail=2.5
 	# detail=3
-	plot=0
+	# detail=4
+	# plot=0
 	# plot=1
-	# plot=2 # step-by-step breakdown
+	plot=2 # step-by-step breakdown
+	# plot=2.1 # step-by-step breakdown - Thacker Pass Aggregation
+	# plot=2.2 # step-by-step breakdown - Jianxiawo Aggregation
 	# plot=3 # Tornado
 
 	# for write in [True,3,5]:

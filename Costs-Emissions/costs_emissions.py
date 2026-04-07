@@ -79,11 +79,20 @@ DEFAULT_COLOR = "#7f7f7f"
 
 # Style for literature reference lines
 LIT_LINE_COLOR  = "#888888"
-LIT_LINE_ALPHA  = 0.55
-LIT_LINE_WIDTH  = 0.9
-LIT_LINE_STYLE  = "--"
+LIT_LINE_ALPHA  = 0.65
+LIT_LINE_WIDTH  = 1.0
+LIT_LINE_STYLE  = (0, (6, 4.5))
 LIT_LABEL_COLOR = "#444444"
 LIT_LABEL_SIZE  = 6.5
+
+# Per-type line styles for vertical (cost) lines.
+# Source types are read from a 'source_type' row in the CSV — see load section.
+COST_LINE_STYLES = {
+	"disclosure":    dict(color="#333333", alpha=0.85, linewidth=1.4, linestyle="-"),
+	"grey_lit":      dict(color="#333333", alpha=0.45, linewidth=1.5, linestyle=(0, (1, 4))),
+	"peer_reviewed": dict(color=LIT_LINE_COLOR, alpha=LIT_LINE_ALPHA,
+	                      linewidth=LIT_LINE_WIDTH, linestyle=LIT_LINE_STYLE),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -103,12 +112,33 @@ def plot_cost_vs_emissions(
 	show_lit_labels:     bool = False,   # label those lines (ignored if show_lit_lines=False)
 	show_project_labels: bool = True,    # annotate each project with its name
 	show_legend:         bool = False,   # show the legend
+	lit_only:            bool = False,   # show only literature ranges, hide Our Study boxes
 	top_n:               int  = None,    # if set, use Our Study-Low-{N}/High-{N} as box bounds
 ):
 	# ------------------------------------------------------------------
 	# Load & parse
 	# ------------------------------------------------------------------
 	df = pd.read_csv(csv_path)
+
+	# Extract the source_type metadata row (Dimension == "source_type") before
+	# any numeric parsing or project filtering. Fails loudly if missing.
+	source_type_rows = df[df["Dimension"] == "source_type"]
+	if source_type_rows.empty:
+		raise SystemExit(
+			"ERROR: No 'source_type' row found in the CSV (Dimension == 'source_type').\n"
+			"Add a row with Dimension='source_type' and classify each literature column\n"
+			"as 'peer_reviewed', 'disclosure', or 'grey_lit'."
+		)
+	source_type_row = source_type_rows.iloc[0]
+	# Strip the source_type row from project data
+	df = df[df["Dimension"] != "source_type"].copy()
+ 
+	# Build {col: source_type} for all literature columns; default to peer_reviewed
+	col_source_type = {}
+	for c in df.columns:
+		if c not in METADATA_COLS:
+			val = source_type_row.get(c, None)
+			col_source_type[c] = str(val).strip() if pd.notna(val) else "peer_reviewed"
 
 	numeric_cols = [c for c in df.columns if c not in METADATA_COLS]
 	for c in numeric_cols:
@@ -288,19 +318,16 @@ def plot_cost_vs_emissions(
 	# ---- Literature reference lines (clipped to lit box interiors) -------
 	if show_lit_lines:
 
-		def draw_vline_in_boxes(project, v, display_label):
+		def draw_vline_in_boxes(project, v, display_label, line_style):
 			"""Vertical line at x=v, drawn only inside the lit box for this project."""
 			label_y = None
 			for (proj, bx_lo, bx_hi, by_lo, by_hi) in boxes:
 				if proj == project and bx_lo <= v <= bx_hi:
-					ax.plot([v, v], [by_lo, by_hi],
-							color=LIT_LINE_COLOR, alpha=LIT_LINE_ALPHA,
-							linewidth=LIT_LINE_WIDTH, linestyle=LIT_LINE_STYLE,
-							zorder=4)
+					ax.plot([v, v], [by_lo, by_hi], zorder=4, **line_style)
 					label_y = by_hi if label_y is None else max(label_y, by_hi)
 			if show_lit_labels and label_y is not None:
 				ax.annotate(display_label, xy=(v, label_y),
-							xytext=(0, 2), textcoords="offset points",
+							xytext=(0, 4), textcoords="offset points",
 							rotation=0, va="bottom", ha="center",
 							fontsize=LIT_LABEL_SIZE, color=LIT_LABEL_COLOR,
 							clip_on=True, zorder=7)
@@ -317,15 +344,17 @@ def plot_cost_vs_emissions(
 					label_x = bx_hi if label_x is None else max(label_x, bx_hi)
 			if show_lit_labels and label_x is not None:
 				ax.annotate(display_label, xy=(label_x, v),
-							xytext=(4, -4), textcoords="offset points",
+							xytext=(4, 4), textcoords="offset points",
 							va="bottom", ha="left",
 							fontsize=LIT_LABEL_SIZE, color=LIT_LABEL_COLOR,
 							clip_on=True, zorder=7)
 
 		for col, by_project in cost_lit_lines.items():
-			letter = col_to_letter[col]
+			letter     = col_to_letter[col]
+			source     = col_source_type.get(col, "peer_reviewed")
+			line_style = COST_LINE_STYLES.get(source, COST_LINE_STYLES["peer_reviewed"])
 			for project, v in by_project.items():
-				draw_vline_in_boxes(project, v, letter)
+				draw_vline_in_boxes(project, v, letter, line_style)
 
 		for col, by_project in emiss_lit_lines.items():
 			letter = col_to_letter[col]
@@ -354,7 +383,7 @@ def plot_cost_vs_emissions(
 			))
 
 		# Our Study bounding box (opaque)
-		if (np.isfinite(r["c_lo"]) and np.isfinite(r["c_hi"]) and
+		if not lit_only and (np.isfinite(r["c_lo"]) and np.isfinite(r["c_hi"]) and
 				np.isfinite(r["e_lo"]) and np.isfinite(r["e_hi"])):
 			ax.add_patch(mpatches.FancyBboxPatch(
 				(r["c_lo"], r["e_lo"]),
@@ -366,7 +395,7 @@ def plot_cost_vs_emissions(
 			))
 
 		# Midpoint
-		if np.isfinite(r["c_mid"]) and np.isfinite(r["e_mid"]):
+		if not lit_only and np.isfinite(r["c_mid"]) and np.isfinite(r["e_mid"]):
 			ax.scatter(r["c_mid"], r["e_mid"], color=color, s=70,
 					   zorder=5, edgecolors="white", linewidths=0.8)
 
@@ -384,13 +413,16 @@ def plot_cost_vs_emissions(
 
 	# Shared legend proxies
 	legend_handles += [
-		mpatches.Patch(facecolor="gray", alpha=our_alpha, edgecolor="gray",
-					   linewidth=1.6, label="Our Study range"),
 		mpatches.Patch(facecolor="gray", alpha=lit_alpha, edgecolor="gray",
 					   linewidth=1.2, label="Literature range"),
-		Line2D([0], [0], marker="o", color="w", markerfacecolor="gray",
-			   markersize=7, markeredgecolor="white", label="Our Study midpoint"),
 	]
+	if not lit_only:
+		legend_handles += [
+			mpatches.Patch(facecolor="gray", alpha=our_alpha, edgecolor="gray",
+						   linewidth=1.6, label="Our Study range"),
+			Line2D([0], [0], marker="o", color="w", markerfacecolor="gray",
+				   markersize=7, markeredgecolor="white", label="Our Study midpoint"),
+		]
 
 	# ------------------------------------------------------------------
 	# Axes formatting
@@ -467,6 +499,11 @@ if __name__ == "__main__":
 		"--legend", dest="show_legend", action="store_true", default=False,
 		help="Show the legend (default: hidden)",
 	)
+	parser.add_argument(
+		"--lit-only", dest="lit_only", action="store_true", default=False,
+		help="Show literature ranges only, hiding Our Study boxes and midpoints",
+	)
+
 	args = parser.parse_args()
 
 	if not args.save:
@@ -483,5 +520,6 @@ if __name__ == "__main__":
 		show_lit_labels=args.lit_labels,
 		show_project_labels=args.project_labels,
 		show_legend=args.show_legend,
+		lit_only=args.lit_only,
 		top_n=args.top_n,
 	)

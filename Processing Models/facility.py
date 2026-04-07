@@ -641,18 +641,19 @@ def tailings_handling(sc):
 		# On-site:   c_disposal = ONSITE_CTFS_OPEX (flat $/t DS, no gate fee) 
 		# Stacking:  c_disposal = 0 (stacking cost already in dewatering_stacking for s >= 0.55)
 		# ------------------------------------------------------------------
-
-		# --- Jianxiawo: impurity sludge (metal hydroxide precipitates, hazardous) ---
-		# Route: off-site hazardous secure landfill (Jiangxi).  Disposal cost: NDRC 2024.
-		s_haz = 0.20
-		c_haz = dewatering_stacking(s_haz, ep).cost + NDRC_HAZ_JX / s_haz
-		sc.register_sink_cost("tailings_20", c_haz * ds_per_m3(s_haz))
 		
 		# --- Thacker Pass: impurity sludge (Mg/Ca precipitates, thickener underflow) ---
 		# Route: on-site CTFS (lined).  No gate fee; CTFS opex added explicitly.
 		s_tp_sludge = 0.25
 		c_tp_sludge = dewatering_stacking(s_tp_sludge, ep).cost + ONSITE_CTFS_OPEX
 		sc.register_sink_cost("tailings_25", c_tp_sludge * ds_per_m3(s_tp_sludge))
+
+		# --- Jianxiawo: impurity sludge (metal hydroxide precipitates, hazardous) ---
+		# Route: off-site hazardous secure landfill (Jiangxi).  Disposal cost: NDRC 2024.
+		s_haz = 0.20
+		c_haz = dewatering_stacking(s_haz, ep).cost + NDRC_HAZ_JX / s_haz
+		sc.register_sink_cost("tailings_20", c_haz * ds_per_m3(s_haz))
+		# sc.register_sink_cost("tailings_20", c_tp_sludge * ds_per_m3(s_haz)) #<-- if we assume no hazardous material handling 
 
 		# --- Jianxiawo: classification/flotation coarse reject (nonhazardous gangue, wet slurry) ---
 		# Stream: dilute slurry discharged from classifying step at ~30wt% solids; not mechanically

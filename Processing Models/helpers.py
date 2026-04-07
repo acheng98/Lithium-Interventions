@@ -669,6 +669,7 @@ def plot_stacked_bars(labels, series_dict, *,
 	xscale=1, yscale=1,
 	title='Cost of Steps', xlab='Step Names', ylab='Total',
 	xlims=None, ylims=None,
+	xticks=None, 
 	fixed_width=None, 
 	base_width_per_bar=0.5,
 	legend_order='top_to_bottom',     # 'top_to_bottom' or 'bottom_to_top'
@@ -829,6 +830,9 @@ def plot_stacked_bars(labels, series_dict, *,
 		else:
 			ymax = ax.get_ylim()[1]
 			ax.set_ylim(0, ymax * (1 + top_margin))
+
+	if xticks is not None:
+		ax.set_xticks(list(xticks))
  
 	# Legend
 	if show_legend:
@@ -1092,7 +1096,7 @@ def plot_tornado(
 	entries.sort(key=lambda x: abs(x[2] - x[1]), reverse=True)
 	entries = entries[:top_n][::-1]
 
-	# print(entries)
+	print(entries)
 
 	labels   = [e[0] for e in entries]
 	opt_vals = np.array([e[1] for e in entries])
@@ -1121,15 +1125,551 @@ def plot_tornado(
 
 
 
+# ---------------------------------------------------------------------------
+# Thacker Pass presentation aggregation
+# ---------------------------------------------------------------------------
+
+# Canonical step-group mapping.
+# Each entry: (display_label, [step_names_to_aggregate]).
+# Step names must match the labels produced by _build_steps_cost_series and
+# _build_steps_impact_series (i.e. step.step_name / transport.name / normalised
+# sink names "Tailings" and "Wastewater Treatment").
+# Both "Hauling" and "Ore transport via truck" are included so the mapping
+# is robust regardless of which name the transport leg uses.
+_THACKER_PASS_GROUPS = [
+	("Blast mining &\ntransport",
+		["Blasting with drilling and explosives", "Loading with excavator", "Hauling",
+		 "Ore transport via truck"]),
+	("Acid leaching",
+		["Acid Leaching"]),
+	("Impurity removal",
+		["Impurity Removal"]),
+	("Other leach\nsolution steps",
+		["Crushing", "Attrition Scrubbing", "Classification", "Thickening",
+		 "Neutralization", "Counter-Current Decantation and Thickening"]),
+	("Li\u2082CO\u2083\nprecipitation",
+		["Soda ash precipitation (Li2CO3)"]),
+	("Other Li\u2082CO\u2083\nproduction steps",
+		["Thickening and dewatering", "Washing & purification", "Drying & packaging"]),
+	("Tailings &\nwater management",
+		["Tailings", "Wastewater Treatment"]),
+]
 
 
+def _aggregate_step_series(labels, series, groups):
+	"""
+	Aggregate a (labels, series_dict) pair into presentation groups.
+
+	Parameters
+	----------
+	labels : list[str]
+		Step display names as returned by _build_steps_cost_series or
+		_build_steps_impact_series.
+	series : dict[str, list[float]]
+		Series dict aligned with labels (same length per key).
+	groups : list of (display_label: str, step_names: list[str])
+		Ordered mapping from group label to the step names it absorbs.
+		Steps not matched by any group are silently discarded.
+		Steps matched by multiple groups use the first match.
+
+	Returns
+	-------
+	(agg_labels, agg_series) with the same series keys as input.
+	Values for unmatched step names are excluded (not bucketed elsewhere).
+	"""
+	label_to_idx = {lbl: i for i, lbl in enumerate(labels)}
+	agg_labels = []
+	agg_series = {k: [] for k in series}
+
+	for display_label, step_names in groups:
+		agg_labels.append(display_label)
+		for k in series:
+			total = 0.0
+			for sname in step_names:
+				idx = label_to_idx.get(sname)
+				if idx is not None:
+					total += float(series[k][idx])
+			agg_series[k].append(total)
+
+	return agg_labels, agg_series
 
 
+def thacker_pass_steps_aggregated(
+	sc,
+	project_data,
+	apv,
+	*,
+	view="opex",
+	impact="co2",
+	mode="average",
+	transp=True,
+	groups=None,
+	title_cost=None,
+	title_emissions=None,
+	ylab_cost=None,
+	ylab_emissions=None,
+	show_legend=False,
+	wrap_width=18,
+	ylims_cost=None,
+	xticks_cost=None,
+	ylims_emissions=None,
+	xticks_emissions=None,
+):
+	"""
+	Plot Thacker Pass costs and emissions with steps aggregated into
+	presentation-friendly groups, with asymmetric scenario error bars.
 
+	Mirrors plot_scenario_step_costs / plot_scenario_step_impacts but
+	collapses the full step list into the seven groups defined in
+	_THACKER_PASS_GROUPS (or a caller-supplied override via ``groups``).
+	Both cost and emissions plots are produced in sequence.
 
+	Parameters
+	----------
+	sc           : SupplyChain  (facilities already built via evaluate_project)
+	project_data : dict
+	apv          : float        annual production volume (kg Li2CO3)
+	view         : str          cost view for _build_steps_cost_series (default "opex")
+	impact       : str          impact category key (default "co2")
+	mode         : str          "average" | "total"
+	transp       : bool         include transport steps
+	groups       : list | None  override _THACKER_PASS_GROUPS if supplied
+	show_legend  : bool
+	wrap_width   : int          y-axis label wrap width (chars)
+	"""
+	import numpy as np
 
+	if groups is None:
+		groups = _THACKER_PASS_GROUPS
 
+	mode = str(mode).lower().strip()
+	if mode not in {"total", "average"}:
+		raise ValueError("mode must be 'total' or 'average'")
+	if mode == "average" and not apv:
+		raise ValueError("apv is zero; cannot compute average costs/impacts.")
 
+	def _row_totals(series_dict):
+		"""Sum all series keys element-wise → 1-D total array."""
+		n = len(next(iter(series_dict.values())))
+		totals = np.zeros(n)
+		for vals in series_dict.values():
+			totals += np.asarray(vals, dtype=float)
+		return totals
+
+	# ------------------------------------------------------------------
+	# Conservative scenario
+	# ------------------------------------------------------------------
+	update_machines(sc, "conservative")
+	update_materials(sc, project_data, "conservative")
+	sc.update_apv(apv, recalc=True)
+
+	con_labels, con_cost_raw, _ = sc._build_steps_cost_series(
+		view=view, detail=2, transp=transp, top_n=None)
+	_, con_imp_raw, _ = sc._build_steps_impact_series(
+		impact=impact, transp=transp)
+
+	_, con_cost_agg = _aggregate_step_series(con_labels, con_cost_raw, groups)
+	_, con_imp_agg  = _aggregate_step_series(con_labels, con_imp_raw,  groups)
+	con_cost_totals = _row_totals(con_cost_agg)
+	con_imp_totals  = _row_totals(con_imp_agg)
+
+	# ------------------------------------------------------------------
+	# Optimistic scenario
+	# ------------------------------------------------------------------
+	update_machines(sc, "optimistic")
+	update_materials(sc, project_data, "optimistic")
+	sc.update_apv(apv, recalc=True)
+
+	opt_labels, opt_cost_raw, _ = sc._build_steps_cost_series(
+		view=view, detail=2, transp=transp, top_n=None)
+	_, opt_imp_raw, _ = sc._build_steps_impact_series(
+		impact=impact, transp=transp)
+
+	_, opt_cost_agg = _aggregate_step_series(opt_labels, opt_cost_raw, groups)
+	_, opt_imp_agg  = _aggregate_step_series(opt_labels, opt_imp_raw,  groups)
+	opt_cost_totals = _row_totals(opt_cost_agg)
+	opt_imp_totals  = _row_totals(opt_imp_agg)
+
+	# ------------------------------------------------------------------
+	# Midpoint scenario  (defines bar values and stack order)
+	# ------------------------------------------------------------------
+	update_machines(sc, "midpoint")
+	update_materials(sc, project_data, "midpoint")
+	sc.update_apv(apv, recalc=True)
+
+	mid_labels, mid_cost_raw, cost_stack_order = sc._build_steps_cost_series(
+		view=view, detail=2, transp=transp, top_n=None)
+	_, mid_imp_raw, imp_stack_order = sc._build_steps_impact_series(
+		impact=impact, transp=transp)
+
+	agg_labels, mid_cost_agg = _aggregate_step_series(mid_labels, mid_cost_raw, groups)
+	_,           mid_imp_agg  = _aggregate_step_series(mid_labels, mid_imp_raw,  groups)
+	mid_cost_totals = _row_totals(mid_cost_agg)
+	mid_imp_totals  = _row_totals(mid_imp_agg)
+
+	# Sanity-check that all three runs produced identical raw label sets
+	if con_labels != mid_labels or opt_labels != mid_labels:
+		raise ValueError(
+			"Step label mismatch across scenarios — check that conservative, "
+			"midpoint, and optimistic runs all produce the same step ordering.")
+
+	# ------------------------------------------------------------------
+	# Asymmetric error bars
+	#   cost:      conservative (higher) → upward;  optimistic (lower) → downward
+	#   emissions: same convention
+	# ------------------------------------------------------------------
+	cost_err_low  = np.maximum(mid_cost_totals - opt_cost_totals, 0.0)
+	cost_err_high = np.maximum(con_cost_totals - mid_cost_totals, 0.0)
+	imp_err_low   = np.maximum(mid_imp_totals  - opt_imp_totals,  0.0)
+	imp_err_high  = np.maximum(con_imp_totals  - mid_imp_totals,  0.0)
+
+	# ------------------------------------------------------------------
+	# Per-unit scaling
+	# ------------------------------------------------------------------
+	divisor = float(apv) if mode == "average" else 1.0
+	mid_cost_agg = {k: [v / divisor for v in vals]
+					for k, vals in mid_cost_agg.items()}
+	mid_imp_agg  = {k: [v / divisor for v in vals]
+					for k, vals in mid_imp_agg.items()}
+	cost_err_low  /= divisor;  cost_err_high /= divisor
+	imp_err_low   /= divisor;  imp_err_high  /= divisor
+
+	# ------------------------------------------------------------------
+	# Prune stack_order to series that actually exist after aggregation
+	# and carry at least one non-zero value
+	# ------------------------------------------------------------------
+	cost_stack_order = [
+		k for k in cost_stack_order
+		if k in mid_cost_agg and any(v != 0.0 for v in mid_cost_agg[k])
+	]
+	imp_stack_order = [
+		k for k in imp_stack_order
+		if k in mid_imp_agg and any(v != 0.0 for v in mid_imp_agg[k])
+	]
+
+	# ------------------------------------------------------------------
+	# Default axis labels
+	# ------------------------------------------------------------------
+	if title_cost is None:
+		title_cost = (
+			"Average cost per tonne Li\u2082CO\u2083 — Thacker Pass"
+			if mode == "average" else
+			"Total cost — Thacker Pass"
+		)
+	if title_emissions is None:
+		title_emissions = (
+			f"Average {impact.upper()} impact per tonne Li\u2082CO\u2083 — Thacker Pass"
+			if mode == "average" else
+			f"Total {impact.upper()} impact — Thacker Pass"
+		)
+	if ylab_cost is None:
+		ylab_cost = (
+			"Average cost ($/t Li\u2082CO\u2083)"
+			if mode == "average" else "Total cost ($)"
+		)
+	if ylab_emissions is None:
+		ylab_emissions = (
+			f"Average {impact.upper()} (kg/t Li\u2082CO\u2083)"
+			if mode == "average" else f"Total {impact.upper()} (kg)"
+		)
+
+	# ------------------------------------------------------------------
+	# Colors — match existing dissertation figure convention
+	# ------------------------------------------------------------------
+	cost_colors = {
+		"Material Costs":      "#4e79a7",
+		"Labor Costs":         "#f28e2b",
+		"Utility Costs":       "#59a14f",
+		"Other":               "#e15759",
+		"Tailings":            "#7b5ea7",
+		"Wastewater Treatment":"#b09bc7",  # lighter purple — adjacent to tailings
+	}
+	imp_colors = {
+		"Scope One":   "#f28e2b",
+		"Scope Two":   "#4e79a7",
+		"Scope Three": "#76b7b2",
+	}
+
+	# ------------------------------------------------------------------
+	# Plot 1: costs
+	# ------------------------------------------------------------------
+	plot_stacked_bars(
+		agg_labels, mid_cost_agg,
+		stack_order=cost_stack_order,
+		colors=cost_colors,
+		title=title_cost,
+		ylab=ylab_cost,
+		err_low=cost_err_low,
+		err_high=cost_err_high,
+		show_legend=show_legend,
+		wrap_width=wrap_width,
+		ylims=ylims_cost,
+		xticks=xticks_cost,
+	)
+
+	# ------------------------------------------------------------------
+	# Plot 2: emissions
+	# ------------------------------------------------------------------
+	plot_stacked_bars(
+		agg_labels, mid_imp_agg,
+		stack_order=imp_stack_order,
+		colors=imp_colors,
+		title=title_emissions,
+		ylab=ylab_emissions,
+		err_low=imp_err_low,
+		err_high=imp_err_high,
+		show_legend=show_legend,
+		wrap_width=wrap_width,
+		ylims=ylims_emissions,
+		xticks=xticks_emissions,
+	)
+
+# ---------------------------------------------------------------------------
+# Jianxiawo presentation aggregation
+# ---------------------------------------------------------------------------
+
+_JIANXIAWO_GROUPS = [
+	("Blast mining &\ntransport",
+		["Blasting with drilling and explosives", "Loading with excavator", "Hauling",
+		 "Ore transport via truck"]),
+	("Classification\n& flotation",
+		["Classification"]),
+	("Sulfate roasting",
+		["Roasting of lepidolate with sulfate salts"]),
+	("Other roast-leach\nsteps",
+		["Crushing", "Grinding via mill", "Dewatering to allow for high-temp roasting",
+		 "Water leaching", "Impurity Removal", "Lithium Stream Clarification"]),
+	("Li\u2082CO\u2083\nprecipitation",
+		["Soda ash precipitation (Li2CO3)"]),
+	("Other Li\u2082CO\u2083\nproduction steps",
+		["Thickening and dewatering", "Washing & purification", "Drying & packaging"]),
+	("Tailings &\nwater management",
+		["Tailings", "Wastewater Treatment"]),
+]
+
+def jianxiawo_steps_aggregated(
+	sc,
+	project_data,
+	apv,
+	*,
+	view="opex",
+	impact="co2",
+	mode="average",
+	transp=True,
+	groups=None,
+	title_cost=None,
+	title_emissions=None,
+	ylab_cost=None,
+	ylab_emissions=None,
+	show_legend=False,
+	wrap_width=18,
+	ylims_cost=None,
+	xticks_cost=None,
+	ylims_emissions=None,
+	xticks_emissions=None,
+):
+	"""
+	Plot Jianxiawo costs and emissions with steps aggregated into
+	presentation-friendly groups, with asymmetric scenario error bars.
+
+	Mirrors thacker_pass_steps_aggregated but uses _JIANXIAWO_GROUPS,
+	which separates Classification & Flotation as its own row to highlight
+	the pathway-specific beneficiation burden of low-grade lepidolite ore.
+
+	Parameters
+	----------
+	sc           : SupplyChain  (facilities already built via evaluate_project)
+	project_data : dict
+	apv          : float        annual production volume (kg Li2CO3)
+	view         : str          cost view for _build_steps_cost_series (default "opex")
+	impact       : str          impact category key (default "co2")
+	mode         : str          "average" | "total"
+	transp       : bool         include transport steps
+	groups       : list | None  override _JIANXIAWO_GROUPS if supplied
+	show_legend  : bool
+	wrap_width   : int          y-axis label wrap width (chars)
+	"""
+	import numpy as np
+
+	if groups is None:
+		groups = _JIANXIAWO_GROUPS
+
+	mode = str(mode).lower().strip()
+	if mode not in {"total", "average"}:
+		raise ValueError("mode must be 'total' or 'average'")
+	if mode == "average" and not apv:
+		raise ValueError("apv is zero; cannot compute average costs/impacts.")
+
+	def _row_totals(series_dict):
+		n = len(next(iter(series_dict.values())))
+		totals = np.zeros(n)
+		for vals in series_dict.values():
+			totals += np.asarray(vals, dtype=float)
+		return totals
+
+	# ------------------------------------------------------------------
+	# Conservative scenario
+	# ------------------------------------------------------------------
+	update_machines(sc, "conservative")
+	update_materials(sc, project_data, "conservative")
+	sc.update_apv(apv, recalc=True)
+
+	con_labels, con_cost_raw, _ = sc._build_steps_cost_series(
+		view=view, detail=2, transp=transp, top_n=None)
+	_, con_imp_raw, _ = sc._build_steps_impact_series(
+		impact=impact, transp=transp)
+
+	_, con_cost_agg = _aggregate_step_series(con_labels, con_cost_raw, groups)
+	_, con_imp_agg  = _aggregate_step_series(con_labels, con_imp_raw,  groups)
+	con_cost_totals = _row_totals(con_cost_agg)
+	con_imp_totals  = _row_totals(con_imp_agg)
+
+	# ------------------------------------------------------------------
+	# Optimistic scenario
+	# ------------------------------------------------------------------
+	update_machines(sc, "optimistic")
+	update_materials(sc, project_data, "optimistic")
+	sc.update_apv(apv, recalc=True)
+
+	opt_labels, opt_cost_raw, _ = sc._build_steps_cost_series(
+		view=view, detail=2, transp=transp, top_n=None)
+	_, opt_imp_raw, _ = sc._build_steps_impact_series(
+		impact=impact, transp=transp)
+
+	_, opt_cost_agg = _aggregate_step_series(opt_labels, opt_cost_raw, groups)
+	_, opt_imp_agg  = _aggregate_step_series(opt_labels, opt_imp_raw,  groups)
+	opt_cost_totals = _row_totals(opt_cost_agg)
+	opt_imp_totals  = _row_totals(opt_imp_agg)
+
+	# ------------------------------------------------------------------
+	# Midpoint scenario
+	# ------------------------------------------------------------------
+	update_machines(sc, "midpoint")
+	update_materials(sc, project_data, "midpoint")
+	sc.update_apv(apv, recalc=True)
+
+	mid_labels, mid_cost_raw, cost_stack_order = sc._build_steps_cost_series(
+		view=view, detail=2, transp=transp, top_n=None)
+	_, mid_imp_raw, imp_stack_order = sc._build_steps_impact_series(
+		impact=impact, transp=transp)
+
+	agg_labels, mid_cost_agg = _aggregate_step_series(mid_labels, mid_cost_raw, groups)
+	_,           mid_imp_agg  = _aggregate_step_series(mid_labels, mid_imp_raw,  groups)
+	mid_cost_totals = _row_totals(mid_cost_agg)
+	mid_imp_totals  = _row_totals(mid_imp_agg)
+
+	if con_labels != mid_labels or opt_labels != mid_labels:
+		raise ValueError(
+			"Step label mismatch across scenarios — check that conservative, "
+			"midpoint, and optimistic runs all produce the same step ordering.")
+
+	# ------------------------------------------------------------------
+	# Asymmetric error bars
+	# ------------------------------------------------------------------
+	cost_err_low  = np.maximum(mid_cost_totals - opt_cost_totals, 0.0)
+	cost_err_high = np.maximum(con_cost_totals - mid_cost_totals, 0.0)
+	imp_err_low   = np.maximum(mid_imp_totals  - opt_imp_totals,  0.0)
+	imp_err_high  = np.maximum(con_imp_totals  - mid_imp_totals,  0.0)
+
+	# ------------------------------------------------------------------
+	# Per-unit scaling
+	# ------------------------------------------------------------------
+	divisor = float(apv) if mode == "average" else 1.0
+	mid_cost_agg = {k: [v / divisor for v in vals]
+					for k, vals in mid_cost_agg.items()}
+	mid_imp_agg  = {k: [v / divisor for v in vals]
+					for k, vals in mid_imp_agg.items()}
+	cost_err_low  /= divisor;  cost_err_high /= divisor
+	imp_err_low   /= divisor;  imp_err_high  /= divisor
+
+	# ------------------------------------------------------------------
+	# Prune stack_order to series present and non-zero after aggregation
+	# ------------------------------------------------------------------
+	cost_stack_order = [
+		k for k in cost_stack_order
+		if k in mid_cost_agg and any(v != 0.0 for v in mid_cost_agg[k])
+	]
+	imp_stack_order = [
+		k for k in imp_stack_order
+		if k in mid_imp_agg and any(v != 0.0 for v in mid_imp_agg[k])
+	]
+
+	# ------------------------------------------------------------------
+	# Default axis labels
+	# ------------------------------------------------------------------
+	if title_cost is None:
+		title_cost = (
+			"Average cost per tonne Li\u2082CO\u2083 — Jianxiawo"
+			if mode == "average" else
+			"Total cost — Jianxiawo"
+		)
+	if title_emissions is None:
+		title_emissions = (
+			f"Average {impact.upper()} impact per tonne Li\u2082CO\u2083 — Jianxiawo"
+			if mode == "average" else
+			f"Total {impact.upper()} impact — Jianxiawo"
+		)
+	if ylab_cost is None:
+		ylab_cost = (
+			"Average cost ($/t Li\u2082CO\u2083)"
+			if mode == "average" else "Total cost ($)"
+		)
+	if ylab_emissions is None:
+		ylab_emissions = (
+			f"Average {impact.upper()} (kg/t Li\u2082CO\u2083)"
+			if mode == "average" else f"Total {impact.upper()} (kg)"
+		)
+
+	# ------------------------------------------------------------------
+	# Colors — match existing dissertation figure convention
+	# ------------------------------------------------------------------
+	cost_colors = {
+		"Material Costs":      "#4e79a7",
+		"Labor Costs":         "#f28e2b",
+		"Utility Costs":       "#59a14f",
+		"Other":               "#e15759",
+		"Tailings":            "#7b5ea7",
+		"Wastewater Treatment":"#b09bc7",
+	}
+	imp_colors = {
+		"Scope One":   "#f28e2b",
+		"Scope Two":   "#4e79a7",
+		"Scope Three": "#76b7b2",
+	}
+
+	# ------------------------------------------------------------------
+	# Plot 1: costs
+	# ------------------------------------------------------------------
+	plot_stacked_bars(
+		agg_labels, mid_cost_agg,
+		stack_order=cost_stack_order,
+		colors=cost_colors,
+		title=title_cost,
+		ylab=ylab_cost,
+		err_low=cost_err_low,
+		err_high=cost_err_high,
+		show_legend=show_legend,
+		wrap_width=wrap_width,
+		ylims=ylims_cost,
+		xticks=xticks_cost,
+	)
+
+	# ------------------------------------------------------------------
+	# Plot 2: emissions
+	# ------------------------------------------------------------------
+	plot_stacked_bars(
+		agg_labels, mid_imp_agg,
+		stack_order=imp_stack_order,
+		colors=imp_colors,
+		title=title_emissions,
+		ylab=ylab_emissions,
+		err_low=imp_err_low,
+		err_high=imp_err_high,
+		show_legend=show_legend,
+		wrap_width=wrap_width,
+		ylims=ylims_emissions,
+		xticks=xticks_emissions,
+	)
 
 
 
