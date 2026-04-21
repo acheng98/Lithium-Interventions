@@ -92,6 +92,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 									location=project_data["Location 1"],
 									steps=helpers.build_facility_dict(data_folder,project_data["Pathway 1"]))
 
+	# PULL PROJECT-SPECIFIC DATA
 	rho_bank  = project_data["Initial Density"]
 	swell_factor = project_data["Swell Factor"]
 	dilution = project_data["Dilution"] # Apply dilution directly to chemical composition instead
@@ -148,6 +149,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 		ccf = 0.2/(0.2/2.7+0.8/1)/10**6 # Assume TDS is ~100 g/L
 		precip_step.set_conversion_factor("pls_post_polishing",ccf,field="ccf")
 		precip_step.set_conversion_factor("step_basis",ccf,field="ccf")
+		precip_step.set_conversion_factor("lithium_slurry",project_data["Carbonate Yield Rate"],field="yield_rate")
 
 	elif project_data["Type"] == "Lepidolite":
 		material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
@@ -202,37 +204,41 @@ def evaluate_project(sc,project_data,data_folder,detail=1,plot=1):
 	summary["midpoint"] = summary_midpoint
 	# pprint(summary_midpoint)
 	
-	if detail > 1:
-		print("\nProduction volume at each step:")
-		print("\nStep Production volumes:", sc.get_detailed_pvs())
-		# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
-		# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
-		pprint(sc.get_step_costs(transp=True,detail=1))
+	if type(detail) in (float,int):
+		if detail > 1:
+			print("\nProduction volume at each step:")
+			print("\nStep Production volumes:", sc.get_detailed_pvs())
+			# print("\nAmount of lithium in each step:", sc.get_constituent_amount_at_steps("Li"))
+			# print("\nAmount of lithium carbonate in each step:",sc.get_constituent_amount_at_steps("Li2CO3"))
+			pprint(sc.get_step_costs(transp=True,detail=1))
 
-	if (detail > 1) and (detail <=2):
-		print(sc.get_detailed_inputs())
-		pprint(sc.get_step_constituents())
+		if (detail > 1) and (detail <=2):
+			print(sc.get_detailed_inputs())
+			pprint(sc.get_step_constituents())
 
-	if detail > 2:
-		print("\nNumber of Machines at each step:")
-		pprint(sc.get_step_machines())
-		print("\nReagents:")
-		pprint(sc.get_total_reagents())
-		print("\nUtilities:")
-		pprint(sc.get_total_utilities())
-		print("\nLabor:")
-		pprint(sc.get_step_labor())
-		print("\nCosts at each step:")
-		pprint(sc.get_step_costs(transp=True,detail=2))
-		print("\nImpacts at each step:")
-		pprint(sc.get_step_impacts(transp=True))
+		if detail > 2:
+			print("\nNumber of Machines at each step:")
+			pprint(sc.get_step_machines())
+			print("\nReagents:")
+			pprint(sc.get_total_reagents())
+			print("\nUtilities:")
+			pprint(sc.get_total_utilities())
+			print("\nLabor:")
+			pprint(sc.get_step_labor())
+			print("\nCosts at each step:")
+			pprint(sc.get_step_costs(transp=True,detail=2))
+			print("\nImpacts at each step:")
+			pprint(sc.get_step_impacts(transp=True))
 
-	if detail == 2.5:	
-		wk_compare(sc,project_type) # Output comparison metrics vs Wesselkamper et al. 2025
+		if detail == 2.5:	
+			wk_compare(sc,project_type) # Output comparison metrics vs Wesselkamper et al. 2025
 
-	if detail > 3:
-		print(sc.get_step_reagent_usage())
-		pprint(sc.get_step_utilities_detailed())
+		if detail > 3:
+			print(sc.get_step_reagent_usage())
+			pprint(sc.get_step_utilities_detailed())
+	else:
+		if detail == "tp_debug":
+			tp_debug(sc,summary_midpoint)
 	
 	if plot == 1:
 		# sc.plot_step_costs(mode="average",view="opex",detail=3)
@@ -329,6 +335,146 @@ def wk_compare(sc,proj): # Outputs metrics for comparison against Wesselkamper e
 		"\nAvg. Process Power cost:", proc_pow/apv,
 		"\nAvg. Other Process costs:", proc_other/apv,
 		"\nAvg. Process Capex costs:", proc_capex/apv)
+
+def tp_debug(sc, summary):
+	"""
+	Print a clean, tabular summary of Thacker Pass calibration metrics.
+	Designed for step-by-step revision tracking against the DFS.
+	Call with detail=5 in evaluate_project.
+	"""
+	apv = sc.apv
+	if not apv:
+		print("ERROR: APV is zero, cannot compute per-unit metrics.")
+		return
+ 
+	# --- Summary-level metrics ---
+	avg_opex = summary.get("avg_opex", 0.0)
+	avg_var_cost = summary.get("avg_var_cost", 0.0)
+	avg_co2 = summary.get("avg_co2", 0.0)
+	avg_cost = summary.get("avg_cost", 0.0)
+	avg_capex = summary.get("avg_capex", 0.0)
+ 
+	# --- Reagents ---
+	reagents = sc.get_total_reagents()
+	def _reagent(name):
+		r = reagents.get(name, {})
+		return r.get("abs_usage", 0.0), r.get("total_cost", 0.0)
+ 
+	acid_kg, acid_cost = _reagent("sulfuric_acid")
+	lime_kg, lime_cost = _reagent("lime")
+	soda_kg, soda_cost = _reagent("soda_ash")
+	lstone_kg, lstone_cost = _reagent("limestone")
+	floc_kg, floc_cost = _reagent("flocculant")
+	water_qty, water_cost = _reagent("process_water")
+ 
+	# --- Utilities ---
+	utilities = sc.get_total_utilities()
+	def _util(name):
+		u = utilities.get(name, {})
+		return u.get("consumed", 0.0), u.get("cost", 0.0)
+ 
+	elec_kwh, elec_cost = _util("electricity")
+	diesel_l, diesel_cost = _util("diesel")
+	gas_qty, gas_cost = _util("natural_gas")
+	steam_qty, steam_cost = _util("steam")
+ 
+	# --- Labor ---
+	labor = sc.get_total_labor()
+	labor_workers = labor.get("labor_required", 0.0)
+	labor_cost = labor.get("labor_cost", 0.0)
+ 
+	# --- Tailings / coproducts ---
+	sinks = sc.get_sink_handling_costs()
+	sink_summary = {}
+	for rec in sinks:
+		sname = rec["sink"]
+		if sname not in sink_summary:
+			sink_summary[sname] = {"volume": 0.0, "cost": 0.0}
+		sink_summary[sname]["volume"] += rec["volume"]
+		sink_summary[sname]["cost"] += rec["total_cost"]
+ 
+	# --- Ore throughput (from leach step PV × solids concentration) ---
+	pvs = sc.get_detailed_pvs()
+	leach_pv = 0.0
+	for row in pvs:
+		if row[0] == "acid_leaching":
+			leach_pv = row[1]
+			break
+	ore_throughput = leach_pv * 430 / 1000	# 430 kg solids/m³ at ρ_l=1.0, ÷1000 for tonnes
+ 
+	# --- Print ---
+	sep = "=" * 72
+	div = "-" * 72
+ 
+	print(f"\n{sep}")
+	print(f"  THACKER PASS CALIBRATION SUMMARY  (detail=5)")
+	print(f"{sep}")
+ 
+	print(f"\n{'HEADLINE METRICS'}")
+	print(div)
+	print(f"  {'APV (t LCE/yr)':<40} {apv:>14,.0f}")
+	print(f"  {'avg_opex ($/t LCE)':<40} {avg_opex:>14,.0f}")
+	print(f"  {'avg_var_cost ($/t LCE)':<40} {avg_var_cost:>14,.0f}")
+	print(f"  {'avg_capex ($/t LCE)':<40} {avg_capex:>14,.0f}")
+	print(f"  {'avg_cost ($/t LCE)':<40} {avg_cost:>14,.0f}")
+	print(f"  {'avg_co2 (t CO₂/t LCE)':<40} {avg_co2:>14,.2f}")
+	print(f"  {'Ore throughput (t ore/yr)':<40} {ore_throughput:>14,.0f}")
+	print(f"  {'Leach slurry volume (m³/yr)':<40} {leach_pv:>14,.0f}")
+ 
+	print(f"\n{'REAGENT CONSUMPTION':<40} {'Total/yr':>14} {'kg/t LCE':>12} {'$/t LCE':>12} {'% of opex':>10}")
+	print(div)
+	reagent_rows = [
+		("Sulfuric acid", acid_kg, acid_cost),
+		("Lime (Ca(OH)₂)", lime_kg, lime_cost),
+		("Soda ash (Na₂CO₃)", soda_kg, soda_cost),
+		("Limestone (CaCO₃)", lstone_kg, lstone_cost),
+		("Flocculant", floc_kg, floc_cost),
+		("Process water (m³)", water_qty, water_cost),
+	]
+	tot_reagent_cost = sum(r[2] for r in reagent_rows)
+	for name, qty, cost in reagent_rows:
+		pct = (cost / (avg_opex * apv) * 100) if avg_opex else 0.0
+		print(f"  {name:<38} {qty:>14,.0f} {qty/apv:>12,.0f} {cost/apv:>12,.0f} {pct:>9.1f}%")
+	print(f"  {'TOTAL REAGENTS':<38} {'':>14} {'':>12} {tot_reagent_cost/apv:>12,.0f}")
+ 
+	print(f"\n{'UTILITIES':<40} {'Total/yr':>14} {'per t LCE':>12} {'$/t LCE':>12}")
+	print(div)
+	util_rows = [
+		("Electricity (kWh)", elec_kwh, elec_cost),
+		("Diesel (L)", diesel_l, diesel_cost),
+		("Natural gas", gas_qty, gas_cost),
+		("Steam", steam_qty, steam_cost),
+	]
+	tot_util_cost = sum(r[2] for r in util_rows)
+	for name, qty, cost in util_rows:
+		print(f"  {name:<38} {qty:>14,.0f} {qty/apv:>12,.1f} {cost/apv:>12,.0f}")
+	print(f"  {'TOTAL UTILITIES':<38} {'':>14} {'':>12} {tot_util_cost/apv:>12,.0f}")
+ 
+	print(f"\n{'LABOR'}")
+	print(div)
+	print(f"  {'Workers per shift':<40} {labor_workers:>14,.1f}")
+	print(f"  {'Total labor cost ($/t LCE)':<40} {labor_cost/apv:>14,.0f}")
+ 
+	print(f"\n{'TAILINGS & WASTE STREAMS':<40} {'Volume/yr':>14} {'$/t LCE':>12}")
+	print(div)
+	tot_sink_cost = 0.0
+	for sname in sorted(sink_summary.keys()):
+		sv = sink_summary[sname]
+		tot_sink_cost += sv["cost"]
+		print(f"  {sname:<38} {sv['volume']:>14,.0f} {sv['cost']/apv:>12,.0f}")
+	print(f"  {'TOTAL SINK COSTS':<38} {'':>14} {tot_sink_cost/apv:>12,.0f}")
+ 
+	print(f"\n{'COST BUILDUP CHECK'}")
+	print(div)
+	print(f"  {'Reagents':<40} {tot_reagent_cost/apv:>14,.0f}")
+	print(f"  {'Utilities':<40} {tot_util_cost/apv:>14,.0f}")
+	print(f"  {'Labor':<40} {labor_cost/apv:>14,.0f}")
+	print(f"  {'Sinks':<40} {tot_sink_cost/apv:>14,.0f}")
+	subtotal = (tot_reagent_cost + tot_util_cost + labor_cost + tot_sink_cost) / apv
+	print(f"  {'Subtotal (visible opex)':<40} {subtotal:>14,.0f}")
+	print(f"  {'Reported avg_opex':<40} {avg_opex:>14,.0f}")
+	print(f"  {'Residual (maint+overhead+opex_excess)':<40} {avg_opex - subtotal:>14,.0f}")
+	print(f"{sep}\n")
 
 def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=False,detail=1,plot=1):
 	"""
@@ -794,8 +940,8 @@ if __name__ == '__main__':
 	################
 	# Pick project #
 	################
-	projects = ["Silver Peak"]
-	# projects = ["Thacker Pass"]
+	# projects = ["Silver Peak"]
+	projects = ["Thacker Pass"]
 	# projects = ["Jianxiawo"]
 	# projects = ["Jianxiawo","Thacker Pass"]
 	# projects = ["Silver Peak","Thacker Pass"]
@@ -805,14 +951,15 @@ if __name__ == '__main__':
 	# write=True
 	# write=3
 	# write=5
-	detail=1
+	# detail=1
 	# detail=2
 	# detail=2.5
 	# detail=3
 	# detail=4
-	# plot=0
+	detail="tp_debug"
+	plot=0
 	# plot=1
-	plot=2 # step-by-step breakdown
+	# plot=2 # step-by-step breakdown
 	# plot=2.1 # step-by-step breakdown - Thacker Pass Aggregation
 	# plot=2.2 # step-by-step breakdown - Jianxiawo Aggregation
 	# plot=3 # Tornado
