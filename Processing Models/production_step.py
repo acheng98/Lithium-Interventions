@@ -240,6 +240,7 @@ class ProductionStep:
 
 				self.tooling_cost_base: float = safe_float(machine_data.get("tooling_cost_base"), 0.0)
 				self.tooling_cost_base_unit: Optional[str] = machine_data.get("tooling_cost_base_unit")
+				self.tool_life: Optional[float] = safe_float(machine_data.get("tool_life"), 1.0) or None
 				self.tooling_scaling_exponent: float = safe_float(machine_data.get("tooling_scaling_exponent"), 1.0)
 
 				self.footprint_base: float = safe_float(machine_data.get("footprint_base"), 0.0)
@@ -857,13 +858,13 @@ class ProductionStep:
 				# --- Tool cost ---
 				if hasattr(self, "tool_price") and self.tool_price:
 						if self.tool_life is not None:
-								tool_crf = crf(self.facility.dr, self.tool_life)
+								tool_crf = self.facility.calc_crf(self.facility.dr, self.tool_life)
 								self.tool_cost = tool_crf * self.tool_price * getattr(self, "machines_required", 1) * getattr(self, "tool_use", 1)
 						else:
 								self.tool_cost = self.facility.crf * self.tool_price * getattr(self, "machines_required", 1) * getattr(self, "tool_use", 1)
 				elif hasattr(self, "tooling_cost_base") and self.tooling_cost_base:
 						if self.tool_life is not None:
-								tool_crf = crf(self.facility.dr, self.tool_life)
+								tool_crf = self.facility.calc_crf(self.facility.dr, self.tool_life)
 								self.tool_cost = tool_crf * self.tooling_cost_base
 						else:
 								self.tool_cost = self.facility.crf * self.tooling_cost_base

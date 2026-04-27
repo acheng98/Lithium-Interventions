@@ -7,7 +7,7 @@ hps,Hours per shift,Hours,8,8,12,8,8,8,,,
 ub,Hours of unpaid breaks/shift,Hours,0.5,0.5,,0.5,0.5,0.5,,,
 pb,Hours of paid breaks/shift,Hours,0.5,0.5,,0.5,0.5,0.5,,,
 dr,Discount Rate,"%, as a number",10%,10%,10%,10%,10%,10%,10%,10%,10%
-wage,Direct Wage (w/benefits),2025USD per hour,$7.00,$7.00,,$50.00,$25.00,12,,,
+wage,Direct Wage (w/benefits),2025USD per hour,$7.00,$7.00,,$50.00,$10.00,12,,,
 elec_price,Electricity cost,$/KWh,$0.17,$0.17,,$0.09,$0.075,0.075,,,
 gas_price,Gas cost,$/MMBTU,$12.40,$12.40,,$5.04,$8.50,8.5,,,
 diesel_price,Diesel cost,$/L,$1.02,$1.02,,$4.20,$1.05,1.05,,,
@@ -24,7 +24,7 @@ maint,Annualized maintenance costs,% of main machine cost,5%,5%,5%,5%,5%,0.05,,,
 fixed_over,Annualized fixed overhead costs,"% of the total of {main machine, building, auxiliary equipment, and maintenance} costs",10%,10%,10%,10%,10%,0.1,,,
 tailings_nonhazardous_cost,,$ / tonne received for disposal of nonhazardous waste,-,-,-,$67.00,$10.00,,-,-,-
 tailings_hazardous_cost,,$ / tonne received for disposal of hazardous waste,-,-,-,$648.00,$280.00,,-,-,-
-utility_impact.electricity.co2,Grid emissions intensity - carbondi.com,kgCO2e/kWh,0.27343,0.27343,0.32716,0.35507,0.5836,0.5306,0.58023,0.11541,0.06398
+utility_impact.electricity.co2,Grid emissions intensity,kgCO2/kWh,0.27343,0.27343,0.32716,0.3192,0.5836,0.5306,0.58023,0.11541,0.06398
 utility_impact.electricity.water,Water usage intensity of grid electricity,L/kWh,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 utility_impact.natural_gas.co2,Combustion emissions intensity of natural gas,kgCO2e/MMBTU,53.06,53.06,53.06,53.06,53.06,53.06,53.06,53.06,53.06
 utility_impact.cooling_water.co2,Emissions intensity of chilled water,kgCO2e/m3,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08

@@ -3,13 +3,13 @@ step_id,Step ID (unique),batch_treatment,sls_step
 step_name,Human-readable process step,Batch treatment of brine (Slaked Lime [Ca[OH2]] + soda ash [Na2CO3]),Solid–liquid separation (settling + filtration lumped)
 key_equation,"Key equation, chemical or physical, evaluated in this step.",Mg2+ + (OH)-2 --> Mg(OH)2(s); Ca2+ + CO3^2- -> CaCO3(s),
 notes,"Key information, notes","Batch reactor/tanks with agitation. Purpose is impurity precipitation (Mg, Ca) while keeping Li in solution.",Primary tunable is Li loss to solids.
-machine_options,,batch_treatment_generic.conservative; batch_treatment_generic.midpoint; batch_treatment_generic.optimistic,solid_liquid_separation.conservative; solid_liquid_separation.midpoint; solid_liquid_separation.optimistic
-machine_default,,batch_treatment_generic.midpoint,solid_liquid_separation.midpoint
-step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,concentrated_brine_throughput,mixture_being_separated
+machine_options,,batch_treatment_generic.conservative; batch_treatment_generic.midpoint; batch_treatment_generic.optimistic,thickener_generic.conservative; thickener_generic.midpoint; thickener_generic.optimistic
+machine_default,,batch_treatment_generic.midpoint,thickener_generic.midpoint
+step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,concentrated_brine_throughput,thickener_feed_throughput
 step_basis_unit,,L/batch concentrated brine,m3/h treated slurry equivalent (pseudo-continuous)
 step_ccf,Constituent conversion factor from constituent units to step_basis units,0.00000125,0.00000125
 step_ccf_units,Units to convert constituents into step_basis units,kg/L (conc. brine density),kg/m3 (conc. brine density)
-volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",concentrated_brine_throughput,mixture_being_separated
+volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",concentrated_brine_throughput,thickener_feed_throughput
 volume_defining_basis_unit,What unit is the process volume or constituent in?,L concentrated_lithium_brine,m3 brine_post_lime
 volume_defining_output,What is the output or output constituent that needs to be converted to,treated_slurry,pls_post_polishing
 volume_defining_output_unit,What unit is that output in?,L brine_post_lime,L brine_post_polish
@@ -24,7 +24,7 @@ primary_input_1_ccf_units,Units for constituent conversion factor,kg/L (conc. br
 primary_input_1_chemistry_dependence,Does the chemistry for this primary input depend on an output of the previous step? ,TRUE,TRUE
 reagent_1_name,Reagent name,lime,filter_aid
 reagent_1_name_long,Long/descriptive reagent name,Slaked lime (Ca(OH)2) for Mg precipitation / pH adjustment,"precoat (e.g., diatomaceous earth)"
-reagent_1_target_constituents,,Mg,mixture_being_separated
+reagent_1_target_constituents,,Mg,thickener_feed_throughput
 reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),3.658,0.005
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,0.95,0.005
 reagent_1_units,,kg Ca(OH)2 per kg Mg,kg_filter_aid per m3 treated slurry

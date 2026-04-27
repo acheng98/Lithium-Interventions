@@ -1,4 +1,4 @@
-variable_name,Description,Crushing,Attrition Scrubbing,Classification,Thickening (to ~55 wt% solids leach feed),Acid Leaching (at ~33 wt% solids after adding acid + liquid),Neutralization,Primary CCD / Leach Residue Thickening (multistage),Impurity Removal and Neutralization
+variable_name,Description,Crushing,Attrition Scrubbing,Classification,Thickening (to ~55 wt% solids leach feed),Acid Leaching (at ~33 wt% solids after adding acid + liquid),Neutralization,Primary CCD / Leach Residue (multistage),Impurity Removal and Neutralization
 step_id,Step ID (unique),crushing,scrubbing,classifying,thickening,acid_leaching,neutralization,ccd,impurity_removal
 step_name,Human-readable process step,Crushing,Attrition Scrubbing,Classification,Thickening,Acid Leaching,Neutralization,Counter-Current Decantation and Thickening,Impurity Removal
 key_equation,"Key equation, chemical or physical, evaluated in this step.",N/A (mechanical),"N/A (mechanical). However, inputs to this step are: crushed claystone, recycled coarse materials, recycled water, and makeup water. Assuming a target of ~30 wt% solids, a grain density of 2.6 t/m3 and water density of 1 t/m3. r_mix = 1 / (w_s / rho_s + (1 - w_s) / (rho_water)) --> conversion factor is 1/(w_s*r_mix). Assuming 20% of this comes from the recycling in step 3, we have a conversion factor of ≈3.40",N/A (size separation),N/A (Solid-liquid settling),"Acid leaching of Li-bearing clays (simplified): Li₂O·nSiO₂·mH₂O (s) + H₂SO₄ (aq) → Li₂SO₄ (aq) + nSiO₂ (s) + (m+1)H₂O. Other gangue elements (Al, Mg, Ca, Fe) form soluble sulfates or secondary solids.","Impurity precipitation / neutralization, e.g. Fe³⁺ + 3OH⁻ → Fe(OH)₃(s); Al³⁺ + 3OH⁻ → Al(OH)₃(s). Lithium remains mostly in solution.","N/A (multi-stage CCD solid–liquid separation and washing; no net chemistry beyond minor neutralization). Not present in Thacker Pass but in TLC, Bonnie Claire, previous Thacker pass disclosures.",Impurity precipitation / second-stage neutralization: Mg²⁺ + CO₃²⁻ → MgCO₃(s); Ca²⁺ + CO₃²⁻ → CaCO₃(s); Lithium remains mostly in solution.
@@ -7,7 +7,7 @@ machine_options,,crushing_cycle.conservative; crushing_cycle.midpoint; crushing_
 machine_default,,crushing_cycle.midpoint,attrition_scrubber.midpoint,classifier_generic.midpoint,thickener_generic.midpoint,acid_leach_circuit.midpoint,staged_neutralization.midpoint,multi_stage_ccd_thickening.midpoint,staged_neutralization.midpoint
 step_basis,Name of the intermediate volume inputs are aggregated into and outputs produced from,crushed_ore_throughput,scrubbed_slurry_throughput,classified_slurry_throughput,thickener_feed_throughput,leach_slurry_throughput,pls_being_neutralized,CCD_feed_throughput,pregnant_solution_throughput
 step_basis_unit,,tonnes crushed ore,m^3 slurry at 20% solids,"m^3 slurry being classified, 20% solids",m^3 20% density slurry to be thickened,m^3 leach slurry throughput at 34% solids density,m^3 pls throughput at 34% solids density,m^3 neutralized PLS throughput at ~34% solids density,m^3 pregnant solution
-step_ccf,Constituent conversion factor from constituent units to step_basis units,0.001,0.0003679,0.0002281,0.0001653,0.0004300,0.0004300,0.0004300,0.00105
+step_ccf,Constituent conversion factor from constituent units to step_basis units,0.001,0.0003679,0.0002281,0.0001653,0.0004300,0.0004300,0.0004300,0.0004300
 step_ccf_units,Units to convert constituents into step_basis units,kg ore / tonne ore • 1/PPM ,kg ore / m^3 30% slurry • 1/PPM ,kg ore / m^3 20% slurry • 1/PPM ,kg ore / m^3 15% slurry • 1/PPM ,kg ore / m^3 34% slurry • 1/PPM ,kg ore / m^3 34% slurry • 1/PPM ,kg ore / m^3 ~34% slurry • 1/PPM ,kg / m^3 PLS density
 volume_defining_basis,"Are we converting from the step basis, or a constituent (extent) of the process basis?",crushed_ore_throughput,scrubbed_slurry_throughput,classified_slurry_throughput,thickener_feed_throughput,leach_slurry_throughput,pls_being_neutralized,CCD_feed_throughput,pregnant_solution_throughput
 volume_defining_basis_unit,What unit is the process volume or constituent in?,tonnes ROM ore,m^3 slurry at 30% solids,"m^3 slurry being classified, 20% solids",m^3 slurry to be thickened (start at 15% density),m^3 leach slurry throughput at 34% solids density,m^3 pls throughput at ~34% solids density,m^3 neutralized PLS throughput at ~34% solids density,m^3 pregnant leach solution (need to calculate/assume density)
@@ -27,12 +27,12 @@ reagent_1_name_long,Long/descriptive reagent name,,Slurry dispersant for clay/si
 reagent_1_target_constituents,,,scrubbed_slurry_throughput,,thickener_feed_throughput,leach_slurry_throughput,pls_being_neutralized,CCD_feed_throughput,pregnant_solution_throughput
 reagent_1_constituent_ratio,Reagent per target (e.g. kg/kg),,0.001,,0.00026,85,11.2,0.04,29.1
 reagent_1_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,0,0,0,0,0
-reagent_1_units,,,kg/m^3 slurry,,kg/m^3 slurry,kg acid/m^3,kg/m^3 pls,kg/m^3 ccd_feed_throughput,kg/m^3 pregnant_solution_throughput
-reagent_2_name,Reagent name,,process_water,,,process_water,flocculant,,soda_ash
+reagent_1_units,,,kg/m^3 slurry,,kg/m^3 slurry,kg acid/m^3 slurry,kg/m^3 pls,kg/m^3 ccd_feed_throughput,kg/m^3 pregnant_solution_throughput
+reagent_2_name,Reagent name,,process_water,,,process_water,flocculant,process_water,soda_ash
 reagent_2_name_long,Long/descriptive reagent name,,,,,,High-molecular-weight flocculant,,Soda ash to target calcium from lime
-reagent_2_target_constituents,,,scrubbed_slurry_throughput,,,leach_slurry_throughput,pls_being_neutralized,,pregnant_solution_throughput
+reagent_2_target_constituents,,,scrubbed_slurry_throughput,,,leach_slurry_throughput,pls_being_neutralized,CCD_feed_throughput,pregnant_solution_throughput
 reagent_2_constituent_ratio,Reagent per target (e.g. kg/kg),,0.4,,,0.483,0.03,,5.3
-reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,,0,0,,0
+reagent_2_target_constituents_eliminated,Fraction of constituent eliminated by target,,0,,,0,0,0,0
 reagent_2_units,,,,,,,kg/m^3 pls_being_neutralized,,kg/m^3 pregnant_solution_throughput
 reagent_3_name,Reagent name,,,,,,,,flocculant
 reagent_3_name_long,Long/descriptive reagent name,,,,,,,,High-molecular-weight flocculant
@@ -42,7 +42,7 @@ reagent_3_target_constituents_eliminated,Fraction of constituent eliminated by t
 reagent_3_units,,,,,,,,,kg/m^3 pregnant_solution_throughput
 primary_output_1_name,Output stream/material,crushed_ore,scrubbed_slurry,classified_slurry,thick_leach_feed,leached_slurry,neutralized_pls,washed_pregnant_leach_solution,pls_post_polishing
 primary_output_1_step,The step or waste material tracker that this output goes to,scrubbing,classifying,thickening,acid_leaching,neutralization,ccd,impurity_removal,Final
-primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",1,1,0.95,1,0.9,1,0.99,0.99
+primary_output_1_yield_rate,"Yield rate for output, independent of unit conversion factors",1,1,0.95,1,0.92,1,0.99,0.99
 primary_output_1_conversion_factor,Convert from step basis units to output units (step basis * CF = output),1,1.613,1.380,0.199,1,1,1.31,1000
 primary_output_1_units,Units after conversion is applied,tonnes ROM ore,m^3 slurry at 20% solids,m^3 classified slurry at 15% solids,m^3 thickened slurry at 55% solids,m^3 leach slurry throughput at 34% solids density,m^3 pls throughput at ~34% solids density,m^3 washed pregnant leach solution (assume ~75 g/L total dissolved solids for now),L PLS_post_polish
 primary_output_1_constituents,,,,,,,,,Li

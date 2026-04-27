@@ -100,7 +100,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 	rho_loose = rho_bank / swell_factor
 	loss = project_data["Loss"]
 	
-	init_conc = project_data["Initial Concentration"]
+	init_conc = deepcopy(project_data["Initial Concentration"])
 	rom_comp = deepcopy(project_data["Initial Concentration"])
 	if not project_data["ROM feed"]: # If the reported grade is not the grade at ROM, need to dilute
 		rom_comp["Li"] = rom_comp["Li"] * (1 - dilution) # Apply dilution to initial composition - may need to apply to other minerals as well, or increase their makeup
@@ -149,7 +149,7 @@ def clay_lepidolite(sc,project_data,data_folder):
 		ccf = 0.2/(0.2/2.7+0.8/1)/10**6 # Assume TDS is ~100 g/L
 		precip_step.set_conversion_factor("pls_post_polishing",ccf,field="ccf")
 		precip_step.set_conversion_factor("step_basis",ccf,field="ccf")
-		precip_step.set_conversion_factor("lithium_slurry",project_data["Carbonate Yield Rate"],field="yield_rate")
+		# precip_step.set_conversion_factor("lithium_slurry",project_data["Carbonate Yield Rate"],field="yield_rate") <-- override carbonate yield if needed
 
 	elif project_data["Type"] == "Lepidolite":
 		material_refining.add_target_comp(target = "rom_ore_feed", composition = rom_comp, 
@@ -941,22 +941,22 @@ if __name__ == '__main__':
 	# Pick project #
 	################
 	# projects = ["Silver Peak"]
-	projects = ["Thacker Pass"]
+	# projects = ["Thacker Pass"]
 	# projects = ["Jianxiawo"]
 	# projects = ["Jianxiawo","Thacker Pass"]
 	# projects = ["Silver Peak","Thacker Pass"]
-	# projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
+	projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
-	write=False
+	# write=False
 	# write=True
 	# write=3
 	# write=5
-	# detail=1
+	detail=1
 	# detail=2
 	# detail=2.5
 	# detail=3
 	# detail=4
-	detail="tp_debug"
+	# detail="tp_debug"
 	plot=0
 	# plot=1
 	# plot=2 # step-by-step breakdown
@@ -964,9 +964,9 @@ if __name__ == '__main__':
 	# plot=2.2 # step-by-step breakdown - Jianxiawo Aggregation
 	# plot=3 # Tornado
 
-	# for write in [True,3,5]:
-	# 	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
-	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
+	for write in [True,3,5]:
+		compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
+	# compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
 
 
 
