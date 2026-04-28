@@ -230,6 +230,22 @@ def evaluate_project(sc,project_data,data_folder,detail=1,plot=1):
 			print("\nImpacts at each step:")
 			pprint(sc.get_step_impacts(transp=True))
 
+			print("\nStep-level OPEX & CO2 (per tonne):")
+			_apv = sc.apv
+			_imp_map = {r["step_name"]: r for r in sc.get_step_impacts(transp=True)}
+			for _rec in sc.get_step_cost_report(view="opex", transp=True, detail=2):
+				# detail=2 returns lists for transport and OrderedDicts for production/sinks
+				if isinstance(_rec, list):
+					_sname, _opex = _rec[0], _rec[1]
+				else:
+					_sname = _rec.get("step_name")
+					_opex  = float(_rec.get("total_cost") or sum(
+						_rec.get(k, 0.0) or 0.0 for k in
+						("material_costs","labor_costs","utility_costs","opex_fixed_like")))
+				_r = _imp_map.get(_sname, {})
+				_co2 = sum(float((_r.get(sk) or {}).get("co2", 0.0) or 0.0) for sk in ("scope_one","scope_two","scope_three"))
+				print(f"  {_sname}: opex=${_opex/_apv:,.1f}/t  co2={_co2/_apv:,.2f} kg/t")
+
 		if detail == 2.5:	
 			wk_compare(sc,project_type) # Output comparison metrics vs Wesselkamper et al. 2025
 
@@ -476,7 +492,11 @@ def tp_debug(sc, summary):
 	print(f"  {'Residual (maint+overhead+opex_excess)':<40} {avg_opex - subtotal:>14,.0f}")
 	print(f"{sep}\n")
 
-def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=False,detail=1,plot=1):
+def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=False,detail=1,plot=1,
+	ylims_cost=None,
+	xticks_cost=None,
+	ylims_emissions=None,
+	xticks_emissions=None,):
 	"""
 	write=False  -> do not write to CSV
 	write=True   -> write full conservative/midpoint/optimistic to standard columns
@@ -485,12 +505,6 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 	"""
 	project_summaries = {}
 	topn_summaries    = {}  # populated only when write is an integer
-	
-	# CUSTOM RANGE DEFINITIONS
-	ylims_cost=(0, 7000)
-	xticks_cost=range(0, 7001, 1000)
-	ylims_emissions=(0, 30000)
-	xticks_emissions=range(0, 30001, 5000)
 
 	for project in projects:
 		project_data = projects_data[project]
@@ -552,6 +566,22 @@ def compare_projects(projects,projects_data,transp_data,loc_data,machine_data,ma
 	if detail in [1,3]:
 		pprint(extracted_data)
 	# helpers.plot_project_summaries(project_summaries)
+
+	# helpers.update_machines(sc, "midpoint")
+	# helpers.update_materials(sc, project_data, "midpoint")
+	# sc.update_apv(apv, recalc=True)
+	# step = sc.facilities["Concentrated Brine"].steps["batch_treatment"]
+	# step = sc.facilities["Material Refining"].steps["sulfate_roasting"]
+	# step = sc.facilities["Material Refining"].steps["grinding"]
+	# print("step_pv:              ", step.step_pv)
+	# print("ltr:                  ", step.ltr)
+	# print("lta:                  ", step.lta)
+	# print("machines_required:    ", step.machines_required)
+	# print("electricity_consumed: ", step.electricity_consumed)
+	# print("electricity_base:     ", step.electricity_base_total)
+	# print("batch_cycle+setup:    ", step.batch_cycle_time, "+", step.batch_setup_time)
+	# print("base_volume:          ", step.base_volume)
+	# print("dedicated_line:       ", step.dedicated_line)
 
 	if write is not False and write is not None:
 		# Assumes:
@@ -941,22 +971,22 @@ if __name__ == '__main__':
 	# Pick project #
 	################
 	# projects = ["Silver Peak"]
-	# projects = ["Thacker Pass"]
+	projects = ["Thacker Pass"]
 	# projects = ["Jianxiawo"]
 	# projects = ["Jianxiawo","Thacker Pass"]
 	# projects = ["Silver Peak","Thacker Pass"]
-	projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
+	# projects = ["Jianxiawo","Silver Peak","Thacker Pass"]
 
-	# write=False
+	write=False
 	# write=True
 	# write=3
 	# write=5
-	detail=1
+	# detail=1
 	# detail=2
 	# detail=2.5
 	# detail=3
 	# detail=4
-	# detail="tp_debug"
+	detail="tp_debug"
 	plot=0
 	# plot=1
 	# plot=2 # step-by-step breakdown
@@ -964,10 +994,14 @@ if __name__ == '__main__':
 	# plot=2.2 # step-by-step breakdown - Jianxiawo Aggregation
 	# plot=3 # Tornado
 
-	for write in [True,3,5]:
-		compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
-	# compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
+	# for write in [True,3,5]:
+	# 	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
+	compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=plot)
 
+	# Normalised axes for cross-project comparison
+	# compare_projects(projects,projects_data,transp_data,loc_data,machine_data,material_data,write=write,detail=detail,plot=2,
+	# 	ylims_cost=(0, 7000), xticks_cost=range(0, 7001, 1000),ylims_emissions=(0, 30000), xticks_emissions=range(0, 30001, 5000),
+	# 	)
 
 
 
