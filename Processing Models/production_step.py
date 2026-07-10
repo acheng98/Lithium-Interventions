@@ -554,7 +554,7 @@ class ProductionStep:
 				# --- Co-product volumes ---
 				for coproduct_name, props in self.secondary_outputs.items():
 						conv = props["conversion_factor"]
-						coproduct_volume = self.step_pv * conv * yield_rate
+						coproduct_volume = self.step_pv * conv
 						self.secondary_outputs[coproduct_name]["volume"] = coproduct_volume
 
 						sink_name = props["sink"]
