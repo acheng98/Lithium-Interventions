@@ -2,10 +2,10 @@ from typing import Dict, Any, List, Optional, Union
 from collections import OrderedDict, defaultdict
 import copy
 
-from facility import Facility
+from facility import Facility, ReagentFacility
 from production_step import ProductionStep
 from transportation import Transportation, TransportRoute
-from helpers import plot_stacked_bars, plot_production_curve
+from helpers import plot_stacked_bars, plot_production_curve, cost_series_colors
 
 # Define a class for the supply chain
 class SupplyChain:
@@ -229,6 +229,8 @@ class SupplyChain:
 
 		cur_apv = float(apv)
 		for fac in self.rev:
+			if isinstance(fac, ReagentFacility): # Skip reagent facilities - to be calculated in second pass
+				continue
 			updated_apv = False
 			summary = fac.update_apv(cur_apv,recalc)
 			self.tot_var_cost += summary["tot_var_cost"]
@@ -261,6 +263,22 @@ class SupplyChain:
 			
 			if not updated_apv: # No transportation link identified, just get the input value to this current facility
 				cur_apv = fac.get_initial_input_amount()
+
+		# Second pass for reagent facilities
+		for fac in self.rev:
+			if not isinstance(fac, ReagentFacility):
+				continue
+			demand = fac.demand()
+			if not demand:
+				raise ValueError(f"Reagent facility '{fac.fac_id}' has no scaled demand.")
+			summary = fac.update_apv(demand, recalc)
+			self.tot_var_cost += summary["tot_var_cost"]
+			self.tot_fixed_cost += summary["tot_fixed_cost"]
+			self.tot_opex += summary["tot_opex"]
+			self.tot_capex += summary["tot_capex"]
+			self.tot_cost += summary["tot_cost"]
+			for k, val in summary["emissions_totals"].items():
+				self.env_impacts[k] = self.env_impacts.get(k, 0.0) + val
 
 		for rec in self.get_sink_handling_costs():
 			self.tot_var_cost	+= rec["total_cost"]
@@ -407,6 +425,7 @@ class SupplyChain:
 					("machines_required", float(_safe_get(node, "machines_required", 0.0))),
 					("labor_required", float(_safe_get(node, "labor_required", 0.0))),
 					("costs", costs),
+					("sink_impacts", dict(getattr(node, "sink_impacts", {}) or {})),
 					("impacts", impacts),
 				]))
 
@@ -455,6 +474,7 @@ class SupplyChain:
 					("source_step",	snap["step_id"]),
 					("volume",		volume),
 					("unit_cost",	unit_cost),
+					("impacts",		dict(((snap.get("sink_impacts") or {}).get(sink) or {}).get(c_name) or {})),
 					("pv",			0.0),
 					("costs",		OrderedDict([
 						("tot_var_cost",	total_cost),
@@ -1111,10 +1131,12 @@ class SupplyChain:
 				cost = float(rec.get("total_cost", rec.get("variable_costs", 0.0)) or 0.0)
 				if detail == 2:
 					sink_name = rec.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
-					if sink_name.startswith("tailings"):
-						sink_name = "Tailings"
-					elif sink_name.startswith("wastewater"):
+					if sink_name in getattr(self, "sink_params", {}):
+						sink_name = "Tailings Management"
+					elif sink_name in getattr(self, "wastewater_params", {}):
 						sink_name = "Wastewater Treatment"
+					elif sink_name == "waste_pile":
+						sink_name = "Waste Rock Pile"
 					sink_cost_buf[sink_name] = sink_cost_buf.get(sink_name, 0.0) + cost
 				else:	# detail == 3: per-coproduct bar, skip zero-cost sinks
 					if cost == 0.0:
@@ -1184,7 +1206,9 @@ class SupplyChain:
 				_append("Aux Equip Cost", bd.get("aux_equip_cost", 0.0))
 
 			elif view == "opex":
-				if detail == 2:
+				if "material_costs" not in rec:
+					_append("Transport", rec.get("variable_costs", rec.get("total_cost", 0.0)))
+				elif detail == 2:
 					other = rec.get("opex_excess", 0.0) + rec.get("opex_fixed_like", 0.0)
 					_append("Material Costs", rec.get("material_costs", 0.0))
 					_append("Labor Costs", rec.get("labor_costs", 0.0))
@@ -1223,7 +1247,8 @@ class SupplyChain:
 		if view == "total" and detail == 2:
 			stack_order = ["Fixed Costs", "Variable Costs"]
 		elif view == "opex" and detail == 2:
-			base_order = ["Material Costs", "Labor Costs", "Utility Costs", "Other"]
+			base_order = ["Material Costs", "Labor Costs", "Utility Costs", "Transport", 
+				"Waste Rock Pile", "Tailings Management", "Wastewater Treatment", "Other"]
 			sink_keys = [k for k in series if k not in base_order]
 			stack_order = base_order + sink_keys
 		else:
@@ -1287,6 +1312,7 @@ class SupplyChain:
 		top_n = None,
 		transp: bool = True,
 		wrap_width: int = 12,
+		cost_colors = None,
 		):
 		"""
 		Plot costs at each step.
@@ -1340,9 +1366,9 @@ class SupplyChain:
 			series = {k: [v / self.apv * yscale for v in vals] for k, vals in series.items()}
 			yscale = 1  # already applied above
 		
-		print(labels, series)
-		plot_stacked_bars(labels, series, stack_order=stack_order, xscale=xscale, yscale=yscale,
-						  title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims, wrap_width=wrap_width)
+		# print(labels, series)
+		plot_stacked_bars(labels, series, stack_order=stack_order, colors=cost_series_colors(series, cost_colors),
+				  xscale=xscale, yscale=yscale, title=title, xlab=xlab, ylab=ylab, xlims=xlims, ylims=ylims, wrap_width=wrap_width)
 
 	def _build_steps_impact_series(
 		self,
@@ -1358,8 +1384,8 @@ class SupplyChain:
 		the label list matches _build_steps_cost_series exactly.
 		"""
 		labels: List[str] = []
+		sink_buf: Dict[str, List[float]] = {}  # per sink name: [cost, scope_one, scope_two, scope_three]
 		scopes: Dict[str, List[float]] = defaultdict(list)
-		sink_buf: Dict[str, None] = {}  # ordered set of sink names seen
 
 		# Build a lookup from step_name -> impact record for quick access
 		impact_map: Dict[str, OrderedDict] = {
@@ -1373,13 +1399,20 @@ class SupplyChain:
 			# Sink records: aggregate by sink name, flush zeros at the end
 			if kind == "sink":
 				sink_name = s.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
-				if sink_name.startswith("tailings"):
-					sink_name = "Tailings"
-				elif sink_name.startswith("wastewater"): 	# <-- comment this out for Silver Peak
-					sink_name = "Wastewater Treatment"		# <-- comment this out for Silver Peak
+				if sink_name in getattr(self, "sink_params", {}):
+					sink_name = "Tailings Management"
+				elif sink_name in getattr(self, "wastewater_params", {}):
+					sink_name = "Wastewater Treatment"
+				elif sink_name == "waste_pile":
+					sink_name = "Waste Rock Pile"
 				else:
 					continue
-				sink_buf[sink_name] = None
+				cost = float((s.get("costs") or {}).get("tot_var_cost", 0.0) or 0.0)
+				val = float((s.get("impacts") or {}).get(impact, 0.0) or 0.0)
+				scoped = 2 if s.get("sink_name") in (getattr(self, "sink_scope_two", set()) or set()) else 1
+				buf = sink_buf.setdefault(sink_name, [0.0, 0.0, 0.0, 0.0])
+				buf[0] += cost
+				buf[scoped] += val
 				continue
 
 			# Production / transport: look up pre-computed impact record
@@ -1403,17 +1436,26 @@ class SupplyChain:
 
 			s2 = float(rec["scope_two"].get(impact,   0.0) or 0.0)
 			s3 = float(rec["scope_three"].get(impact, 0.0) or 0.0)
+			scope_two_sinks = getattr(self, "sink_scope_two", set()) or set()
+			for sink_name, by_coproduct in (s.get("sink_impacts") or {}).items():
+				moved = sum(float((cats or {}).get(impact, 0.0) or 0.0) for cats in (by_coproduct or {}).values())
+				if sink_name in scope_two_sinks:
+					s2 -= moved
+				else:
+					s1 -= moved
  
 			scopes["Scope One"].append(s1)
 			scopes["Scope Two"].append(s2)
 			scopes["Scope Three"].append(s3)
 
-		# Flush sink buffer: one zero-value row per unique sink name
-		for sink_name in sink_buf:
+		# Flush sink buffer: one zero-value row per unique sink name (skip zero-cost sinks)
+		for sink_name, (total, s1, s2, s3) in sink_buf.items():
+			if total == 0.0:
+				continue
 			labels.append(sink_name)
-			scopes["Scope One"].append(0.0)
-			scopes["Scope Two"].append(0.0)
-			scopes["Scope Three"].append(0.0)
+			scopes["Scope One"].append(s1)
+			scopes["Scope Two"].append(s2)
+			scopes["Scope Three"].append(s3)
 
 		# Only include scopes that have at least one non-zero value
 		stack_order = [s for s in ["Scope One", "Scope Two", "Scope Three"]
@@ -1441,6 +1483,7 @@ class SupplyChain:
 		impact: str = "co2",
 		transp: bool = True,
 		wrap_width: int = 12,
+		imp_colors = None,
 		):
 		"""
 		Plot environmental impacts at each step, broken out by scope.
@@ -1477,8 +1520,7 @@ class SupplyChain:
 			scopes = {k: [v / self.apv * yscale for v in vals] for k, vals in scopes.items()}
 			yscale = 1
 
-		colors = {"Scope One": "#f28e2b", "Scope Two": "#4e79a7", "Scope Three": "#76b7b2"}
-		plot_stacked_bars(labels, scopes, stack_order=stack_order, colors=colors,
+		plot_stacked_bars(labels, scopes, stack_order=stack_order, colors=imp_colors,
 						xscale=xscale, yscale=yscale, title=title, xlab=xlab, ylab=ylab,
 						xlims=xlims, ylims=ylims, wrap_width=wrap_width)
 

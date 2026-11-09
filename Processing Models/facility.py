@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import NamedTuple
 
 from production_step import ProductionStep
-from helpers import plot_stacked_bars, plot_production_curve
+from helpers import plot_stacked_bars, plot_production_curve, build_data_dict
 
 # Define a class for the production environment
 class Facility:
@@ -16,6 +16,7 @@ class Facility:
 			self.apv = apv
 			self.sc = supply_chain # The supply chain object this facility is associated with 
 			self.material_data = copy.deepcopy(self.sc.material_data) # to be updated with location-specific overrides as specified
+			self.onsite_reagents = set()
 			self.location = location # Location name
 			self.steps = {}
 			self.primary_inputs = {}   # facility-level "imports"
@@ -52,6 +53,7 @@ class Facility:
 			self.build_price = 0 # Building space cost, $/m^2
 			self.tailings_nonhazardous_cost = 0 # Cost of disposal for nonhazardous tailings for this facility
 			self.tailings_hazardous_cost = 0 # Cost of disposal for hazardous tailings for this facility
+			self.tailings_storage_cost = 0 # Cost of storage for tailings
 			self.crp = 0 # Capital Recovery Period
 			self.brp = 0 # Building Recovery Period
 			self.aux_equip = 0 # Annualized auxiliary Equipment cost, as a percentage of main machine cost
@@ -506,23 +508,19 @@ class Facility:
 		# ============================================================
 		# PLOTTING FUNCTIONS
 		# ============================================================
-
 		def plot_tot_step_costs(self,apv=None,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None):
 				if apv is not None:
 						self.update_apv(apv)
 				elif len(self.prod_map.keys()) == 0:
 						raise ValueError(f"No APV values have been run; rerun with some target production volume.")
 
-				labels = []
-				variable_costs = []
-				fixed_costs = []
-
-				for step in self.fwd:
-						labels.append(step.step_id)
-						variable_costs.append(step.tot_var_cost)
-						fixed_costs.append(step.tot_fixed_cost)
-
-				plot_breakdown(labels,variable_costs,fixed_costs,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None)
+				labels = [step.step_name for step in self.fwd]
+				series = {
+						"Fixed Costs": [step.tot_fixed_cost for step in self.fwd],
+						"Variable Costs": [step.tot_var_cost for step in self.fwd],
+				}
+				return plot_stacked_bars(labels,series,stack_order=["Fixed Costs","Variable Costs"],xscale=xscale,yscale=yscale,
+						title=title,xlab=xlab,ylab=ylab,xlims=xlims,ylims=ylims)
 
 		def plot_avg_step_costs(self,apv=None,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Cost/Unit',xlims=None,ylims=None):
 				if apv is not None:
@@ -530,11 +528,13 @@ class Facility:
 				elif len(self.prod_map.keys()) == 0:
 						raise ValueError(f"No APV values have been run; rerun with some target production volume.")
 
-				labels = [step.step_id_short for step in self.steps]
-				variable_costs = [step.tot_var_cost/apv for step in self.steps]
-				fixed_costs = [step.tot_fixed_cost/apv for step in self.steps]
-
-				plot_breakdown(labels,variable_costs,fixed_costs,xscale=1,yscale=1,title='Cost of Steps',xlab='Step Names',ylab='Total Cost',xlims=None,ylims=None)
+				labels = [step.step_name for step in self.fwd]
+				series = {
+						"Fixed Costs": [step.tot_fixed_cost / self.apv for step in self.fwd],
+						"Variable Costs": [step.tot_var_cost / self.apv for step in self.fwd],
+				}
+				return plot_stacked_bars(labels,series,stack_order=["Fixed Costs","Variable Costs"],xscale=xscale,yscale=yscale,
+						title=title,xlab=xlab,ylab=ylab,xlims=xlims,ylims=ylims)
 
 		def plot_unit_cc(self,xscale=1,yscale=1,title='APV vs Average Cost',xlab='Annual Production Volume (APV)',ylab='Unit Cost'):
 				# Extract APVs and costs from the prod_map
@@ -549,151 +549,139 @@ class Facility:
 
 				plot_production_curve(apvs,tot_costs,xscale=1,yscale=1,title='APV vs Average Cost',xlab='Annual Production Volume (APV)',ylab='Unit Cost')
 
+class ReagentFacility(Facility):
+
+		def __init__(self, fac_id, supply_chain, location, sinks, target_reagent,
+					target_facilities, apv=0, steps=None, impact_factors=None):
+				super().__init__(fac_id, supply_chain, location, sinks, apv, steps, impact_factors)
+				self.target_reagent = target_reagent
+				self.target_facilities = list(target_facilities)
+				for fac in self.target_facilities:
+						if not any(target_reagent in step.secondary_inputs for step in fac.steps.values()):
+								raise KeyError(f"{fac.fac_id} does not dose '{target_reagent}'.")
+						fac.onsite_reagents.add(target_reagent)
+
+		def demand(self):
+				total = 0.0
+				for fac in self.target_facilities:
+						for step in fac.steps.values():
+								props = step.secondary_inputs.get(self.target_reagent)
+								if props is None:
+										continue
+								total += props.get("abs_usage") or 0.0
+				return total
+
 class DewateringResult(NamedTuple):
 		cost: float   # $/t dry solids — OPEX excl. electricity cost
 		elec: float   # kWh/t dry solids — for separate emissions calc
 		# diesel: float # diesel usage/t dry solids - for separate emissions calc
 
+SINK_REQUIRED = {
+	"tailings": ("route", "location", "storage", "s_in", "s_final", "rho_s", "x_hyd"),
+	"wastewater": ("cost",),
+	"waste_rock": ("cost",),
+	"other": ("cost",),
+}
+
+def load_sink_params(sc, data_folder):
+	table = build_data_dict(data_folder, "Sink Data", skip_rows=["notes", "sources", "cost_unit"])
+	tail = build_data_dict(data_folder, "Tailings Model Inputs")
+	sc.sink_names = list(table)
+	sc.sink_params, sc.wastewater_params, sc.flat_sinks = {}, {}, {}
+	for name, row in table.items():
+		kind = row.get("kind")
+		if kind not in SINK_REQUIRED:
+			raise ValueError(f"Sink Data '{name}': kind '{kind}' not in {sorted(SINK_REQUIRED)}")
+		missing = [k for k in SINK_REQUIRED[kind] if row.get(k) is None]
+		if missing:
+			raise ValueError(f"Sink Data '{name}' ({kind}) missing {missing}")
+		if kind == "tailings":
+			sc.sink_params[name] = dict(row, train=list((row.get("train") or {}).items()))
+		elif kind == "wastewater":
+			sc.wastewater_params[name] = row
+		else:
+			sc.flat_sinks[name] = row
+	sc.s_ceil, sc.stage, sc.placement, sc.tsf_opex = {}, {}, {}, {}
+	for col, row in tail.items():
+		for ph in ("cry", "hyd"):
+			if (row.get("s_ceil") or {}).get(ph) is not None:
+				sc.s_ceil[(col, ph)] = row["s_ceil"][ph]
+				sc.stage[(col, ph)] = tuple(row[k][ph] for k in ("C_m", "c_w", "E_m", "e_w"))
+		if row.get("tsf_opex") is not None:
+			sc.placement[col] = (row["placement_cost"], row["placement_elec"])
+			sc.tsf_opex[col] = row["tsf_opex"]
+
+def sink_s_out(sc, name):
+	p = sc.sink_params[name]
+	return p["train"][-1][1] if p["train"] else p["s_in"]
+
 def tailings_handling(sc):
-		# ------------------------------------------------------------------
-		# Disposal gate fees — applied to off-site streams only
-		# Units: $/tonne wet as-received at gate
-		# To convert to $/t DS: divide by s (cake solids fraction)
-		# ------------------------------------------------------------------
-		EREF_NONHAZ_NV	= 67.0		# $/t wet; non-hazardous landfill, Nevada (EREF 2024). Change to loading in from locational data later
-		NDRC_HAZ_JX			= 280.0		# $/t wet; hazardous secure landfill, Jiangxi (NDRC 2024) - ~$2000 yuan/ton. Change to loading in from locational data later
+	def mw(s):
+		return (1.0 - s) / s
 
-		# On-site CTFS operating cost — Thacker Pass lined tailings facility
-		# Covers liner amortization, leachate collection, monitoring, stormwater mgmt
-		# Applied on top of dewatering cost for streams entering the CTFS
-		# $/t DS; placeholder pending permit operational data
-		ONSITE_CTFS_OPEX = 5.0		# $/t DS
+	def s_ceil(mech, x):
+		w = x * mw(sc.s_ceil[(mech, "hyd")]) + (1.0 - x) * mw(sc.s_ceil[(mech, "cry")])
+		return 1.0 / (1.0 + w)
 
-		# ------------------------------------------------------------------
-		# Dewatering / stacking cost tables (unchanged from prior definition)
-		# ------------------------------------------------------------------
-		DEWATERING_COST_BREAKPOINTS = {
-				# (s_low, s_high): (c_at_s_low, c_at_s_high)  $/t dry solids
-				# Estimated costs based on thickener and mechanical dewatering block models
-				(0.08, 0.15): (8,  17),		# gravity thickening
-				(0.15, 0.25): (17, 30),		# belt filter press
-				(0.25, 0.50): (30, 48),		# plate-and-frame filter press
-		}
-		DEWATERING_ELECTRICITY_BREAKPOINTS = {
-				# kWh/t dry solids
-				(0.08, 0.15): (3,   8),		# gravity thickening: essentially pumping only
-				(0.15, 0.25): (20, 35),		# belt filter press: belts + wash water pumps
-				(0.25, 0.50): (35, 60),		# plate-and-frame: hydraulic press + feed pump
-		}
-		TAILINGS_STACKING_COST = {
-				# (s_low, s_high): (c_at_s_low, c_at_s_high)  $/t dry solids
-				(0.55, 0.75): (3.0, 8.0),	# paste pumping + conveyor stacking; wear rises with stiffness
-				(0.75, 1.00): (4.0, 1.5),	# dry stack / conveyor only; cost falls with dryness
-		}
-		TAILINGS_STACKING_ELECTRICITY = {
-				# kWh/t dry solids; decreases monotonically as s increases
-				(0.55, 0.75): (20.0, 8.0),	# paste pump dominates; eases toward dry handoff
-				(0.75, 1.00): (4.0,  2.0),	# conveyor + compaction only
-		}
+	def stage_coef(mech, x):
+		h = sc.stage[(mech, "hyd")]
+		c = sc.stage[(mech, "cry")]
+		return tuple(x * h[i] + (1.0 - x) * c[i] for i in range(4))
 
-		def dewatering_stacking(s: float, elec_cost: float = 0.0) -> DewateringResult:
-				"""
-				Returns dewatering OPEX (s < 0.55) or stacking OPEX (s >= 0.55), in $/t DS.
-				Does NOT include disposal gate fee or on-site CTFS opex — add those separately.
-				"""
-				if s < 0.55:
-						breakpoints      = DEWATERING_COST_BREAKPOINTS
-						elec_breakpoints = DEWATERING_ELECTRICITY_BREAKPOINTS
-				else:
-						breakpoints      = TAILINGS_STACKING_COST
-						elec_breakpoints = TAILINGS_STACKING_ELECTRICITY
-				for (s_lo, s_hi), (c_lo, c_hi) in breakpoints.items():
-						if s_lo <= s <= s_hi:
-								frac        = (s - s_lo) / (s_hi - s_lo)
-								base_cost   = c_lo + frac * (c_hi - c_lo)
-								e_lo, e_hi  = elec_breakpoints[(s_lo, s_hi)]
-								electricity = e_lo + frac * (e_hi - e_lo)
-								cost        = base_cost + electricity * elec_cost
-								return DewateringResult(cost=cost, elec=electricity)
-				raise ValueError(
-						f"s={s:.3f} outside modeled range. "
-						f"Sludge dewatering: [0.08, 0.55). Coarse stacking: [0.55, 1.00]."
-				)
+	def ds_per_m3(w_s, rho_s, rho_w=1.0):
+		rho_mix = 1.0 / (w_s / rho_s + (1.0 - w_s) / rho_w)
+		return w_s * rho_mix
 
-		# ------------------------------------------------------------------
-		# Helper — dry solids mass (t) per m³ of slurry at weight fraction w_s
-		# Used to convert $/t DS → $/m³ slurry for sink cost registration
-		# Basis: mixture density  rho_mix = 1 / (w_s/rho_s + (1-w_s)/rho_w)
-		# ------------------------------------------------------------------
-		def ds_per_m3(w_s: float, rho_s: float = 2.7, rho_w: float = 1.0) -> float:
-				rho_mix = 1.0 / (w_s / rho_s + (1.0 - w_s) / rho_w)
-				return w_s * rho_mix
+	sc.topo_order()
+	ep = next(f.elec_price for f in sc.rev if not isinstance(f, ReagentFacility))
+	sc.sink_elec = {}
 
-		sc.topo_order()
-		fac = sc.rev[0]
-		ep = fac.elec_price
+	for name, p in sc.sink_params.items():
+		x = p["x_hyd"]
+		s_k = p.get("s_feed") or p["s_in"]
+		dew_c, dew_e = 0.0, 0.0
+		for mech, s_out in p["train"]:
+			cap = s_ceil(mech, x)
+			if s_out > cap + 1e-9:
+				raise ValueError(f"{name}: {mech} s_out {s_out:.3f} exceeds ceiling {cap:.3f} at x_hyd={x}")
+			if s_out <= s_k + 1e-9:
+				raise ValueError(f"{name}: {mech} s_out {s_out:.3f} not above inlet {s_k:.3f}")
+			dW = 1.0 / s_k - 1.0 / s_out
+			C_m, c_w, E_m, e_w = stage_coef(mech, x)
+			dew_c += C_m + c_w * dW
+			dew_e += E_m + e_w * dW
+			s_k = s_out
+		if p["s_final"] < s_k - 1e-9:
+			raise ValueError(f"{name}: s_final {p['s_final']} below mechanical outlet {s_k:.3f}")
 
-		# ------------------------------------------------------------------
-		# Sink cost registrations
-		# Formula: $/m³ slurry = (c_handling_per_t_ds + c_disposal_per_t_ds) * ds_per_m3(w_s)
-		#
-		# Off-site:  c_disposal = gate_fee / s   (gate fee is $/t wet as-received)
-		# On-site:   c_disposal = ONSITE_CTFS_OPEX (flat $/t DS, no gate fee) 
-		# Stacking:  c_disposal = 0 (stacking cost already in dewatering_stacking for s >= 0.55)
-		# ------------------------------------------------------------------
-		
-		# --- Thacker Pass: impurity sludge (Mg/Ca precipitates, thickener underflow) ---
-		# Route: on-site CTFS (lined).  No gate fee; CTFS opex added explicitly.
-		s_tp_sludge = 0.25
-		c_tp_sludge = dewatering_stacking(s_tp_sludge, ep).cost + ONSITE_CTFS_OPEX
-		sc.register_sink_cost("tailings_25", c_tp_sludge * ds_per_m3(s_tp_sludge))
+		if p.get("placement_cost") is not None:
+			pl_c, pl_e = p["placement_cost"], p["placement_elec"]
+		else:
+			pl_c, pl_e = sc.placement[p["route"]]
+		loc = sc.loc_data[p["location"]]
+		cost_tds = dew_c + pl_c
+		elec = dew_e + pl_e
+		if p["route"] == "offsite_gate":
+			cost_tds += loc[f"tailings_{p['gate_class']}_cost"] / s_k
+		elif p["storage"]:
+			cost_tds += sc.tsf_opex[p["route"]]
+			rdf = p.get("rho_dry_final")
+			cost_tds += loc["tailings_storage_cost"] / (rdf if rdf else ds_per_m3(s_k, p["rho_s"]))
+		cost_tds += elec * ep
+		sc.register_sink_cost(name, cost_tds * ds_per_m3(p["s_in"], p["rho_s"]))
+		sc.sink_elec[name] = elec
 
-		# --- Jianxiawo: impurity sludge (metal hydroxide precipitates, hazardous) ---
-		# Route: off-site hazardous secure landfill (Jiangxi).  Disposal cost: NDRC 2024.
-		s_haz = 0.20
-		c_haz = dewatering_stacking(s_haz, ep).cost + NDRC_HAZ_JX / s_haz
-		sc.register_sink_cost("tailings_20", c_haz * ds_per_m3(s_haz))
-		# sc.register_sink_cost("tailings_20", c_tp_sludge * ds_per_m3(s_haz)) #<-- if we assume no hazardous material handling 
+	sc.sink_scope_two = set(sc.sink_params)
+	for fac in sc.rev:
+		efs = fac.impact_factors.get("electricity") or {}
+		fac.scope_two_sinks = sc.sink_scope_two
+		fac.impact_factors = dict(fac.impact_factors, **{
+			name: {cat: sc.sink_elec[name] * ds_per_m3(p["s_in"], p["rho_s"]) * f
+				for cat, f in efs.items()}
+			for name, p in sc.sink_params.items()})
 
-		# --- Jianxiawo: classification/flotation coarse reject (nonhazardous gangue, wet slurry) ---
-		# Stream: dilute slurry discharged from classifying step at ~30wt% solids; not mechanically
-		# dewatered prior to disposal.  Route: on-site conventional wet tailings storage facility
-		# (TSF), Jiangxi.  No liner requirement for nonhazardous lepidolite gangue under China
-		# standards; basic earthwork + seepage monitoring + water reclaim circuit.
-		# Cost basis:
-		#   - Slurry pumping to TSF:   2.0 kWh/t DS (hilly Jiangxi terrain; placeholder)
-		#   - TSF OPEX:                4.0 $/t DS    (earthwork, monitoring, water reclaim)
-		#   - No gate fee (on-site); no mechanical dewatering (slurry pumped as-is)
-		# NOTE: dewatering_stacking() is NOT used here - this stream would be below the dewatering
-		# model range, but since it's nonhazardous, is not mechanically dewatered before placement.
-		WET_TSF_PUMP_KWH_PER_TDS = 2.0   # kWh/t DS
-		WET_TSF_OPEX_PER_TDS     = 4.0   # $/t DS
-		s_wet = 0.30
-		c_wet_tsf = WET_TSF_OPEX_PER_TDS + WET_TSF_PUMP_KWH_PER_TDS * ep
-		sc.register_sink_cost("tailings_30", c_wet_tsf * ds_per_m3(s_wet))
-
-		# --- Silver Peak: brine chemical treatment residue (Mg(OH)2 / CaCO3 filter cake) ---
-		# Route: on-site stacking. Stacking cost is returned directly by dewatering_stacking.
-		s_brine = 0.35
-		c_brine = dewatering_stacking(s_brine, ep).cost + ONSITE_CTFS_OPEX
-		sc.register_sink_cost("tailings_35", c_brine * ds_per_m3(s_brine))
-
-		# --- Thacker Pass + Jianxiawo: on-site stackable material (s ~ 0.62-0.68, use 0.65) ---
-		# Streams: Thacker Pass CCD filter cake; Jianxiawo leach residue
-		# Route: on-site stacking.  Stacking cost is returned directly by dewatering_stacking.
-		s_stack = 0.65
-		c_stack = dewatering_stacking(s_stack, ep).cost		# stacking cost only; no gate fee
-		sc.register_sink_cost("tailings_65", c_stack * ds_per_m3(s_stack))
-
-		# --- All pathways: crushed reject / waste rock (dry, on-site pile) ---
-		# Route: on-site waste rock stack; no dewatering, no gate fee.
-		# s ~ 0.95 (residual handling moisture); cost is conveyor + dozer only.
-		s_rock = 1
-		c_rock = dewatering_stacking(s_rock, ep).cost
-		sc.register_sink_cost("tailings_solid", c_rock * ds_per_m3(s_rock))
-
-		sc.register_sink_cost("wastewater_treatment", 1)   # $/m3, placeholder
-
+	for name, p in {**sc.wastewater_params, **sc.flat_sinks}.items():
+		sc.register_sink_cost(name, p["cost"])
 
 
 

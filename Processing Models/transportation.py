@@ -34,6 +34,9 @@ class Transportation:
 		self.loss_fraction = mode_data["loss_fraction"]
 		self.fixed_cost = mode_data["fixed_cost"]
 		self.ref_volume = mode_data["base_volume"]
+		if mode_data.get("round_trip") is None:
+			raise KeyError(f"Transportation mode '{mode}' has no round_trip value.")
+		self.round_trip = mode_data["round_trip"]
 
 		self.input_volume = self.volume / (1.0 - self.loss_fraction)
 
@@ -53,7 +56,7 @@ class Transportation:
 		self.trip_number = math.ceil(self.input_volume / self.ref_volume)
 
 		dist_trips = self.distance * self.trip_number
-		if self.mode not in ["dry_bulk_barges", "ocean_transport"]:
+		if self.round_trip:
 			dist_trips = dist_trips * 2 # Need to account for round trip
 
 		self.emissions_totals = {

@@ -1,0 +1,206 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+table{width:100%;border-collapse:collapse;margin-bottom:1rem;font-size:12.5px}
+thead th{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-align:left;padding:5px 8px;border-bottom:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);white-space:nowrap}
+tbody tr{border-bottom:0.5px solid var(--color-border-tertiary)}
+tbody tr:last-child{border-bottom:none}
+td{padding:6px 8px;font-size:12px;vertical-align:top;line-height:1.5}
+td.var{font-weight:500;font-size:12px;color:var(--color-text-primary);width:13%}
+td.unit{font-size:11px;color:var(--color-text-tertiary);width:7%}
+td.est{text-align:center;width:7%;font-weight:500}
+td.actual{text-align:center;width:10%}
+td.delta{text-align:center;width:7%;font-size:11px;font-weight:500}
+td.note{font-size:11px;color:var(--color-text-secondary);width:20%}
+td.src{font-size:10.5px;width:16%}
+.src a{color:var(--color-text-info);text-decoration:none;display:block;line-height:1.5}
+.src a:hover{text-decoration:underline}
+.ok{color:#3B6D11;background:#EAF3DE;border-radius:3px;padding:1px 5px}
+.warn{color:#854F0B;background:#FAEEDA;border-radius:3px;padding:1px 5px}
+.err{color:#A32D2D;background:#FCEBEB;border-radius:3px;padding:1px 5px}
+.unit-err{color:#534AB7;background:#EEEDFE;border-radius:3px;padding:1px 5px}
+.region{font-size:10px;font-weight:500;border-radius:3px;padding:1px 5px;display:inline-block;margin-bottom:2px}
+.nv{background:#E6F1FB;color:#185FA5}
+.cn{background:#EAF3DE;color:#3B6D11}
+h2{font-size:14px;font-weight:500;margin:1.25rem 0 0.5rem;color:var(--color-text-primary)}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--color-text-secondary);margin-bottom:1rem;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:4px}
+.footer{font-size:11.5px;color:var(--color-text-secondary);border-top:0.5px solid var(--color-border-tertiary);padding-top:0.75rem;margin-top:0.75rem;line-height:1.7}
+</style>
+
+<div style="padding:0.75rem 0">
+
+<div class="legend">
+  <span><span class="ok">✓ Good</span> Within ~10%</span>
+  <span><span class="warn">~ Off</span> 10–40% off</span>
+  <span><span class="err">✗ Wrong</span> >40% off</span>
+  <span><span class="unit-err">⚠ Unit?</span> Likely unit error</span>
+</div>
+
+<table>
+<thead><tr>
+  <th>Variable</th><th>Unit</th><th>Region</th>
+  <th>Your estimate</th><th>Best current estimate</th><th>Verdict</th>
+  <th>Notes</th><th>Key sources</th>
+</tr></thead>
+<tbody>
+
+<tr>
+  <td class="var" rowspan="2">elec_price</td>
+  <td class="unit" rowspan="2">$/kWh</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$0.090</td>
+  <td class="actual"><strong>$0.086</strong></td>
+  <td class="delta"><span class="ok">✓ Good</span></td>
+  <td class="note">EIA 2024 annual avg industrial rate: 8.64 ¢/kWh. Your estimate is 4% high — essentially correct.</td>
+  <td class="src"><a href="https://www.eia.gov/electricity/sales_revenue_price/pdf/table_4.pdf">EIA Table 4 – 2024 State Industrial Rates</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$0.075</td>
+  <td class="actual"><strong>$0.087</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">CEIC NDRC 36-city avg Dec 2025: 0.630 RMB/kWh = ~$0.087/kWh. China Briefing reports ~$0.088/kWh for 2024. Jiangxi sits near national avg. Your estimate is ~14% low.</td>
+  <td class="src"><a href="https://www.ceicdata.com/en/china/price-monitoring-center-ndrc-36-city-monthly-avg-transaction-price-production-material/cn-usage-price-36-city-avg-electricity-for-industry-35-kv-and-above">CEIC – China industrial elec. avg</a><a href="https://www.china-briefing.com/news/chinas-industrial-power-rates-category-electricity-usage-region-classification/">China Briefing – $0.088/kWh 2024</a></td>
+</tr>
+
+<tr>
+  <td class="var" rowspan="2">gas_price</td>
+  <td class="unit" rowspan="2">$/MMBTU</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$5.04</td>
+  <td class="actual"><strong>$4.8–5.5</strong></td>
+  <td class="delta"><span class="ok">✓ Good</span></td>
+  <td class="note">US industrial natural gas avg was ~$4.8/MMBTU in 2024 (EIA). Nevada typically slightly above US avg due to pipeline constraints; $5.04 is a reasonable midpoint. National industrial avg Jan 2026: $7.20 (post-winter spike), but 2024 avg was lower.</td>
+  <td class="src"><a href="https://www.eia.gov/dnav/ng/hist/n3035nv3m.htm">EIA – Nevada industrial gas price</a><a href="https://www.chooseenergy.com/data-center/natural-gas-rates-by-state/">Choose Energy – Jan 2026 $7.20/MMBTU national</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$8.50</td>
+  <td class="actual"><strong>$10–13</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">CEIC NDRC 36-city avg Nov 2025: 3.58 RMB/m³. At 38.5 MJ/m³ (0.03651 MMBTU/m³): 3.58 ÷ 0.03651 = 98 RMB/MMBTU = ~$13.5/MMBTU. Intratec LNG industrial May 2025: 88.5 CNY/MMBTU = ~$12.2/MMBTU. S&P Global: pipeline imports avg ~$10-11/MMBTU in 2024. Your estimate is 20-35% low.</td>
+  <td class="src"><a href="https://www.ceicdata.com/en/china/price-monitoring-center-ndrc-36-city-monthly-avg-transaction-price-production-material/cn-usage-price-36-city-avg-natural-gas-natural-gas-for-industry">CEIC – China industrial gas avg</a><a href="https://www.intratec.us/solutions/energy-prices-markets/commodity/natural-gas-price-china">Intratec – China LNG industrial</a><a href="https://www.spglobal.com/commodity-insights/en/news-research/latest-news/lng/062724-ample-power-supply-high-lng-prices-curb-chinas-summer-gas-demand">S&P Global – pipeline $10-11/MMBTU</a></td>
+</tr>
+
+<tr>
+  <td class="var" rowspan="2">diesel_price</td>
+  <td class="unit" rowspan="2">$/L</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$4.20</td>
+  <td class="actual"><strong>$1.04</strong></td>
+  <td class="delta"><span class="unit-err">⚠ Unit?</span></td>
+  <td class="note">GlobalPetrolPrices shows Nevada diesel Nov 2025–Feb 2026 avg: $1.04/L. $4.20/L is ~4× too high — almost certainly a unit error. $4.20 per gallon ÷ 3.785 = $1.11/L, which would be essentially correct. Strongly suspect original source used $/gallon.</td>
+  <td class="src"><a href="https://www.globalpetrolprices.com/USA/Nevada/diesel_prices/">GlobalPetrolPrices – Nevada diesel $1.04/L</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$1.05</td>
+  <td class="actual"><strong>$1.05–1.10</strong></td>
+  <td class="delta"><span class="ok">✓ Good</span></td>
+  <td class="note">GlobalPetrolPrices China avg Mar 2026: CNY 8.25/L = $1.20/L. Statista Dec 2024 Beijing: 7.14 RMB/L = ~$0.98/L. Mid-2025 avg ~$1.05/L. Jiangxi prices largely uniform nationally (NDRC regulated). Your estimate is accurate.</td>
+  <td class="src"><a href="https://www.globalpetrolprices.com/China/diesel_prices/">GlobalPetrolPrices – China diesel</a><a href="https://www.statista.com/statistics/1479583/china-diesel-fuel-price-by-region/">Statista – China diesel by province Dec 2024</a></td>
+</tr>
+
+<tr>
+  <td class="var" rowspan="2">propane_price</td>
+  <td class="unit" rowspan="2">$/L</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$0.26</td>
+  <td class="actual"><strong>$0.60–0.65</strong></td>
+  <td class="delta"><span class="err">✗ Wrong</span></td>
+  <td class="note">Nevada propane Mar 2026: $2.34/gal (consultenergy.org) = $0.618/L. EIA 2024–25 winter avg US residential ~$0.70/gal (~$0.185/L) — but that's the wholesale benchmark; delivered retail is 2–3× higher. At $0.26/L your estimate implies ~$0.98/gal which is well below any recent reported Nevada price. Likely stale or based on wholesale spot, not delivered.</td>
+  <td class="src"><a href="https://www.consultenergy.org/propane/nv/">consultenergy.org – Nevada $2.34/gal Mar 2026</a><a href="https://www.comparepropane.com/nevada-propane-prices/">ComparePropane – NV ~$2.60/gal</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$0.26</td>
+  <td class="actual"><strong>$0.35–0.55</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">China LPG (propane/butane mix, NDRC-regulated) is typically CNY 5.5–8.0/kg. Propane density ~0.493 kg/L → CNY 2.7–3.9/L = $0.37–0.54/L. Your estimate looks like it may use an old or wholesale benchmark. No Jiangxi-specific price found; national rate applies.</td>
+  <td class="src"><a href="https://www.globalpetrolprices.com/China/diesel_prices/">GlobalPetrolPrices – China fuel benchmarks</a></td>
+</tr>
+
+<tr>
+  <td class="var" rowspan="2">cool_water_price</td>
+  <td class="unit" rowspan="2">$/m³</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$1.20</td>
+  <td class="actual"><strong>$0.10–1.50</strong></td>
+  <td class="delta"><span class="ok">✓ Good</span></td>
+  <td class="note">No single published benchmark exists — this is an internally generated utility cost. Cooling tower water: $0.05–0.30/m³. Chilled water (~7°C): $0.50–1.50/m³. Your value of $1.20 implies chilled water, which is defensible if that's what the model requires. Reasonable.</td>
+  <td class="src"><a href="https://www.energy.gov/sites/prod/files/2014/05/f15/tech_brief_true_cost.pdf">DOE – Industrial utility benchmarks</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$0.80</td>
+  <td class="actual"><strong>$0.05–1.00</strong></td>
+  <td class="delta"><span class="ok">✓ Good</span></td>
+  <td class="note">Same caveat applies — internally generated cost. Lower labour and electricity costs in China reduce chilled water generation cost. $0.80/m³ is on the high end for China but defensible for refrigerated chilled water. Cooling tower water would be $0.05–0.20/m³.</td>
+  <td class="src"><a href="https://hrone.com/blog/industrial-water-utility-cost-in-china-uncover-surprising-trends/">HROne – China industrial water costs</a></td>
+</tr>
+
+<tr>
+  <td class="var" rowspan="2">steam_price</td>
+  <td class="unit" rowspan="2">$/kg</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$0.030</td>
+  <td class="actual"><strong>$0.015–0.030</strong></td>
+  <td class="delta"><span class="ok">✓ Good</span></td>
+  <td class="note">DOE benchmark: at $5/MMBTU gas, 80% boiler efficiency, LP steam (~100 psig): cost ≈ $0.016–0.022/kg fuel-only; adding water treatment, maintenance, capital → $0.022–0.035/kg. Your estimate of $0.030 is at the upper end but within range.</td>
+  <td class="src"><a href="https://docs.nlr.gov/docs/fy01osti/28881.pdf">DOE – Benchmark Fuel Cost of Steam</a><a href="https://www.energy.gov/eere/amo/articles/benchmark-fuel-cost-steam-generation">DOE AMO – Steam generation benchmarking</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$0.030</td>
+  <td class="actual"><strong>$0.035–0.055</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">At China industrial gas ~$12/MMBTU, 80% efficiency: fuel cost alone ≈ $0.039/kg steam. Adding capex/maintenance → $0.045–0.060/kg. Your estimate of $0.030 is meaningfully low for China given its higher gas price. Would be accurate only if using coal-fired steam (~$0.020–0.030/kg).</td>
+  <td class="src"><a href="https://www.ceicdata.com/en/china/price-monitoring-center-ndrc-36-city-monthly-avg-transaction-price-production-material/cn-usage-price-36-city-avg-natural-gas-natural-gas-for-industry">CEIC – China gas avg → steam cost calc</a></td>
+</tr>
+
+<tr>
+  <td class="var" rowspan="2">comp_air_price</td>
+  <td class="unit" rowspan="2">$/Nm³</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$0.040</td>
+  <td class="actual"><strong>$0.015–0.025</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">Academic/industry literature reports 0.6–3 ct/Nm³, typical 1.5–2.7 ct/Nm³ in practice. At NV electricity $0.086/kWh × 120 Wh/Nm³ = $0.010/Nm³ energy; +capital/maintenance → ~$0.015–0.020/Nm³. Your estimate of $0.040 is ~2× high.</td>
+  <td class="src"><a href="https://www.sciencedirect.com/science/article/pii/S1877705812024125/pdf">Dindorf et al. – 0.6–3 ct/Nm³</a><a href="https://www.maintenanceandengineering.com/2015/11/01/reducing-energy-costs-in-compressed-air-systems/">Maint. & Eng. – 1.5–2.7 ct/Nm³ typical</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$0.025</td>
+  <td class="actual"><strong>$0.013–0.020</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">At China elec $0.087/kWh × 120 Wh/Nm³ = $0.010/Nm³ energy; +capital → ~$0.014–0.018/Nm³. Your estimate of $0.025 is roughly 40–80% high, though the range in the literature is wide. If capital costs are amortized quickly, could reach $0.025.</td>
+  <td class="src"><a href="https://www.china-briefing.com/news/chinas-industrial-power-rates-category-electricity-usage-region-classification/">China Briefing – industrial electricity base</a></td>
+</tr>
+
+<tr>
+  <td class="var" rowspan="2">build_price</td>
+  <td class="unit" rowspan="2">$/m²</td>
+  <td><span class="region nv">Nevada</span></td>
+  <td class="est">$60</td>
+  <td class="actual"><strong>context-dependent</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">Interpretation matters critically. If $/m²/year lease: rural NV industrial lease ~$40–100/m²/yr ($4–9/ft²/month) — $60 is reasonable. If construction CAPEX: industrial building in NV runs $800–1,500/m² — $60 is far too low. No universal benchmark found; clarify assumption.</td>
+  <td class="src"><a href="https://www.nvenergy.com/publish/content/dam/nvenergy/brochures_arch/about-nvenergy/economic-development/energyrates.pdf">NV Energy – NV economic benchmarks</a></td>
+</tr>
+<tr>
+  <td><span class="region cn">Jiangxi</span></td>
+  <td class="est">$60</td>
+  <td class="actual"><strong>context-dependent</strong></td>
+  <td class="delta"><span class="warn">~ Off</span></td>
+  <td class="note">Jiangxi industrial construction CAPEX: ~$300–600/m² (much less than US). Industrial lease rent: ~$15–40/m²/yr in inland provinces. $60/m² as a lease rate seems high for Jiangxi; as CAPEX it's very low. Same ambiguity as Nevada — definition of this parameter needs clarification.</td>
+  <td class="src"><a href="https://hrone.com/blog/industrial-water-utility-cost-in-china-uncover-surprising-trends/">HROne – China industrial context</a></td>
+</tr>
+
+</tbody>
+</table>
+
+<div class="footer">
+<strong style="color:var(--color-text-primary)">Priority corrections:</strong> (1) <strong>Nevada diesel</strong> — almost certainly a unit error; $4.20/gallon → $1.11/L is correct, not $4.20/L. (2) <strong>Nevada &amp; China propane</strong> — both significantly underestimated; update to ~$0.62/L (NV) and ~$0.45/L (CN). (3) <strong>China natural gas</strong> — $8.50/MMBTU should be ~$11–13/MMBTU. (4) <strong>China steam</strong> — flows from the gas price error; recalculate using corrected gas price. (5) <strong>Compressed air</strong> — both values appear ~1.5–2× high; literature consensus is 1.5–2.7 ct/Nm³. (6) <strong>Build price</strong> — clarify whether this is $/m²/yr lease or $/m² construction CAPEX, as the interpretation changes accuracy dramatically.
+</div>
+</div>

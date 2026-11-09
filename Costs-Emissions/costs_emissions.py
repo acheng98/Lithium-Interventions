@@ -114,6 +114,7 @@ def plot_cost_vs_emissions(
 	show_legend:         bool = False,   # show the legend
 	lit_only:            bool = False,   # show only literature ranges, hide Our Study boxes
 	top_n:               int  = None,    # if set, use Our Study-Low-{N}/High-{N} as box bounds
+	project_hatches:     dict = None,    # {project: hatch pattern} for Our Study boxes
 ):
 	# ------------------------------------------------------------------
 	# Load & parse
@@ -392,6 +393,7 @@ def plot_cost_vs_emissions(
 				boxstyle="square,pad=0", linewidth=1.6,
 				edgecolor=(*rgb, our_edge_alpha),
 				facecolor=(*rgb, our_alpha), zorder=3,
+				hatch=(project_hatches or {}).get(r["project"]),
 			))
 
 		# Midpoint
@@ -523,3 +525,7 @@ if __name__ == "__main__":
 		lit_only=args.lit_only,
 		top_n=args.top_n,
 	)
+
+# Fig 3 / Costs-Emissions: python3 costs_emissions.py --lit-lines --show-top 3 --no-project-labels --save
+# Fig 11 / Append Fig 2 / 7.3: python3 costs_emissions.py --lit-lines --no-project-labels --save --output "cost_vs_emissions_full.png"
+# Presentation literature only: python3 costs_emissions.py --lit-lines --no-project-labels --lit-only

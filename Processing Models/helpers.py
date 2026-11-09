@@ -2,11 +2,16 @@ from typing import Dict, Any, List, Optional
 import numpy as np
 import pandas as pd
 import csv
+import os
+import contextlib
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import textwrap
 import re
 from collections import defaultdict
+
+# GLOBAL VARIABLES
+_WORKBOOK_CACHE = {}
 
 def safe_float(x, default=0.0):
 	try:
@@ -236,6 +241,61 @@ def build_constituent_dict(constituents, fractions=None):
 
 	return dict(zip(clean_consts, clean_fracs))
 
+class _Table:
+	def __init__(self, fieldnames, rows):
+		self.fieldnames = fieldnames
+		self._rows = rows
+	def __iter__(self):
+		return iter(self._rows)
+
+def _load_workbook(path):
+	import openpyxl
+	key = (os.path.abspath(path), os.path.getmtime(path))
+	if key not in _WORKBOOK_CACHE:
+		_WORKBOOK_CACHE.clear()
+		_WORKBOOK_CACHE[key] = openpyxl.load_workbook(path, data_only=True)
+	return _WORKBOOK_CACHE[key]
+
+def _resolve_sheet(wb, name):
+	if name in wb.sheetnames:
+		return wb[name]
+	for sheet in wb.sheetnames:
+		if sheet == name[:31]:
+			return wb[sheet]
+	raise KeyError(f"Sheet '{name}' not found. Available: {wb.sheetnames}")
+
+@contextlib.contextmanager
+def _open_table(data_folder, file):
+	if str(data_folder).lower().endswith((".xlsx", ".xlsm")):
+		ws = _resolve_sheet(_load_workbook(data_folder), file)
+		grid = [list(r) for r in ws.iter_rows(values_only=True)]
+		if not grid:
+			raise ValueError(f"Sheet '{file}' is empty.")
+		width = max((i + 1 for i, v in enumerate(grid[0]) if v is not None and str(v).strip()), default=0)
+		fieldnames = [str(v).strip() for v in grid[0][:width]]
+		rows = []
+		for raw in grid[1:]:
+			cells = list(raw[:width]) + [None] * max(0, width - len(raw))
+			rows.append({h: ("" if v is None else str(v)) for h, v in zip(fieldnames, cells)})
+		yield _Table(fieldnames, rows)
+	else:
+		with open(data_folder + file + ".csv", newline="") as f:
+			reader = csv.DictReader(f)
+			yield _Table(reader.fieldnames, list(reader))
+
+def check_workbook_formula_cache(path):
+	import openpyxl
+	formulas = openpyxl.load_workbook(path, data_only=False)
+	values = openpyxl.load_workbook(path, data_only=True)
+	missing = []
+	for name in formulas.sheetnames:
+		sf, sv = formulas[name], values[name]
+		for row in sf.iter_rows():
+			for cell in row:
+				if isinstance(cell.value, str) and cell.value.startswith("=") and sv[cell.coordinate].value is None:
+					missing.append((name, cell.coordinate, cell.value))
+	return missing
+
 def build_data_dict(data_folder,file,col=2,param_split=".",skip_rows=["notes", "sources", "key_equation"]):
 	"""
 	Returns:
@@ -245,14 +305,13 @@ def build_data_dict(data_folder,file,col=2,param_split=".",skip_rows=["notes", "
 	Also, when the value includes a key_split, also return a nested dict
 		{ column : { row_name : {key: value, key: value}, ... }, ... }
 	"""
-	with open(data_folder+file+".csv", newline="") as f:
-		reader = csv.DictReader(f)
+	with _open_table(data_folder,file) as reader:
 		inputs_dict = {name: {} for name in reader.fieldnames[col:]} # typically, col=2: 0: variable names, 1: descriptions
 
 		var_col = reader.fieldnames[0]
 		for row in reader:
 			var = row[var_col]
-			if var_col in skip_rows: # skip processing all of the rows in skip_rows
+			if var in skip_rows: # skip processing all of the rows in skip_rows
 				for column in inputs_dict:
 					inputs_dict[column][var] = row[column]
 			elif param_split in var:
@@ -274,9 +333,7 @@ def build_locations_dict(data_folder,file,skip_rows=["notes", "sources", "key_eq
 	Returns:
 		{ location : { row_name : typed_value, ... }, ... }
 	"""
-	with open(data_folder+file+".csv", newline="") as f:
-		reader = csv.DictReader(f)
-
+	with _open_table(data_folder,file) as reader:
 		# 0: variable names, 1: descriptions, 2: units
 		location_names = reader.fieldnames[3:]
 		locations_dict = {name: {} for name in location_names}
@@ -335,7 +392,7 @@ def build_locations_dict(data_folder,file,skip_rows=["notes", "sources", "key_eq
 			# Flat variables
 			else:
 				for loc in location_names:
-					if var_col in skip_rows: # skip processing all of the rows in skip_rows
+					if var in skip_rows: # skip processing all of the rows in skip_rows
 						locations_dict[loc][var] = row.get(loc)
 					else:
 						locations_dict[loc][var] = clean_input_str(row.get(loc))
@@ -347,8 +404,7 @@ def build_facility_dict(data_folder,file,skip_rows=["notes", "sources", "key_equ
 	Returns:
 		{ location : { row_name : typed_value, ... }, ... }
 	"""
-	with open(data_folder+file+".csv", newline="") as f:
-		reader = csv.DictReader(f)
+	with _open_table(data_folder,file) as reader:
 
 		# 0: variable names, 1: descriptions
 		step_names = reader.fieldnames[2:]
@@ -451,14 +507,16 @@ def build_facility_dict(data_folder,file,skip_rows=["notes", "sources", "key_equ
 				ratios  = ensure_list(block.get("constituent_ratio"), cast=float)
 				elims   = ensure_list(block.get("target_constituents_eliminated"), cast=float)
 
-				new[name] = {
+				entry = new.setdefault(name, {
 					"name_long": block.get("name_long"),
-					"targets": dict(
-						(t, {"ratio": r, "elim": e, "usage": 0, "abs_usage": 0, "total_cost": 0})
-						for t, r, e in zip(targets, ratios, elims)
-					),
+					"targets": {},
 					"units": block.get("units"),
-				}
+				})
+				for t, r, e in zip(targets, ratios, elims):
+					if t in entry["targets"]:
+						raise KeyError(f"Reagent '{name}' in step '{step}' declares target '{t}' more than once.")
+					entry["targets"][t] = {"ratio": r, "elim": e, "usage": 0, "abs_usage": 0, "total_cost": 0}
+					
 			mf["secondary_inputs"] = new
 
 			# ---- Primary outputs ----
@@ -599,10 +657,10 @@ def update_machines(sc, machine_rank):
 		updates[(fac_id, step_id)] = {"old": old_block, "new": new_block, "rank": rank_to_apply}
 	return updates
 
-def update_materials(sc, project_data, rank):
-	"""Apply project-specific material cost and impact overrides at a given rank.
+def update_materials(sc, pathway_data, rank):
+	"""Apply pathway-specific material cost and impact overrides at a given rank.
 
-	Reads from two keys in project_data (populated by build_data_dict):
+	Reads from two keys in pathway_data (populated by build_data_dict):
 	  material_cost.<material>.<rank>              -> facility.material_data[material]["cost"]
 	  material_impact.<material>.<category>.<rank> -> facility.material_data[material][category]
 
@@ -613,11 +671,11 @@ def update_materials(sc, project_data, rank):
 	Parameters
 	----------
 	sc          : SupplyChain
-	project_data: dict   -- single-project slice from build_data_dict
+	pathway_data: dict   -- single-pathway slice from build_data_dict
 	rank        : str    -- "optimistic", "midpoint", or "conservative"
 	"""
-	cost_overrides = project_data.get("material_cost",   {}) or {}
-	impact_overrides = project_data.get("material_impact", {}) or {}
+	cost_overrides = pathway_data.get("material_cost",   {}) or {}
+	impact_overrides = pathway_data.get("material_impact", {}) or {}
 	base_mat_data = sc.material_data
 
 	for fac in sc.facilities.values():
@@ -662,6 +720,12 @@ def _wrap_labels(labels, width=14):
 		else:
 			wrapped.append('\n'.join(tw.wrap(s)))
 	return wrapped
+
+def cost_series_colors(series_keys, palette=None):
+	keys = list(series_keys)
+	if palette and keys and all(k in palette for k in keys):
+		return palette
+	return None
 
 def plot_stacked_bars(labels, series_dict, *,
 	stack_order=None,                 # list of series labels from bottom -> top
@@ -733,18 +797,47 @@ def plot_stacked_bars(labels, series_dict, *,
  
 	pos = np.arange(n)
  
-	# Draw stacked bars
-	running = np.zeros(n, dtype=float)
+	# Draw stacked bars - include negatives
+	pos_run = np.zeros(n, dtype=float)
+	neg_run = np.zeros(n, dtype=float)
 	handle_map = {}
 	for name in order:
 		clr = (colors.get(name) if colors and name in colors else None)
+		v = np.maximum(data[name], 0.0)
 		if horiz:
-			h = ax.barh(pos, data[name], left=running, height=bar_thickness, label=name, color=clr)
+			h = ax.barh(pos, v, left=pos_run, height=bar_thickness, label=name, color=clr)
 		else:
-			h = ax.bar(pos, data[name], bottom=running, label=name, color=clr)
+			h = ax.bar(pos, v, bottom=pos_run, label=name, color=clr)
 		handle_map[name] = h
-		running += data[name]
- 
+		pos_run = pos_run + v
+
+	credit_top = pos_run.copy()
+	for name in order:
+		v = np.minimum(data[name], 0.0)
+		if not (v < 0.0).any():
+			continue
+		clr = (colors.get(name) if colors and name in colors else None)
+		k = v < 0.0
+		if horiz:
+			ax.barh(pos[k], -v[k], left=(credit_top + v)[k], height=bar_thickness,
+				facecolor='none', edgecolor=(clr or 'black'), hatch='///', linewidth=1.2, zorder=3)
+		else:
+			ax.bar(pos[k], -v[k], bottom=(credit_top + v)[k],
+				facecolor='none', edgecolor=(clr or 'black'), hatch='///', linewidth=1.2, zorder=3)
+		credit_top = credit_top + v
+		neg_run = neg_run + v
+	running = pos_run + neg_run
+
+	signed = bool((neg_run < 0.0).any())
+	if signed:
+		m = neg_run < 0.0
+		if horiz:
+			ax.plot(running[m], pos[m], linestyle='none', marker='D', markersize=8,
+				color='black', markeredgecolor='white', markeredgewidth=1.2, zorder=7)
+		else:
+			ax.plot(pos[m], running[m], linestyle='none', marker='D', markersize=8,
+				color='black', markeredgecolor='white', markeredgewidth=1.2, zorder=7)
+
 	# Error bars
 	if err_low is not None or err_high is not None:
 		_low  = np.asarray(err_low  if err_low  is not None else np.zeros(n), dtype=float) * yscale
@@ -818,8 +911,9 @@ def plot_stacked_bars(labels, series_dict, *,
 		if ylims is not None:
 			ax.set_xlim(ylims)
 		else:
-			xmax = ax.get_xlim()[1]
-			ax.set_xlim(0, xmax * (1 + top_margin))
+			xmin, xmax = ax.get_xlim()
+			lo = min(0.0, xmin) * (1 + top_margin)
+			ax.set_xlim(lo, xmax * (1 + top_margin))
 		if xlims is not None:
 			ax.set_ylim(xlims)
 	else:
@@ -828,8 +922,9 @@ def plot_stacked_bars(labels, series_dict, *,
 		if ylims is not None:
 			ax.set_ylim(ylims)
 		else:
-			ymax = ax.get_ylim()[1]
-			ax.set_ylim(0, ymax * (1 + top_margin))
+			ymin, ymax = ax.get_ylim()
+			lo = min(0.0, ymin) * (1 + top_margin)
+			ax.set_ylim(lo, ymax * (1 + top_margin))
 
 	if xticks is not None:
 		ax.set_xticks(list(xticks))
@@ -848,7 +943,7 @@ def plot_stacked_bars(labels, series_dict, *,
  
 	plt.tight_layout()
 
-	plt.savefig("output", dpi=300, bbox_inches="tight")
+	# plt.savefig("output", dpi=300, bbox_inches="tight")
 	if show:
 		plt.show()
 	return fig, ax
@@ -869,8 +964,8 @@ def plot_production_curve(apvs,avg_costs,xscale=1,yscale=1,title='APV vs Average
 	plt.show()
 	return fig
 
-def plot_project_summaries(
-	project_summaries: dict,
+def plot_pathway_summaries(
+	pathway_summaries: dict,
 	*,
 	x_key: str = "avg_var_cost",
 	y_key: str = "avg_co2",
@@ -878,7 +973,7 @@ def plot_project_summaries(
 	center_scenario: str = "midpoint",
 	low_scenario: str = "conservative",
 	high_scenario: str = "optimistic",
-	project_markers=None,
+	pathway_markers=None,
 	size_range=(60, 500),   # scatter "s" (area) range
 	alpha=0.85,
 	edgecolor="black",
@@ -892,25 +987,25 @@ def plot_project_summaries(
 	figsize=(10, 6),
 ):
 	"""
-	Plot nested project_summaries dict:
-	  project_summaries[project][scenario][metric] -> value
+	Plot nested pathway_summaries dict:
+	  pathway_summaries[pathway][scenario][metric] -> value
 
 	X: cost_key (default avg_cost)
 	Y: co2_key  (default avg_co2)
 	Size: size_key (default apv)
 	Color: scenario
-	Marker: project
+	Marker: pathway
 	"""
 
 	# ----------------------------
 	# 1) Flatten to DataFrame
 	# ----------------------------
 	rows = []
-	for project, scenarios in project_summaries.items():
+	for pathway, scenarios in pathway_summaries.items():
 		for scenario, metrics in scenarios.items():
 			rows.append(
 				{
-					"project": project,
+					"pathway": pathway,
 					"scenario": scenario,
 					x_key: metrics.get(x_key, np.nan),
 					y_key: metrics.get(y_key, np.nan),
@@ -923,7 +1018,7 @@ def plot_project_summaries(
 	df = df[df["scenario"].isin([low_scenario, center_scenario, high_scenario])].copy()
 
 	# Pivot so we have columns like (avg_cost, midpoint), etc.
-	piv = df.pivot_table(index="project", columns="scenario", values=[x_key, y_key, size_key], aggfunc="first")
+	piv = df.pivot_table(index="pathway", columns="scenario", values=[x_key, y_key, size_key], aggfunc="first")
 
 	# Helper to safely extract a series
 	def col(metric, scenario):
@@ -943,27 +1038,27 @@ def plot_project_summaries(
 	s_c = col(size_key, center_scenario).astype(float)
 	# If size missing at midpoint, fall back to any available size
 	if s_c.isna().all():
-		s_c = df[df["scenario"] == center_scenario].set_index("project")[size_key]
+		s_c = df[df["scenario"] == center_scenario].set_index("pathway")[size_key]
 	if s_c.isna().any():
 		s_any = (
 			df.dropna(subset=[size_key])
-			  .drop_duplicates(subset=["project"])
-			  .set_index("project")[size_key]
+			  .drop_duplicates(subset=["pathway"])
+			  .set_index("pathway")[size_key]
 		)
 		s_c = s_c.fillna(s_any)
 
-	# Drop projects missing center x/y
+	# Drop pathway missing center x/y
 	ok = x_c.notna() & y_c.notna()
 	x_c, y_c, x_lo, x_hi, y_lo, y_hi, s_c = [v[ok] for v in (x_c, y_c, x_lo, x_hi, y_lo, y_hi, s_c)]
 
-	projects = x_c.index.tolist()
+	pathways = x_c.index.tolist()
 
 	# ----------------------------
 	# 2) Markers and size scaling
 	# ----------------------------
-	if project_markers is None:
+	if pathway_markers is None:
 		marker_cycle = ["o", "s", "^", "D", "P", "X", "v", "<", ">", "h", "*"]
-		project_markers = {p: marker_cycle[i % len(marker_cycle)] for i, p in enumerate(projects)}
+		pathway_markers = {p: marker_cycle[i % len(marker_cycle)] for i, p in enumerate(pathways)}
 
 	def scale_sizes(values, out_min, out_max):
 		v = np.asarray(values, dtype=float)
@@ -996,15 +1091,15 @@ def plot_project_summaries(
 		fig = ax.figure
 
 	# ----------------------------
-	# 5) Plot: one errorbar per project (to allow per-project markers)
+	# 5) Plot: one errorbar per pathway (to allow per-pathway markers)
 	# ----------------------------
-	for i, project in enumerate(projects):
+	for i, pathway in enumerate(pathways):
 		ax.errorbar(
-			x_c.loc[project],
-			y_c.loc[project],
+			x_c.loc[pathway],
+			y_c.loc[pathway],
 			xerr=np.array([[xerr_low[i]], [xerr_high[i]]]),
 			yerr=np.array([[yerr_low[i]], [yerr_high[i]]]),
-			fmt=project_markers.get(project, "o"),
+			fmt=pathway_markers.get(pathway, "o"),
 			markersize=np.sqrt(sizes[i]) / 1.8,  # convert scatter area-ish to a reasonable marker size
 			mfc="white",
 			mec=edgecolor,
@@ -1018,8 +1113,8 @@ def plot_project_summaries(
 
 		if annotate:
 			ax.annotate(
-				project,
-				(x_c.loc[project], y_c.loc[project]),
+				pathway,
+				(x_c.loc[pathway], y_c.loc[pathway]),
 				textcoords="offset points",
 				xytext=(6, 6),
 				fontsize=9,
@@ -1048,19 +1143,19 @@ def plot_project_summaries(
 	# ----------------------------
 	# 7) Legends
 	# ----------------------------
-	# Marker legend for projects
-	project_handles = [
-		Line2D([], [], marker=project_markers[p], linestyle="", color="gray", label=p, markersize=8)
-		for p in projects
+	# Marker legend for pathways
+	pathway_handles = [
+		Line2D([], [], marker=pathway_markers[p], linestyle="", color="gray", label=p, markersize=8)
+		for p in pathways
 	]
-	ax.legend(handles=project_handles, title="Project", loc="upper left", bbox_to_anchor=(1.05, 1.0), frameon=True)
+	ax.legend(handles=pathway_handles, title="Pathway", loc="upper left", bbox_to_anchor=(1.05, 1.0), frameon=True)
 
 	# ----------------------------
 	# 8) Axes formatting
 	# ----------------------------
 	ax.set_xlabel(x_key)
 	ax.set_ylabel(y_key)
-	ax.set_title(f"Project Summary (center={center_scenario}, range={low_scenario}→{high_scenario})")
+	ax.set_title(f"Pathway Summary (center={center_scenario}, range={low_scenario}→{high_scenario})")
 
 	ax.set_xlim(left=0)
 	ax.set_ylim(bottom=0)
@@ -1078,7 +1173,9 @@ def plot_tornado(
 	title=None,
 	xlab=None,
 	show=True,
+	colors=None,
 	):
+	colors = colors or {}
 	baseline = tornado_data["baseline"][metric]
 
 	# Build flat list of (label, opt_val, con_val)
@@ -1106,9 +1203,9 @@ def plot_tornado(
 	fig, ax = plt.subplots(figsize=(10, max(4, len(entries) * 0.7 + 1.5)))
 
 	# Conservative bars — extend right (worse outcome)
-	ax.barh(y, con_vals - baseline, left=baseline, color="#f28e2b", label="Conservative", zorder=3)
+	ax.barh(y, con_vals - baseline, left=baseline, color=colors.get("conservative"), label="Conservative", zorder=3)
 	# Optimistic bars — extend left (better outcome, negative width)
-	ax.barh(y, opt_vals - baseline, left=baseline, color="#4e79a7", label="Optimistic", zorder=3)
+	ax.barh(y, opt_vals - baseline, left=baseline, color=colors.get("optimistic"), label="Optimistic", zorder=3)
 
 	ax.axvline(baseline, color="black", linewidth=1.0, zorder=4)
 	ax.set_yticks(y)
@@ -1123,8 +1220,6 @@ def plot_tornado(
 		plt.show()
 	return fig, ax
 
-
-
 # ---------------------------------------------------------------------------
 # Thacker Pass presentation aggregation
 # ---------------------------------------------------------------------------
@@ -1133,7 +1228,7 @@ def plot_tornado(
 # Each entry: (display_label, [step_names_to_aggregate]).
 # Step names must match the labels produced by _build_steps_cost_series and
 # _build_steps_impact_series (i.e. step.step_name / transport.name / normalised
-# sink names "Tailings" and "Wastewater Treatment").
+# sink names "Waste Rock Pile", "Tailings Management" and "Wastewater Treatment").
 # Both "Hauling" and "Ore transport via truck" are included so the mapping
 # is robust regardless of which name the transport leg uses.
 _THACKER_PASS_GROUPS = [
@@ -1152,7 +1247,9 @@ _THACKER_PASS_GROUPS = [
 	("Other Li\u2082CO\u2083\nproduction steps",
 		["Thickening and dewatering", "Washing & purification", "Drying & packaging"]),
 	("Tailings &\nwater management",
-		["Tailings", "Wastewater Treatment"]),
+		["Waste Rock Pile", "Tailings Management", "Wastewater Treatment"]),
+	("On-site acid\nplant",
+		["Sulfur burning", "Acid absorption"]),
 ]
 
 
@@ -1178,6 +1275,10 @@ def _aggregate_step_series(labels, series, groups):
 	Values for unmatched step names are excluded (not bucketed elsewhere).
 	"""
 	label_to_idx = {lbl: i for i, lbl in enumerate(labels)}
+	grouped = {sname for _, step_names in groups for sname in step_names}
+	unmatched = [lbl for lbl in labels if lbl not in grouped]
+	if unmatched:
+		raise ValueError(f"Steps present in the series but absent from the group table: {unmatched}")
 	agg_labels = []
 	agg_series = {k: [] for k in series}
 
@@ -1196,7 +1297,7 @@ def _aggregate_step_series(labels, series, groups):
 
 def thacker_pass_steps_aggregated(
 	sc,
-	project_data,
+	pathway_data,
 	apv,
 	*,
 	view="opex",
@@ -1214,6 +1315,8 @@ def thacker_pass_steps_aggregated(
 	xticks_cost=None,
 	ylims_emissions=None,
 	xticks_emissions=None,
+	cost_colors=None,
+	imp_colors=None,
 ):
 	"""
 	Plot Thacker Pass costs and emissions with steps aggregated into
@@ -1226,8 +1329,8 @@ def thacker_pass_steps_aggregated(
 
 	Parameters
 	----------
-	sc           : SupplyChain  (facilities already built via evaluate_project)
-	project_data : dict
+	sc           : SupplyChain  (facilities already built via evaluate_pathway)
+	pathway_data : dict
 	apv          : float        annual production volume (kg Li2CO3)
 	view         : str          cost view for _build_steps_cost_series (default "opex")
 	impact       : str          impact category key (default "co2")
@@ -1260,7 +1363,7 @@ def thacker_pass_steps_aggregated(
 	# Conservative scenario
 	# ------------------------------------------------------------------
 	update_machines(sc, "conservative")
-	update_materials(sc, project_data, "conservative")
+	update_materials(sc, pathway_data, "conservative")
 	sc.update_apv(apv, recalc=True)
 
 	con_labels, con_cost_raw, _ = sc._build_steps_cost_series(
@@ -1277,7 +1380,7 @@ def thacker_pass_steps_aggregated(
 	# Optimistic scenario
 	# ------------------------------------------------------------------
 	update_machines(sc, "optimistic")
-	update_materials(sc, project_data, "optimistic")
+	update_materials(sc, pathway_data, "optimistic")
 	sc.update_apv(apv, recalc=True)
 
 	opt_labels, opt_cost_raw, _ = sc._build_steps_cost_series(
@@ -1294,7 +1397,7 @@ def thacker_pass_steps_aggregated(
 	# Midpoint scenario  (defines bar values and stack order)
 	# ------------------------------------------------------------------
 	update_machines(sc, "midpoint")
-	update_materials(sc, project_data, "midpoint")
+	update_materials(sc, pathway_data, "midpoint")
 	sc.update_apv(apv, recalc=True)
 
 	mid_labels, mid_cost_raw, cost_stack_order = sc._build_steps_cost_series(
@@ -1374,23 +1477,6 @@ def thacker_pass_steps_aggregated(
 		)
 
 	# ------------------------------------------------------------------
-	# Colors — match existing dissertation figure convention
-	# ------------------------------------------------------------------
-	cost_colors = {
-		"Material Costs":      "#4e79a7",
-		"Labor Costs":         "#f28e2b",
-		"Utility Costs":       "#59a14f",
-		"Other":               "#e15759",
-		"Tailings":            "#7b5ea7",
-		"Wastewater Treatment":"#b09bc7",  # lighter purple — adjacent to tailings
-	}
-	imp_colors = {
-		"Scope One":   "#f28e2b",
-		"Scope Two":   "#4e79a7",
-		"Scope Three": "#76b7b2",
-	}
-
-	# ------------------------------------------------------------------
 	# Plot 1: costs
 	# ------------------------------------------------------------------
 	plot_stacked_bars(
@@ -1433,7 +1519,7 @@ _JIANXIAWO_GROUPS = [
 		["Blasting with drilling and explosives", "Loading with excavator", "Hauling",
 		 "Ore transport via truck"]),
 	("Classification\n& flotation",
-		["Classification"]),
+		["Classification", "Froth Flotation circuit", "Thickening"]),
 	("Sulfate roasting",
 		["Roasting of lepidolate with sulfate salts"]),
 	("Other roast-leach\nsteps",
@@ -1444,12 +1530,12 @@ _JIANXIAWO_GROUPS = [
 	("Other Li\u2082CO\u2083\nproduction steps",
 		["Thickening and dewatering", "Washing & purification", "Drying & packaging"]),
 	("Tailings &\nwater management",
-		["Tailings", "Wastewater Treatment"]),
+		["Waste Rock Pile", "Tailings Management", "Wastewater Treatment"]),
 ]
 
 def jianxiawo_steps_aggregated(
 	sc,
-	project_data,
+	pathway_data,
 	apv,
 	*,
 	view="opex",
@@ -1467,6 +1553,8 @@ def jianxiawo_steps_aggregated(
 	xticks_cost=None,
 	ylims_emissions=None,
 	xticks_emissions=None,
+	cost_colors=None,
+	imp_colors=None,
 ):
 	"""
 	Plot Jianxiawo costs and emissions with steps aggregated into
@@ -1478,8 +1566,8 @@ def jianxiawo_steps_aggregated(
 
 	Parameters
 	----------
-	sc           : SupplyChain  (facilities already built via evaluate_project)
-	project_data : dict
+	sc           : SupplyChain  (facilities already built via evaluate_pathway)
+	pathway_data : dict
 	apv          : float        annual production volume (kg Li2CO3)
 	view         : str          cost view for _build_steps_cost_series (default "opex")
 	impact       : str          impact category key (default "co2")
@@ -1511,7 +1599,7 @@ def jianxiawo_steps_aggregated(
 	# Conservative scenario
 	# ------------------------------------------------------------------
 	update_machines(sc, "conservative")
-	update_materials(sc, project_data, "conservative")
+	update_materials(sc, pathway_data, "conservative")
 	sc.update_apv(apv, recalc=True)
 
 	con_labels, con_cost_raw, _ = sc._build_steps_cost_series(
@@ -1528,7 +1616,7 @@ def jianxiawo_steps_aggregated(
 	# Optimistic scenario
 	# ------------------------------------------------------------------
 	update_machines(sc, "optimistic")
-	update_materials(sc, project_data, "optimistic")
+	update_materials(sc, pathway_data, "optimistic")
 	sc.update_apv(apv, recalc=True)
 
 	opt_labels, opt_cost_raw, _ = sc._build_steps_cost_series(
@@ -1545,7 +1633,7 @@ def jianxiawo_steps_aggregated(
 	# Midpoint scenario
 	# ------------------------------------------------------------------
 	update_machines(sc, "midpoint")
-	update_materials(sc, project_data, "midpoint")
+	update_materials(sc, pathway_data, "midpoint")
 	sc.update_apv(apv, recalc=True)
 
 	mid_labels, mid_cost_raw, cost_stack_order = sc._build_steps_cost_series(
@@ -1619,23 +1707,6 @@ def jianxiawo_steps_aggregated(
 			f"Average {impact.upper()} (kg/t Li\u2082CO\u2083)"
 			if mode == "average" else f"Total {impact.upper()} (kg)"
 		)
-
-	# ------------------------------------------------------------------
-	# Colors — match existing dissertation figure convention
-	# ------------------------------------------------------------------
-	cost_colors = {
-		"Material Costs":      "#4e79a7",
-		"Labor Costs":         "#f28e2b",
-		"Utility Costs":       "#59a14f",
-		"Other":               "#e15759",
-		"Tailings":            "#7b5ea7",
-		"Wastewater Treatment":"#b09bc7",
-	}
-	imp_colors = {
-		"Scope One":   "#f28e2b",
-		"Scope Two":   "#4e79a7",
-		"Scope Three": "#76b7b2",
-	}
 
 	# ------------------------------------------------------------------
 	# Plot 1: costs

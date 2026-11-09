@@ -1,0 +1,38 @@
+<fulfillmentToken fulfillmentType="loan" auth="user" xmlns="http://ns.adobe.com/adept">
+  <distributor>urn:uuid:501e16ca-f45c-4a0c-9a9f-8a270a9f2ed6</distributor>
+  <operatorURL>https://rps2images.ebscohost.com/fulfillment</operatorURL>
+  <transaction>s8368349:61230668:2003848:1770660830368:1034532479</transaction>
+  <purchase>2026-02-09T18:13:50+00:00</purchase>
+  <expiration>2026-02-10T00:13:50+00:00</expiration>
+  <resourceItemInfo>
+    <resource>urn:uuid:20979255-03b1-4ea9-b62d-4e1acfaf90dd</resource>
+    <resourceItem>0</resourceItem>
+    <metadata>
+      <dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">SME Mineral Processing and Extractive Metallurgy Handbook</dc:title>
+      <dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">S. Komar Kawatra;Courtney A. Young;</dc:creator>
+      <dc:publisher xmlns:dc="http://purl.org/dc/elements/1.1/">Society for Mining Metallurgy &amp; Exploration</dc:publisher>
+      <dc:format xmlns:dc="http://purl.org/dc/elements/1.1/">application/pdf</dc:format>
+      <dc:language xmlns:dc="http://purl.org/dc/elements/1.1/">eng</dc:language>
+    </metadata>
+    <licenseToken>
+      <resource>urn:uuid:20979255-03b1-4ea9-b62d-4e1acfaf90dd</resource>
+      <permissions>
+        <display>
+          <until>2026-03-23T18:13:50+00:00</until>
+        </display>
+        <excerpt>
+          <until>2026-03-23T18:13:50+00:00</until>
+          <count initial="100"/>
+        </excerpt>
+        <print>
+          <until>2026-03-23T18:13:50+00:00</until>
+          <count initial="100"/>
+        </print>
+        <play>
+          <until>2026-03-23T18:13:50+00:00</until>
+        </play>
+      </permissions>
+    </licenseToken>
+  </resourceItemInfo>
+  <hmac>kmUsNeiM0rp+kd4DTJych7hrOTs=</hmac>
+</fulfillmentToken>
