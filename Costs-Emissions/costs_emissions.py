@@ -1,11 +1,12 @@
 import re
 import argparse
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
-
+from config import DATA_FILE
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -24,14 +25,12 @@ def parse_num(x):
 	except ValueError:
 		return np.nan
 
-
 def nanrange(arr):
 	"""Return (min, max) of finite values, or (NaN, NaN) if none."""
 	finite = arr[np.isfinite(arr)]
 	if len(finite) == 0:
 		return np.nan, np.nan
 	return finite.min(), finite.max()
-
 
 def nice_tick(data_range, n_ticks_target=6):
 	raw       = data_range / n_ticks_target
@@ -43,17 +42,15 @@ def nice_tick(data_range, n_ticks_target=6):
 	else:                nice = 10
 	return nice * magnitude
 
-
 def clean_col_label(col):
 	"""Strip pandas .N duplicate suffixes and tidy for display."""
 	return re.sub(r'\.\d+$', '', col).strip()
-
 
 # ---------------------------------------------------------------------------
 # Column definitions
 # ---------------------------------------------------------------------------
 
-METADATA_COLS = {"Pathway", "Company", "Location", "Material", "Dimension"}
+METADATA_COLS = {"Pathway", "Company", "Location", "Material", "Dimension", "Scenario"}
 
 OUR_COLS = {
 	"low":  "Our Study-Low",
@@ -108,18 +105,21 @@ def plot_cost_vs_emissions(
 	lit_alpha:      float = 0.18,
 	our_edge_alpha: float = 0.90,
 	lit_edge_alpha: float = 0.45,
-	show_lit_lines:      bool = False,   # draw dashed reference lines inside boxes
-	show_lit_labels:     bool = False,   # label those lines (ignored if show_lit_lines=False)
-	show_pathway_labels: bool = True,    # annotate each pathway with its name
-	show_legend:         bool = False,   # show the legend
-	lit_only:            bool = False,   # show only literature ranges, hide Our Study boxes
-	top_n:               int  = None,    # if set, use Our Study-Low-{N}/High-{N} as box bounds
-	pathway_hatches:     dict = None,    # {pathway: hatch pattern} for Our Study boxes
+	hide_literature: 	 bool = False,		# Hides/shows the literature bounding boxes
+	show_lit_lines:      bool = False,  	# draw dashed reference lines inside boxes
+	show_lit_labels:     bool = False,  	# label those lines (ignored if show_lit_lines=False)
+	show_pathway_labels: bool = True,   	# annotate each pathway with its name
+	show_legend:         bool = False,  	# show the legend
+	lit_only:            bool = False,  	# show only literature ranges, hide Our Study boxes
+	top_n:               int  = None,   	# if set, use Our Study-Low-{N}/High-{N} as box bounds
+	pathway_hatches:     dict = None,    	# {pathway: hatch pattern} for Our Study boxes
+	scenarios: tuple = ("", "Base", "Both"),# Identifies the rows to show based on their scenario flag
+	sheet_name: str = "Reported Values"		# 
 ):
 	# ------------------------------------------------------------------
 	# Load & parse
 	# ------------------------------------------------------------------
-	df = pd.read_csv(csv_path)
+	df = pd.read_excel(csv_path, sheet_name=sheet_name) if str(csv_path).endswith(".xlsx") else pd.read_csv(csv_path)
 
 	# Extract the source_type metadata row (Dimension == "source_type") before
 	# any numeric parsing or pathway filtering. Fails loudly if missing.
@@ -133,6 +133,10 @@ def plot_cost_vs_emissions(
 	source_type_row = source_type_rows.iloc[0]
 	# Strip the source_type row from pathway data
 	df = df[df["Dimension"] != "source_type"].copy()
+
+	# Filter by scenario
+	scenario = df["Scenario"].fillna("").astype(str).str.strip() if "Scenario" in df.columns else pd.Series("", index=df.index)
+	df = df[scenario.isin(scenarios)].copy()
  
 	# Build {col: source_type} for all literature columns; default to peer_reviewed
 	col_source_type = {}
@@ -146,7 +150,7 @@ def plot_cost_vs_emissions(
 		df[c] = df[c].map(parse_num)
 
 	our_col_set = set(OUR_COLS.values())
-	lit_cols    = [c for c in numeric_cols
+	lit_cols    = [] if hide_literature else [c for c in numeric_cols
 	               if c not in our_col_set and not c.startswith("Our Study")]
 
 	# Resolve which low/high columns to use for the Our Study bounding box.
@@ -516,7 +520,7 @@ if __name__ == "__main__":
 		save_path = "cost_vs_emissions.png"
 
 	plot_cost_vs_emissions(
-		"reported_both.csv",
+		DATA_FILE,
 		save_path=save_path,
 		show_lit_lines=args.lit_lines,
 		show_lit_labels=args.lit_labels,

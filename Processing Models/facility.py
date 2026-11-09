@@ -3,7 +3,7 @@ import copy
 from collections import defaultdict
 
 from production_step import ProductionStep
-from helpers import plot_stacked_bars, plot_production_curve
+from plotting import plot_stacked_bars, plot_production_curve
 
 # Define a class for the production environment
 class Facility:

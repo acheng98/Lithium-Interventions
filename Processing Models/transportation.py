@@ -3,8 +3,6 @@ import copy
 import math
 from collections import defaultdict
 
-from helpers import safe_float, parse_numeric
-
 # Define a class for the production environment
 class Transportation:
 	def __init__(

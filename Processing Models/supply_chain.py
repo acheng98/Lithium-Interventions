@@ -5,7 +5,7 @@ import copy
 from facility import Facility, ReagentFacility
 from production_step import ProductionStep
 from transportation import Transportation, TransportRoute
-from helpers import plot_stacked_bars, plot_production_curve, cost_series_colors
+from plotting import plot_stacked_bars, plot_production_curve, cost_series_colors
 
 # Define a class for the supply chain
 class SupplyChain:

@@ -5,7 +5,6 @@ from collections import defaultdict
 
 from helpers import safe_float, safe_bool
 
-
 # Define a class for each step of the PBCM
 class ProductionStep:
 	def __init__(self,
