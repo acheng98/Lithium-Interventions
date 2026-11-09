@@ -53,7 +53,7 @@ def clean_col_label(col):
 # Column definitions
 # ---------------------------------------------------------------------------
 
-METADATA_COLS = {"Project", "Company", "Location", "Material", "Dimension"}
+METADATA_COLS = {"Pathway", "Company", "Location", "Material", "Dimension"}
 
 OUR_COLS = {
 	"low":  "Our Study-Low",
@@ -101,7 +101,7 @@ COST_LINE_STYLES = {
 
 def plot_cost_vs_emissions(
 	csv_path:       str,
-	title:          str   = "Cost vs. Emissions by project",
+	title:          str   = "Cost vs. Emissions by pathway",
 	figsize:        tuple = (9, 6),   # no longer needs to be square
 	save_path:      str   = None,     # None → use default; False → don't save
 	our_alpha:      float = 0.55,
@@ -110,11 +110,11 @@ def plot_cost_vs_emissions(
 	lit_edge_alpha: float = 0.45,
 	show_lit_lines:      bool = False,   # draw dashed reference lines inside boxes
 	show_lit_labels:     bool = False,   # label those lines (ignored if show_lit_lines=False)
-	show_project_labels: bool = True,    # annotate each project with its name
+	show_pathway_labels: bool = True,    # annotate each pathway with its name
 	show_legend:         bool = False,   # show the legend
 	lit_only:            bool = False,   # show only literature ranges, hide Our Study boxes
 	top_n:               int  = None,    # if set, use Our Study-Low-{N}/High-{N} as box bounds
-	project_hatches:     dict = None,    # {project: hatch pattern} for Our Study boxes
+	pathway_hatches:     dict = None,    # {pathway: hatch pattern} for Our Study boxes
 ):
 	# ------------------------------------------------------------------
 	# Load & parse
@@ -122,7 +122,7 @@ def plot_cost_vs_emissions(
 	df = pd.read_csv(csv_path)
 
 	# Extract the source_type metadata row (Dimension == "source_type") before
-	# any numeric parsing or project filtering. Fails loudly if missing.
+	# any numeric parsing or pathway filtering. Fails loudly if missing.
 	source_type_rows = df[df["Dimension"] == "source_type"]
 	if source_type_rows.empty:
 		raise SystemExit(
@@ -131,7 +131,7 @@ def plot_cost_vs_emissions(
 			"as 'peer_reviewed', 'disclosure', or 'grey_lit'."
 		)
 	source_type_row = source_type_rows.iloc[0]
-	# Strip the source_type row from project data
+	# Strip the source_type row from pathway data
 	df = df[df["Dimension"] != "source_type"].copy()
  
 	# Build {col: source_type} for all literature columns; default to peer_reviewed
@@ -176,22 +176,22 @@ def plot_cost_vs_emissions(
 	emiss_df = df[df["Dimension"] == "Emissions"].copy()
 
 	# ------------------------------------------------------------------
-	# Identify modelled projects (Our Study data in BOTH dimensions)
+	# Identify modelled pathways (Our Study data in BOTH dimensions)
 	# ------------------------------------------------------------------
 	our_vals       = list(OUR_COLS.values())
 	cost_our_mask  = cost_df[our_vals].notna().any(axis=1)
 	emiss_our_mask = emiss_df[our_vals].notna().any(axis=1)
-	cost_with_our  = set(cost_df.loc[cost_our_mask,  "Project"])
-	emiss_with_our = set(emiss_df.loc[emiss_our_mask, "Project"])
-	both_projects  = cost_with_our & emiss_with_our
+	cost_with_our  = set(cost_df.loc[cost_our_mask,  "Pathway"])
+	emiss_with_our = set(emiss_df.loc[emiss_our_mask, "Pathway"])
+	both_pathways  = cost_with_our & emiss_with_our
 
 	# ------------------------------------------------------------------
-	# Build per-project records
+	# Build per-pathway records
 	# ------------------------------------------------------------------
 	records = []
-	for project in sorted(both_projects):
-		crow = cost_df[cost_df["Project"] == project].iloc[0]
-		erow = emiss_df[emiss_df["Project"] == project].iloc[0]
+	for pathway in sorted(both_pathways):
+		crow = cost_df[cost_df["Pathway"] == pathway].iloc[0]
+		erow = emiss_df[emiss_df["Pathway"] == pathway].iloc[0]
 
 		material = crow["Material"]
 
@@ -209,7 +209,7 @@ def plot_cost_vs_emissions(
 		lit_e_lo, lit_e_hi = nanrange(lit_emiss_vals)
 
 		records.append(dict(
-			project=project, material=material,
+			pathway=pathway, material=material,
 			c_lo=c_lo, c_mid=c_mid, c_hi=c_hi,
 			e_lo=e_lo, e_mid=e_mid, e_hi=e_hi,
 			lit_c_lo=lit_c_lo, lit_c_hi=lit_c_hi,
@@ -217,28 +217,28 @@ def plot_cost_vs_emissions(
 		))
 
 	if not records:
-		raise ValueError("No projects found with Our Study data in both cost and emissions.")
+		raise ValueError("No pathways found with Our Study data in both cost and emissions.")
 
 	# ------------------------------------------------------------------
-	# Collect literature reference values for modelled projects
+	# Collect literature reference values for modelled pathways
 	# cost_lit_lines : {col: [val, ...]}  → vertical lines (x = cost value)
 	# emiss_lit_lines: {col: [val, ...]}  → horizontal lines (y = emiss value)
 	# ------------------------------------------------------------------
-	modelled_cost  = cost_df[cost_df["Project"].isin(both_projects)]
-	modelled_emiss = emiss_df[emiss_df["Project"].isin(both_projects)]
+	modelled_cost  = cost_df[cost_df["Pathway"].isin(both_pathways)]
+	modelled_emiss = emiss_df[emiss_df["Pathway"].isin(both_pathways)]
 
-	# {col: {project: val}} — preserves which project each value belongs to
+	# {col: {pathway: val}} — preserves which pathway each value belongs to
 	cost_lit_lines  = {}
 	emiss_lit_lines = {}
 	for c in lit_cols:
 		if c in modelled_cost.columns:
-			by_project = modelled_cost.set_index("Project")[c].dropna().to_dict()
-			if by_project:
-				cost_lit_lines[c] = by_project
+			by_pathway = modelled_cost.set_index("Pathway")[c].dropna().to_dict()
+			if by_pathway:
+				cost_lit_lines[c] = by_pathway
 		if c in modelled_emiss.columns:
-			by_project = modelled_emiss.set_index("Project")[c].dropna().to_dict()
-			if by_project:
-				emiss_lit_lines[c] = by_project
+			by_pathway = modelled_emiss.set_index("Pathway")[c].dropna().to_dict()
+			if by_pathway:
+				emiss_lit_lines[c] = by_pathway
 
 	# ------------------------------------------------------------------
 	# Axis limits: each axis sized tightly to data, tick spacing fixed
@@ -265,12 +265,12 @@ def plot_cost_vs_emissions(
 	# clipping lit lines. Each record contributes up to two boxes.
 	# ------------------------------------------------------------------
 	# Only literature bounding boxes — lit lines should not appear in Our Study boxes.
-	# Each entry includes the project name so lines are only drawn in their own box.
+	# Each entry includes the pathway name so lines are only drawn in their own box.
 	boxes = []
 	for r in records:
 		if (np.isfinite(r["lit_c_lo"]) and np.isfinite(r["lit_c_hi"]) and
 				np.isfinite(r["lit_e_lo"]) and np.isfinite(r["lit_e_hi"])):
-			boxes.append((r["project"], r["lit_c_lo"], r["lit_c_hi"], r["lit_e_lo"], r["lit_e_hi"]))
+			boxes.append((r["pathway"], r["lit_c_lo"], r["lit_c_hi"], r["lit_e_lo"], r["lit_e_hi"]))
 
 	# ------------------------------------------------------------------
 	# Plot
@@ -319,11 +319,11 @@ def plot_cost_vs_emissions(
 	# ---- Literature reference lines (clipped to lit box interiors) -------
 	if show_lit_lines:
 
-		def draw_vline_in_boxes(project, v, display_label, line_style):
-			"""Vertical line at x=v, drawn only inside the lit box for this project."""
+		def draw_vline_in_boxes(pathway, v, display_label, line_style):
+			"""Vertical line at x=v, drawn only inside the lit box for this pathway."""
 			label_y = None
 			for (proj, bx_lo, bx_hi, by_lo, by_hi) in boxes:
-				if proj == project and bx_lo <= v <= bx_hi:
+				if proj == pathway and bx_lo <= v <= bx_hi:
 					ax.plot([v, v], [by_lo, by_hi], zorder=4, **line_style)
 					label_y = by_hi if label_y is None else max(label_y, by_hi)
 			if show_lit_labels and label_y is not None:
@@ -333,11 +333,11 @@ def plot_cost_vs_emissions(
 							fontsize=LIT_LABEL_SIZE, color=LIT_LABEL_COLOR,
 							clip_on=True, zorder=7)
 
-		def draw_hline_in_boxes(project, v, display_label):
-			"""Horizontal line at y=v, drawn only inside the lit box for this project."""
+		def draw_hline_in_boxes(pathway, v, display_label):
+			"""Horizontal line at y=v, drawn only inside the lit box for this pathway."""
 			label_x = None
 			for (proj, bx_lo, bx_hi, by_lo, by_hi) in boxes:
-				if proj == project and by_lo <= v <= by_hi:
+				if proj == pathway and by_lo <= v <= by_hi:
 					ax.plot([bx_lo, bx_hi], [v, v],
 							color=LIT_LINE_COLOR, alpha=LIT_LINE_ALPHA,
 							linewidth=LIT_LINE_WIDTH, linestyle=LIT_LINE_STYLE,
@@ -350,19 +350,19 @@ def plot_cost_vs_emissions(
 							fontsize=LIT_LABEL_SIZE, color=LIT_LABEL_COLOR,
 							clip_on=True, zorder=7)
 
-		for col, by_project in cost_lit_lines.items():
+		for col, by_pathway in cost_lit_lines.items():
 			letter     = col_to_letter[col]
 			source     = col_source_type.get(col, "peer_reviewed")
 			line_style = COST_LINE_STYLES.get(source, COST_LINE_STYLES["peer_reviewed"])
-			for project, v in by_project.items():
-				draw_vline_in_boxes(project, v, letter, line_style)
+			for pathway, v in by_pathway.items():
+				draw_vline_in_boxes(pathway, v, letter, line_style)
 
-		for col, by_project in emiss_lit_lines.items():
+		for col, by_pathway in emiss_lit_lines.items():
 			letter = col_to_letter[col]
-			for project, v in by_project.items():
-				draw_hline_in_boxes(project, v, letter)
+			for pathway, v in by_pathway.items():
+				draw_hline_in_boxes(pathway, v, letter)
 
-	# ---- Per-project boxes and points --------------------------------
+	# ---- Per-pathway boxes and points --------------------------------
 	legend_handles = []
 	seen_materials = set()
 
@@ -393,7 +393,7 @@ def plot_cost_vs_emissions(
 				boxstyle="square,pad=0", linewidth=1.6,
 				edgecolor=(*rgb, our_edge_alpha),
 				facecolor=(*rgb, our_alpha), zorder=3,
-				hatch=(project_hatches or {}).get(r["project"]),
+				hatch=(pathway_hatches or {}).get(r["pathway"]),
 			))
 
 		# Midpoint
@@ -401,11 +401,11 @@ def plot_cost_vs_emissions(
 			ax.scatter(r["c_mid"], r["e_mid"], color=color, s=70,
 					   zorder=5, edgecolors="white", linewidths=0.8)
 
-		# Project label
-		if show_project_labels:
+		# Pathway label
+		if show_pathway_labels:
 			lx = r["c_mid"] if np.isfinite(r["c_mid"]) else (r["c_lo"] + r["c_hi"]) / 2
 			ly = r["e_mid"] if np.isfinite(r["e_mid"]) else (r["e_lo"] + r["e_hi"]) / 2
-			ax.annotate(r["project"], xy=(lx, ly), xytext=(-18, -15),
+			ax.annotate(r["pathway"], xy=(lx, ly), xytext=(-18, -15),
 						textcoords="offset points", fontsize=8, color=color, zorder=6)
 
 		# Legend entry (one per material type)
@@ -490,12 +490,12 @@ if __name__ == "__main__":
 	)
 	label_group = parser.add_mutually_exclusive_group()
 	label_group.add_argument(
-		"--project-labels", dest="project_labels", action="store_true", default=True,
-		help="Show project name labels on the figure (default)",
+		"--pathway-labels", dest="pathway_labels", action="store_true", default=True,
+		help="Show pathway name labels on the figure (default)",
 	)
 	label_group.add_argument(
-		"--no-project-labels", dest="project_labels", action="store_false",
-		help="Hide project name labels",
+		"--no-pathway-labels", dest="pathway_labels", action="store_false",
+		help="Hide pathway name labels",
 	)
 	parser.add_argument(
 		"--legend", dest="show_legend", action="store_true", default=False,
@@ -520,12 +520,12 @@ if __name__ == "__main__":
 		save_path=save_path,
 		show_lit_lines=args.lit_lines,
 		show_lit_labels=args.lit_labels,
-		show_project_labels=args.project_labels,
+		show_pathway_labels=args.pathway_labels,
 		show_legend=args.show_legend,
 		lit_only=args.lit_only,
 		top_n=args.top_n,
 	)
 
-# Fig 3 / Costs-Emissions: python3 costs_emissions.py --lit-lines --show-top 3 --no-project-labels --save
-# Fig 11 / Append Fig 2 / 7.3: python3 costs_emissions.py --lit-lines --no-project-labels --save --output "cost_vs_emissions_full.png"
-# Presentation literature only: python3 costs_emissions.py --lit-lines --no-project-labels --lit-only
+# Fig 3 / Costs-Emissions: python3 costs_emissions.py --lit-lines --show-top 3 --no-pathway-labels --save
+# Fig 11 / Append Fig 2 / 7.3: python3 costs_emissions.py --lit-lines --no-pathway-labels --save --output "cost_vs_emissions_full.png"
+# Presentation literature only: python3 costs_emissions.py --lit-lines --no-pathway-labels --lit-only

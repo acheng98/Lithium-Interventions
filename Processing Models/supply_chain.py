@@ -47,6 +47,9 @@ class SupplyChain:
 		self.avg_cost: float = 0.0
 		self.sink_costs: Dict[str, float] = {}
 		self.env_impacts: Dict[str, float] = {}
+		self.sink_labels: Dict[str, str] = {}
+		self.sink_stack_order: List[str] = []
+		self.sink_scope_two: set = set()
 
 		# Getter/report cache (invalidated on APV recalculation)
 		self._getter_cache: Dict[Tuple[Any, ...], Any] = {}
@@ -115,6 +118,11 @@ class SupplyChain:
 			return
 		self.sink_costs[sink_name] = float(cost_per_unit)
 		self._invalidate_getter_cache()
+
+	def sink_unit_cost(self, sink_name: str) -> float:
+		if sink_name not in self.sink_costs:
+			raise KeyError(f"No unit cost registered for sink '{sink_name}'. Register one with register_sink_cost (0.0 if intended).")
+		return self.sink_costs[sink_name]
 
 	def topo_order(self):
 		"""
@@ -461,7 +469,7 @@ class SupplyChain:
 				if not sink:
 					continue
 				volume		= float(props.get("volume", 0.0) or 0.0)
-				unit_cost	= self.sink_costs.get(sink, 0.0)
+				unit_cost	= self.sink_unit_cost(sink)
 				total_cost	= volume * unit_cost
 				# Use a compound key so two coproducts from the same step going to the same sink stay distinct
 				snap_id = f"{snap['step_id']}::{c_name}"
@@ -540,7 +548,7 @@ class SupplyChain:
 		"""
 		out: List[Dict[str, Any]] = []
 		for step_id, c_name, sink, volume in self.get_coproducts():
-			unit_cost = self.sink_costs.get(sink, 0.0)
+			unit_cost = self.sink_unit_cost(sink)
 			out.append({
 				"step_id":		step_id,
 				"step_name": 	step_id,
@@ -1131,12 +1139,7 @@ class SupplyChain:
 				cost = float(rec.get("total_cost", rec.get("variable_costs", 0.0)) or 0.0)
 				if detail == 2:
 					sink_name = rec.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
-					if sink_name in getattr(self, "sink_params", {}):
-						sink_name = "Tailings Management"
-					elif sink_name in getattr(self, "wastewater_params", {}):
-						sink_name = "Wastewater Treatment"
-					elif sink_name == "waste_pile":
-						sink_name = "Waste Rock Pile"
+					sink_name = self.sink_labels.get(sink_name, sink_name)
 					sink_cost_buf[sink_name] = sink_cost_buf.get(sink_name, 0.0) + cost
 				else:	# detail == 3: per-coproduct bar, skip zero-cost sinks
 					if cost == 0.0:
@@ -1247,8 +1250,7 @@ class SupplyChain:
 		if view == "total" and detail == 2:
 			stack_order = ["Fixed Costs", "Variable Costs"]
 		elif view == "opex" and detail == 2:
-			base_order = ["Material Costs", "Labor Costs", "Utility Costs", "Transport", 
-				"Waste Rock Pile", "Tailings Management", "Wastewater Treatment", "Other"]
+			base_order = ["Material Costs", "Labor Costs", "Utility Costs", "Transport"] + list(self.sink_stack_order) + ["Other"]
 			sink_keys = [k for k in series if k not in base_order]
 			stack_order = base_order + sink_keys
 		else:
@@ -1399,14 +1401,7 @@ class SupplyChain:
 			# Sink records: aggregate by sink name, flush zeros at the end
 			if kind == "sink":
 				sink_name = s.get("step_name", "Unknown Sink").rsplit(" (", 1)[0]
-				if sink_name in getattr(self, "sink_params", {}):
-					sink_name = "Tailings Management"
-				elif sink_name in getattr(self, "wastewater_params", {}):
-					sink_name = "Wastewater Treatment"
-				elif sink_name == "waste_pile":
-					sink_name = "Waste Rock Pile"
-				else:
-					continue
+				sink_name = self.sink_labels.get(sink_name, sink_name)
 				cost = float((s.get("costs") or {}).get("tot_var_cost", 0.0) or 0.0)
 				val = float((s.get("impacts") or {}).get(impact, 0.0) or 0.0)
 				scoped = 2 if s.get("sink_name") in (getattr(self, "sink_scope_two", set()) or set()) else 1

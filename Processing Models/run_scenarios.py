@@ -1,6 +1,7 @@
 import helpers
 from supply_chain import SupplyChain
-from facility import Facility, ReagentFacility, tailings_handling, load_sink_params, sink_s_out
+from facility import Facility, ReagentFacility
+from sinks import load_sink_params, tailings_handling, sink_s_out, sink_override_map, apply_sink_overrides
 from production_step import ProductionStep
 from transportation import Transportation, TransportRoute
 import matplotlib
@@ -287,27 +288,6 @@ def clay_lepidolite(sc,pathway_data,data_folder):
 
 	return sc 
 
-def _sink_override_map(nested):
-	return {(step_id, coproduct): sink
-		for step_id, coproducts in (nested or {}).items()
-		for coproduct, sink in (coproducts or {}).items() if sink}
-
-def apply_sink_overrides(sc,sink_overrides):
-	if not sink_overrides:
-		return
-	for (step_id,coproduct),sink in sink_overrides.items():
-		found = False
-		for fac in sc.rev:
-			step = fac.steps.get(step_id)
-			if step is None:
-				continue
-			if coproduct not in step.secondary_outputs:
-				raise KeyError(f"{step_id}: no secondary output '{coproduct}'")
-			step.secondary_outputs[coproduct]["sink"] = sink
-			found = True
-		if not found:
-			raise KeyError(f"sink override target step '{step_id}' not found")
-
 def evaluate_pathway(sc,pathway_data,data_folder,detail=1,plot=1,sink_overrides=None):
 	summary = {}
 	load_sink_params(sc, data_folder)
@@ -326,7 +306,7 @@ def evaluate_pathway(sc,pathway_data,data_folder,detail=1,plot=1,sink_overrides=
 	else:
 		raise ValueError(f"Pathway type '{pathway_type}' not defined.")
 
-	overrides = _sink_override_map(pathway_data.get("sink_override"))
+	overrides = sink_override_map(pathway_data.get("sink_override"))
 	overrides.update(sink_overrides or {})
 	apply_sink_overrides(sc,overrides)
 
@@ -393,7 +373,7 @@ def evaluate_pathway(sc,pathway_data,data_folder,detail=1,plot=1,sink_overrides=
 	if plot == 1:
 		# sc.plot_step_costs(mode="average",view="opex",detail=3,cost_colors=COST_SERIES_COLORS)
 		sc.plot_step_costs(mode="average",view="opex",detail=2,cost_colors=COST_SERIES_COLORS)
-		sc.plot_step_impacts(mode="average",cost_colors=COST_SERIES_COLORS)
+		sc.plot_step_impacts(mode="average",imp_colors=SCOPE_COLORS)
 		# sc.plot_step_costs(view="variable",detail=3,cost_colors=COST_SERIES_COLORS)
 		# sc.plot_step_costs(view="variable",detail=2,cost_colors=COST_SERIES_COLORS)
 		# sc.plot_tot_steps_impacts()
@@ -625,7 +605,10 @@ def tp_debug(sc, summary):
 	print(f"  {'Residual (maint+overhead+opex_excess)':<40} {avg_opex - subtotal:>14,.0f}")
 	print(f"{sep}\n")
 
-def compare_pathways(pathways,pathways_data,transp_data,loc_data,machine_data,material_data,write=False,detail=1,plot=1,
+def compare_pathways(pathways,pathways_data,transp_data,loc_data,machine_data,material_data,data_folder,
+	write=False,
+	detail=1,
+	plot=1,
 	ylims_cost=None,
 	xticks_cost=None,
 	ylims_emissions=None,
@@ -760,13 +743,13 @@ def pathway_outputs_to_csv(extracted_data, both_csv_path, col_suffix=""):
 		if col not in df.columns:
 			df[col] = None
  
-	for project, scens in extracted_data.items():
-		project_mask = df["Project"].astype(str) == str(project)
-		if not project_mask.any():
+	for pathway, scens in extracted_data.items():
+		pathway_mask = df["Pathway"].astype(str) == str(pathway)
+		if not pathway_mask.any():
 			continue
  
-		cost_mask  = project_mask & (df["Dimension"] == "Cost")
-		emiss_mask = project_mask & (df["Dimension"] == "Emissions")
+		cost_mask  = pathway_mask & (df["Dimension"] == "Cost")
+		emiss_mask = pathway_mask & (df["Dimension"] == "Emissions")
  
 		for scen, col in scen_to_col.items():
 			# Write avg_opex into Cost row
@@ -1217,7 +1200,7 @@ def run_all(pathways_data,transp_data,loc_data,machine_data,material_data,data_f
 			jx_apv = jx_data["Production Volume"]
 			sc_nc = SupplyChain(transp_data,loc_data,machine_data,material_data)
 			evaluate_pathway(sc_nc,jx_data,data_folder,detail=0,plot=0,
-				sink_overrides=_sink_override_map(jx_data.get("noncompliance_sink_override")))
+				sink_overrides=sink_override_map(jx_data.get("noncompliance_sink_override")))
 			helpers.update_machines(sc_nc,"midpoint")
 			helpers.update_materials(sc_nc,jx_data,"midpoint")
 			nc_summary = sc_nc.update_apv(jx_apv,recalc=True)
@@ -1831,7 +1814,7 @@ if __name__ == '__main__':
 	# plot_relocation(reloc,pathways_data,
 	# 	os.path.join(COST_EMISSIONS_DIR,"relocation_both.csv"),
 	# 	save_path=os.path.join(COST_EMISSIONS_DIR,"Current","relocation_cost_emissions.png"),
-	# 	pathway_labels=False)
+	# 	show_pathway_labels=False)
 
 
 
